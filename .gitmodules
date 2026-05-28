@@ -1,0 +1,3 @@
+[submodule "MCP-Proxy"]
+	path = MCP-Proxy
+	url = https://github.com/aditya4060/MCP-Proxy.git
