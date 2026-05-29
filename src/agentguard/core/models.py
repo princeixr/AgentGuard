@@ -38,6 +38,7 @@ class ProposedToolCall(AgentGuardModel):
     risk_level: ToolRiskLevel
     arguments: dict[str, Any] = Field(default_factory=dict)
     argument_summary: str
+    argument_hash: str | None = None
     proposed_by: str
     timestamp: datetime = Field(default_factory=utc_now)
 
@@ -71,12 +72,22 @@ class RawTraceRecord(AgentGuardModel):
     domain: str
     task_category: str
     user_intent: UserIntent
+    system_prompt_hash: str | None = None
+    tool_schema_snapshot_id: str | None = None
     step_index: int
     proposed_tool_call: ProposedToolCall
     prior_tool_calls: list[ExecutedToolCall] = Field(default_factory=list)
     tool_output_context: ToolOutputContext = Field(default_factory=ToolOutputContext)
     execution_status: Literal["proposed", "executed", "blocked_by_guard", "failed"]
-    source_type: Literal["live", "synthetic", "adapted_benchmark"]
+    source_type: Literal[
+        "live",
+        "live_openclaw",
+        "live_google_adk",
+        "synthetic",
+        "synthetic_clean",
+        "synthetic_adversarial",
+        "adapted_benchmark",
+    ]
     created_at: datetime = Field(default_factory=utc_now)
 
 
@@ -146,4 +157,3 @@ class DemoReport(AgentGuardModel):
     summary: str
     metrics: MetricReport | None = None
     generated_at: datetime = Field(default_factory=utc_now)
-

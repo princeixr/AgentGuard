@@ -39,8 +39,9 @@ AgentGuard has three runtime surfaces:
 
 2. `apps/openclaw_trace_agents/`
 
-   Research trace collection. OpenClaw-specific events should be normalized into
-   AgentGuard trace models before entering governance, evaluation, or dashboard code.
+   Research trace collection. OpenClaw runs are not governed by AgentGuard here.
+   OpenClaw transcripts/events are normalized into AgentGuard raw trace models for
+   benchmark construction.
 
 3. `src/agentguard/runtime/mock_runtime.py`
 
@@ -67,12 +68,16 @@ User / Scenario
 No host agent should execute a consequential tool directly. Every proposed tool call must
 be converted into a shared AgentGuard model and intercepted first.
 
+That enforcement rule applies to AgentGuard-governed runtimes such as the Google ADK
+demo. OpenClaw is different in this repository: it is used to collect real agent traces
+offline, and AgentGuard decisions are generated later during benchmark evaluation.
+
 ## Main Components
 
 | Component | Path | Purpose |
 | --- | --- | --- |
 | Shared contracts | `src/agentguard/core/` | Pydantic models, enums, config, and errors used by every subsystem. |
-| Runtime adapters | `src/agentguard/runtime/` | Convert host runtime events into AgentGuard traces and enforce guard decisions. |
+| Runtime adapters | `src/agentguard/runtime/` | Convert governed host runtime events into AgentGuard traces and enforce guard decisions. |
 | Tracing | `src/agentguard/tracing/` | Build, serialize, validate, redact, and persist trace records. |
 | Governance | `src/agentguard/governance/` | Evaluate traces and return allow/warn/review/block/approval decisions. |
 | Evaluation | `src/agentguard/evaluation/` | Load scenarios and labels, replay traces, compare baselines, and compute metrics. |
@@ -97,6 +102,18 @@ The scripts also work before installing the package because they include a local
 python3 scripts/run_mock_session.py
 python3 scripts/run_dashboard.py
 python3 scripts/collect_openclaw_traces.py
+```
+
+Real OpenClaw trace collection, after configuring an OpenClaw profile with a working
+model provider key:
+
+```bash
+python3 scripts/collect_openclaw_traces.py \
+  --real-openclaw \
+  --profile "$OPENCLAW_TRACE_PROFILE" \
+  --agent "$OPENCLAW_TRACE_DEFAULT_AGENT" \
+  --scenario-file data/scenarios/email_intent_drift.jsonl \
+  --runs-per-scenario 1
 ```
 
 ## Current Status

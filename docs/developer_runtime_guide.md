@@ -18,7 +18,7 @@ The project has two public-facing goals:
 The shared core must remain runtime-agnostic. Google ADK, OpenClaw, mock runtimes, and
 future host agents must all emit the same AgentGuard models.
 
-## End-to-End Runtime
+## End-to-End Governed Runtime
 
 ```text
 Scenario or user request
@@ -40,6 +40,26 @@ Scenario or user request
 
 The most important rule is simple: no consequential tool should execute before AgentGuard
 has seen the proposed call and returned a decision.
+
+This is the Google ADK demo path. OpenClaw trace generation uses a different offline
+collection path and should not call AgentGuard governance during collection.
+
+## OpenClaw Dataset Collection Flow
+
+```text
+Scenario JSONL
+    -> real OpenClaw agent config
+    -> OpenClaw run
+    -> transcript.jsonl or event stream
+    -> OpenClaw transcript reader / CLI runner
+    -> OpenClaw event normalizer
+    -> RawTraceRecord
+    -> data/traces/raw/openclaw/
+    -> labels, splits, guard outputs later
+```
+
+OpenClaw traces are evidence for benchmark construction. They are not runtime enforcement
+events.
 
 ## Data Contracts
 
@@ -95,7 +115,7 @@ Files:
 ```text
 runtime_adapter.py       Protocol all runtimes must satisfy
 google_adk_adapter.py    Google hackathon runtime adapter placeholder
-openclaw_adapter.py      OpenClaw research trace adapter placeholder
+openclaw_adapter.py      Deprecated placeholder; OpenClaw is a dataset source, not an enforced runtime
 mock_runtime.py          Deterministic runtime for tests and fallback demos
 interceptor.py           Calls GuardEngine.evaluate(trace)
 tool_event_mapper.py     Converts host runtime events into ProposedToolCall
@@ -224,28 +244,37 @@ Google ADK agent proposes tool call
 
 ### `apps/openclaw_trace_agents/`
 
-This is the research trace-generation area.
+This is the research trace-generation area. OpenClaw is used to generate raw benchmark
+data, not to test AgentGuard runtime enforcement.
 
 Files:
 
 ```text
-email_agent.py            OpenClaw email agent placeholder
-file_agent.py             OpenClaw file agent placeholder
-calendar_agent.py         OpenClaw calendar agent placeholder
-run_trace_collection.py   Trace collection entrypoint placeholder
+configs/                  Planned real OpenClaw agent configurations
+cli_runner.py             Planned real OpenClaw CLI runner
+transcript_reader.py      Planned parser for OpenClaw transcript.jsonl files
+event_normalizer.py       Converts OpenClaw tool events into RawTraceRecord
+trace_collector.py        Orchestrates collection and persistence
+email_agent.py            Temporary email fixture for collector tests
+file_agent.py             Temporary file fixture for collector tests
+calendar_agent.py         Temporary calendar fixture for collector tests
+run_trace_collection.py   Trace collection entrypoint
 README.md                 App-specific notes
 ```
 
 Expected final behavior:
 
 ```text
-OpenClaw agent proposes tool call
-    -> openclaw_adapter maps event
+OpenClaw agent runs with configured tools
+    -> transcript or event stream is captured
+    -> transcript_reader / cli_runner extracts tool events
+    -> event_normalizer maps events
     -> RawTraceRecord is persisted under data/traces/raw/openclaw/
     -> labels and guard outputs are generated separately
 ```
 
-OpenClaw is not the hackathon story's primary runtime. It is the research dataset source.
+OpenClaw is not the hackathon story's primary runtime and should not be intercepted by
+AgentGuard during collection. It is the research dataset source.
 
 ## Data Directories
 

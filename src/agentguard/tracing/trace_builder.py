@@ -24,6 +24,8 @@ class TraceBuilder:
         tool_output_context: ToolOutputContext | None = None,
         execution_status: str = "proposed",
         source_type: str = "live",
+        system_prompt_hash: str | None = None,
+        tool_schema_snapshot_id: str | None = None,
     ) -> RawTraceRecord:
         return RawTraceRecord(
             trace_id=str(uuid4()),
@@ -33,6 +35,8 @@ class TraceBuilder:
             domain=domain,
             task_category=task_category,
             user_intent=user_intent,
+            system_prompt_hash=system_prompt_hash,
+            tool_schema_snapshot_id=tool_schema_snapshot_id,
             step_index=proposed_tool_call.step_index,
             proposed_tool_call=proposed_tool_call,
             prior_tool_calls=prior_tool_calls or [],
@@ -40,4 +44,3 @@ class TraceBuilder:
             execution_status=execution_status,
             source_type=source_type,
         )
-

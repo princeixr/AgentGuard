@@ -81,7 +81,7 @@ The project remains runtime-agnostic internally, but the hackathon demo should c
 | --- | --- | --- |
 | Google ADK | Primary | Main hackathon demo runtime |
 | Mock Runtime | Required fallback | Deterministic testing, replay, and benchmark generation |
-| OpenClaw | Optional/future adapter | Demonstrates portability beyond Google ADK |
+| OpenClaw | Research trace source | Generates real-agent traces for benchmark construction |
 
 ### Strategic Rule
 

@@ -24,7 +24,10 @@ Required fallback runtime:
 MockRuntimeAdapter
 ```
 
-Optional/future runtime:
+OpenClaw is not an AgentGuard enforcement runtime for the current project plan. It is a
+research trace source used by `apps/openclaw_trace_agents/`.
+
+Deprecated/legacy optional runtime wording:
 
 ```text
 OpenClawAdapter
