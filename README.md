@@ -125,6 +125,24 @@ AGENTGUARD_ENV_FILE=.env.openclaw python3 scripts/run_openclaw_productivity_ui.p
 
 Open `http://127.0.0.1:8765`.
 
+## Elastic Storage
+
+Elastic integration starts with canonical v1 traces:
+
+```bash
+python3 scripts/ingest_openclaw_traces_to_elastic.py --dry-run
+```
+
+After setting `ELASTICSEARCH_URL` and auth in an env file:
+
+```bash
+AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/setup_elastic_indices.py
+AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/ingest_openclaw_traces_to_elastic.py
+AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/query_elastic_traces.py --size 5
+```
+
+See [docs/elastic_storage.md](docs/elastic_storage.md).
+
 ## Current Status
 
 The repository has a working v1 trace and firewall path with deterministic placeholder

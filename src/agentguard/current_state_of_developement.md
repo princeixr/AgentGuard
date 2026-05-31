@@ -48,7 +48,7 @@ Purpose:
 
 ### Trace Storage
 
-Status: running locally.
+Status: running locally; initial Elastic path implemented.
 
 Implemented in `src/agentguard/tracing/trace_store.py`.
 
@@ -66,7 +66,31 @@ data/traces/v1/<namespace>/session_risk/<session_id>.json
 
 Remaining:
 
-- Elastic writer/reader implementation for the same record shapes.
+- connect Elastic retrieval results into live `TraceFeatureV1.retrieval`,
+- add semantic/vector retrieval after the first lexical ingestion path is verified.
+
+### Elastic Storage
+
+Status: initial setup and ingestion path running.
+
+Implemented under `src/agentguard/storage/`.
+
+Current capabilities:
+
+- environment-based Elastic config,
+- index setup for all v1 stores,
+- bulk ingestion of `AgentGuardTraceV1` from `data/traces/v1/openclaw/traces.jsonl`,
+- lexical similar-trace query using domain/tool filters and retrieval text,
+- dry-run validation without Elastic credentials.
+
+Commands:
+
+```bash
+python3 scripts/ingest_openclaw_traces_to_elastic.py --dry-run
+AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/setup_elastic_indices.py
+AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/ingest_openclaw_traces_to_elastic.py
+AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/query_elastic_traces.py --size 5
+```
 
 ### Tool Registry
 
