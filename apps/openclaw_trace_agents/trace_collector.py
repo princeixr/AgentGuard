@@ -8,6 +8,7 @@ from pathlib import Path
 
 from agentguard.core.models import RawTraceRecord, ScenarioRecord
 from agentguard.evaluation.dataset_models import BenchmarkTraceRecord, TraceSourceProvenance
+from agentguard.tracing.adapters.openclaw_trace_adapter import OpenClawTraceV1Adapter
 from agentguard.tracing.serializers import append_jsonl
 from agentguard.tracing.trace_store import TraceStore
 from apps.openclaw_trace_agents.base import OpenClawTraceAgent
@@ -17,11 +18,10 @@ from apps.openclaw_trace_agents.transcript_reader import OpenClawTranscriptReade
 
 
 class OpenClawTraceCollector:
-    """Collect raw tool-use traces from OpenClaw agents.
+    """Collect fixture tool-use traces from OpenClaw-style local agents.
 
     This collector is intentionally one-way: it observes OpenClaw behavior and writes
-    AgentGuard RawTraceRecord objects. It does not run AgentGuard governance and does not
-    alter OpenClaw execution.
+    legacy compatibility traces. Real OpenClaw collection writes canonical v1 traces.
     """
 
     def __init__(
@@ -66,6 +66,7 @@ class RealOpenClawTraceCollector:
         cli_runner: OpenClawCliRunner,
         transcript_reader: OpenClawTranscriptReader | None = None,
         normalizer: OpenClawEventNormalizer | None = None,
+        trace_v1_adapter: OpenClawTraceV1Adapter | None = None,
         trace_store: TraceStore | None = None,
         openclaw_raw_root: Path = Path("data/openclaw_raw"),
         benchmark_record_path: Path = Path("data/intenttracebench_v0/benchmark_traces.jsonl"),
@@ -74,6 +75,7 @@ class RealOpenClawTraceCollector:
         self.cli_runner = cli_runner
         self.transcript_reader = transcript_reader or OpenClawTranscriptReader()
         self.normalizer = normalizer or OpenClawEventNormalizer()
+        self.trace_v1_adapter = trace_v1_adapter or OpenClawTraceV1Adapter()
         self.trace_store = trace_store or TraceStore()
         self.openclaw_raw_root = openclaw_raw_root
         self.benchmark_record_path = benchmark_record_path
@@ -121,12 +123,27 @@ class RealOpenClawTraceCollector:
             max_steps=self.max_steps,
             session_id=run_result.session_id,
         )
-        for trace, event in zip(traces, events[: len(traces)], strict=True):
+        for trace in traces:
             self.trace_store.append_raw_trace(trace, namespace="openclaw")
+
+        traces_v1 = self.trace_v1_adapter.adapt_events(
+            scenario=scenario,
+            events=events,
+            session_id=run_result.session_id,
+            agent_id=f"openclaw_{agent_name}",
+            agent_config_id=agent_name,
+            run_id=run_result.run_id,
+            environment_id="openclaw_productivity_workspace"
+            if agent_name == "agentguard_productivity"
+            else None,
+            max_steps=self.max_steps,
+        )
+        for trace_v1, event in zip(traces_v1, events[: len(traces_v1)], strict=True):
+            self.trace_store.append_trace_v1(trace_v1, namespace="openclaw")
             append_jsonl(
                 self.benchmark_record_path,
                 BenchmarkTraceRecord(
-                    trace=trace,
+                    trace=trace_v1,
                     provenance=TraceSourceProvenance(
                         source_framework="openclaw",
                         source_type="live_openclaw",

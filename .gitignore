@@ -7,6 +7,8 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 data/traces/raw/*/traces.jsonl
+data/traces/v1/*/*.jsonl
+data/traces/v1/*/session_risk/
 data/traces/labeled/labels.jsonl
 data/traces/guard_outputs/decisions.jsonl
 data/intenttracebench_v0/benchmark_traces.jsonl

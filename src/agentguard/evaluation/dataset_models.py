@@ -1,8 +1,7 @@
-"""Benchmark dataset models derived from the AgentGuard paper schema.
+"""Benchmark dataset models derived from the AgentGuard v1 schema.
 
-RawTraceRecord remains the central trace object. These wrappers add benchmark
-provenance, manifest, and split metadata without contaminating raw traces with labels
-or guard outputs.
+AgentGuardTraceV1 is the central trace object. These wrappers add benchmark provenance,
+manifest, and split metadata without contaminating traces with labels or guard outputs.
 """
 
 from __future__ import annotations
@@ -12,7 +11,8 @@ from typing import Literal
 
 from pydantic import Field
 
-from agentguard.core.models import AgentGuardModel, RawTraceRecord, utc_now
+from agentguard.core.models import AgentGuardModel, utc_now
+from agentguard.tracing.schema_v1 import AgentGuardTraceV1
 
 
 class TraceSourceProvenance(AgentGuardModel):
@@ -30,7 +30,7 @@ class TraceSourceProvenance(AgentGuardModel):
 
 
 class BenchmarkTraceRecord(AgentGuardModel):
-    trace: RawTraceRecord
+    trace: AgentGuardTraceV1
     provenance: TraceSourceProvenance
     dataset_version: str = "intenttracebench_v0"
     created_at: datetime = Field(default_factory=utc_now)

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenClaw Productivity Sandbox</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark">OC</div>
+        <div>
+          <h1>OpenClawOps</h1>
+          <p>Productivity trace lab</p>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="Environment views">
+        <button class="nav-item active" data-view="inbox">Inbox <span id="count-inbox">0</span></button>
+        <button class="nav-item" data-view="drafts">Drafts <span id="count-drafts">0</span></button>
+        <button class="nav-item" data-view="sent">Sent <span id="count-sent">0</span></button>
+        <button class="nav-item" data-view="files">Files <span id="count-files">0</span></button>
+        <button class="nav-item" data-view="calendar">Calendar <span id="count-calendar">0</span></button>
+        <button class="nav-item" data-view="state">State <span id="count-writes">0</span></button>
+      </nav>
+
+      <section class="stats" aria-label="Session state">
+        <h2>Session State</h2>
+        <div class="stat-grid">
+          <div><span>Drafts</span><strong id="stat-drafts">0</strong></div>
+          <div><span>Sent</span><strong id="stat-sent">0</strong></div>
+          <div><span>Writes</span><strong id="stat-writes">0</strong></div>
+          <div><span>Deleted</span><strong id="stat-deleted">0</strong></div>
+        </div>
+      </section>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">OpenClaw Target Runtime</p>
+          <h2>Productivity environment sandbox</h2>
+        </div>
+        <div class="status-pill" id="agent-pill">agentguard_productivity</div>
+      </header>
+
+      <section class="surface" aria-label="Environment browser">
+        <div class="list-pane">
+          <div class="pane-title">
+            <h3 id="list-title">Inbox</h3>
+            <button class="small-button" id="refresh-button" title="Refresh environment">Refresh</button>
+          </div>
+          <div id="item-list" class="item-list"></div>
+        </div>
+        <article class="detail-pane" id="detail-pane">
+          <div class="empty-state">Select an item to inspect it.</div>
+        </article>
+      </section>
+    </main>
+
+    <aside class="chat-panel">
+      <header class="chat-header">
+        <div>
+          <p class="eyebrow">Stateful OpenClaw Chat</p>
+          <h2>Agent</h2>
+        </div>
+        <button id="reset-button" class="reset-button">Reset</button>
+      </header>
+
+      <div class="messages" id="messages">
+        <div class="message assistant">
+          <strong>Assistant</strong>
+          <p>Ask the OpenClaw productivity agent to inspect email, read files, draft replies, or check the calendar.</p>
+        </div>
+      </div>
+
+      <details class="state-summary">
+        <summary>Last tool trace</summary>
+        <pre id="last-trace">No agent run yet.</pre>
+      </details>
+
+      <form class="composer" id="chat-form">
+        <textarea id="chat-input" placeholder="Ask the agent to inspect, draft, create, or summarize..." rows="5"></textarea>
+        <button type="submit" id="send-button">Send</button>
+      </form>
+    </aside>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

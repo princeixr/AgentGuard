@@ -11,6 +11,7 @@ items, and following `toolResult` messages contain the outputs.
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -37,10 +38,15 @@ class OpenClawTranscriptReader:
                 call_id = content.get("id")
                 result = results_by_call_id.get(call_id, {})
                 output_summary = _summarize_tool_result(result)
+                tool_name = str(content.get("name", "unknown_tool"))
+                arguments = dict(content.get("arguments") or {})
+                semantic_tool = _extract_productivity_tool_call(tool_name, arguments)
+                if semantic_tool:
+                    tool_name, arguments = semantic_tool
                 events.append(
                     OpenClawToolEvent(
-                        tool_name=str(content.get("name", "unknown_tool")),
-                        arguments=dict(content.get("arguments") or {}),
+                        tool_name=tool_name,
+                        arguments=arguments,
                         output_summary=output_summary,
                         source_event_id=record.get("id"),
                         source_tool_call_id=call_id,
@@ -120,6 +126,57 @@ def _compact_error_message(error_message: Any) -> str:
     return str(nested.get("error", {}).get("message", nested_message))[:1000]
 
 
+def _extract_productivity_tool_call(
+    native_tool_name: str,
+    native_arguments: dict[str, Any],
+) -> tuple[str, dict[str, Any]] | None:
+    if native_tool_name != "exec":
+        return None
+    command = native_arguments.get("command")
+    if not isinstance(command, str):
+        return None
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return None
+
+    tool_script_index = None
+    for index, token in enumerate(tokens):
+        if token.endswith("productivity_tool.py"):
+            tool_script_index = index
+            break
+    if tool_script_index is None or tool_script_index + 1 >= len(tokens):
+        return None
+
+    semantic_tool_name = tokens[tool_script_index + 1]
+    if semantic_tool_name not in _PRODUCTIVITY_TOOL_NAMES:
+        return None
+
+    semantic_arguments = _parse_cli_flags(tokens[tool_script_index + 2 :])
+    semantic_arguments["_openclaw_native_tool"] = native_tool_name
+    semantic_arguments["_openclaw_command"] = command
+    return semantic_tool_name, semantic_arguments
+
+
+def _parse_cli_flags(tokens: list[str]) -> dict[str, Any]:
+    arguments: dict[str, Any] = {}
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if not token.startswith("--"):
+            index += 1
+            continue
+        key = token.removeprefix("--").replace("-", "_")
+        next_index = index + 1
+        if next_index >= len(tokens) or tokens[next_index].startswith("--"):
+            arguments[key] = True
+            index += 1
+            continue
+        arguments[key] = tokens[next_index]
+        index += 2
+    return arguments
+
+
 def _contains_untrusted_instruction(text: str | None) -> bool:
     if not text:
         return False
@@ -140,3 +197,18 @@ def _contains_secret_like_content(text: str | None) -> bool:
     lowered = text.lower()
     markers = ["api_key", "secret", "password", "token"]
     return any(marker in lowered for marker in markers)
+
+
+_PRODUCTIVITY_TOOL_NAMES = {
+    "gmail_search",
+    "gmail_read",
+    "gmail_draft",
+    "gmail_send",
+    "file_search",
+    "file_read",
+    "file_write",
+    "file_delete",
+    "calendar_search",
+    "calendar_read",
+    "calendar_create_event",
+}

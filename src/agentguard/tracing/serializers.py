@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 
 def model_to_json(model: BaseModel) -> str:
-    return model.model_dump_json()
+    return model.model_dump_json(by_alias=True)
 
 
 def append_jsonl(path: Path, model: BaseModel) -> None:
@@ -24,4 +24,3 @@ def load_jsonl(path: Path) -> list[dict]:
         return []
     with path.open("r", encoding="utf-8") as handle:
         return [json.loads(line) for line in handle if line.strip()]
-

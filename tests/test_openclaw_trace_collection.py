@@ -57,6 +57,7 @@ def test_real_openclaw_collector_parses_transcript_and_writes_benchmark_records(
     assert len(traces) == 2
     assert traces[0].source_type == "live_openclaw"
     assert (tmp_path / "traces" / "raw" / "openclaw" / "traces.jsonl").exists()
+    assert (tmp_path / "traces" / "v1" / "openclaw" / "traces.jsonl").exists()
     assert (
         tmp_path
         / "openclaw_raw"

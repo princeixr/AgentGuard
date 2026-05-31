@@ -1,431 +1,112 @@
-# AgentGuard Product & Delivery Plan v0.1
+# AgentGuard PM Delivery Plan
 
-## Owner
+Status: current v1 delivery plan.
 
-**Product Manager — Delivery + Coordination**
+Last updated: 2026-05-30
 
-Primary responsibility: keep the project moving toward a finished hackathon artifact by managing scope, milestones, dependencies, integration, documentation, and demo readiness.
+## Current Build Goal
 
-This document inherits from `docs/shared_contract.md`.
-
----
-
-## PM Mission
-
-The PM is not a corporate process layer.
-
-The PM is the operating system of the team.
-
-Their job is to prevent:
-
-1. scope expansion,
-2. late integration failure,
-3. unclear ownership,
-4. weak demo narrative,
-5. missed deadlines,
-6. documentation drift.
-
----
-
-## Project North Star
-
-AgentGuard should be presented as:
+Ship a complete end-to-end AgentGuard skeleton first:
 
 ```text
-Trajectory-aware runtime governance for Google ADK agents.
+trace captured -> v1 schema -> guard features -> scores -> decision -> session risk -> persisted artifacts
 ```
 
-The product/research claim:
+The deeper algorithms can improve after the interfaces are stable and runnable.
+
+## Completed
+
+- Repository scaffold for core, runtime, tracing, governance, evaluation, dashboard,
+  OpenClaw trace generation, and Google ADK demo app.
+- Canonical v1 schema in `src/agentguard/tracing/schema_v1.py`.
+- Schema architecture document with Elastic store plan in `schema_architecture.md`.
+- OpenClaw productivity agent setup with controlled email/file/calendar tools.
+- OpenClaw transcript reader and trace collector.
+- OpenClaw to `AgentGuardTraceV1` adapter.
+- Local v1 trace storage under `data/traces/v1/<namespace>/`.
+- V1 firewall orchestration with feature, score, decision, live-event, and session-risk
+  persistence.
+- Placeholder scoring and decision logic that runs end to end.
+- Local Google ADK demo smoke path through the v1 firewall.
+- Unit tests for schema, OpenClaw reader/adapter/collector, CLI runner, and firewall.
+
+## In Progress
+
+- Aligning docs and READMEs with the implemented v1 architecture.
+- Cleaning old architecture references from the active developer-facing docs.
+- Stabilizing the single OpenClaw productivity trace generator as the benchmark source.
+
+## Next Milestones
+
+### 1. Google ADK Live Interception
+
+Build the real Google ADK/MCP adapter:
 
 ```text
-AgentGuard detects intent-relative and trajectory-level tool-use failures that stateless action-level guards miss.
+MCP proposed tool call -> AgentGuardTraceV1 -> AgentGuardFirewallV1 -> enforce decision
 ```
 
-Do not let the project become:
+Definition of done:
 
-```text
-another generic AI firewall
-```
+- one live demo agent tool call is intercepted before execution,
+- allow/block path works,
+- decision is visible in local JSONL artifacts,
+- side-effecting tool is not executed after block.
 
-or:
+### 2. Elastic Integration
 
-```text
-a broad agent security platform
-```
+Implement the stores described in `schema_architecture.md`:
 
----
+- `agentguard-traces-v1`,
+- `agentguard-live-events-v1`,
+- `agentguard-trace-features-v1`,
+- `agentguard-guard-scores-v1`,
+- `agentguard-guard-decisions-v1`,
+- `agentguard-session-risk-v1`,
+- `agentguard-labels-v1`,
+- `agentguard-scenarios-v1`.
 
-## Team Ownership
+Definition of done:
 
-| Track | Owner | PM Checks |
-|---|---|---|
-| Runtime + Agent Infrastructure | Developer 1 | Can sessions run and emit valid traces? |
-| Governance + Retrieval Engine | Developer 2 | Can traces produce explainable verdicts? |
-| Evaluation + Dashboard | Developer 3 | Can we prove AgentGuard beats baselines? |
-| Delivery + Coordination | PM | Is the whole project demo-ready by June 4? |
+- local JSONL store can be mirrored to Elastic,
+- live decisions can retrieve historical trace context,
+- dashboard can read live events.
 
----
+### 3. Benchmark Dataset
 
-## Milestone Timeline
+Convert OpenClaw productivity traces into `IntentTraceBench v0`.
 
-### May 27 — Architecture Freeze
+Definition of done:
 
-PM deliverables:
+- traces are canonical `AgentGuardTraceV1`,
+- labels are `LabelRecordV1`,
+- splits exist for validation/test/unseen-agent/unseen-domain/memory-train,
+- replay can compute metrics from the dataset.
 
-- confirm shared contract accepted,
-- confirm runtime strategy: Google ADK primary, mock fallback,
-- assign owners,
-- create task board,
-- create integration checklist.
+### 4. Scoring Upgrade
 
-Exit criteria:
+Replace placeholder scoring with calibrated formulas:
 
-```text
-No one is unclear about what they own.
-No one starts coding outside the agreed architecture.
-```
+- intent drift,
+- sequence deviation,
+- argument drift,
+- permission risk,
+- tool-output susceptibility,
+- retrieval risk,
+- cumulative session risk.
 
----
+Definition of done:
 
-### May 28–29 — Core Infrastructure
+- component scores are reproducible,
+- thresholds are documented,
+- benchmark metrics compare against baselines.
 
-PM tracks:
+## Demo Risks
 
-| Owner | Expected Output |
-|---|---|
-| Developer 1 | runtime skeleton, mock tools, trace emission |
-| Developer 2 | static guard, decision policy skeleton |
-| Developer 3 | scenario files, label schema validation, metric skeleton |
+| Risk | Mitigation |
+| --- | --- |
+| Google ADK integration takes longer than expected | Keep local `run_demo.py` path exercising the same v1 firewall. |
+| OpenClaw transcripts vary by version | Keep sanitized samples and parser tests. |
+| Scoring is not yet research-grade | Keep formulas explicit, deterministic, and replaceable. |
+| Elastic setup consumes time | Maintain JSONL store as a local fallback with the same record shapes. |
 
-Integration checkpoint:
-
-```text
-One scenario should run through runtime → trace → guard → decision.
-```
-
----
-
-### May 30–31 — Failure Scenario Development
-
-PM tracks:
-
-| Demo | Owner Coordination |
-|---|---|
-| Draft vs Send | Dev 1 runtime + Dev 2 policy + Dev 3 labels |
-| File Scope Creep | Dev 1 tools + Dev 2 scoring + Dev 3 scenario |
-| Prompt Injection | Dev 1 tool output + Dev 2 susceptibility score + Dev 3 dashboard replay |
-
-Exit criteria:
-
-```text
-At least three end-to-end trajectories exist.
-```
-
----
-
-### June 1 — Baseline Evaluation
-
-PM tracks:
-
-- rule-only baseline complete,
-- stateless intent baseline complete,
-- full AgentGuard complete,
-- labels available,
-- metrics computed,
-- failure cases reviewed.
-
-Exit criteria:
-
-```text
-Baseline comparison table has real computed values.
-```
-
----
-
-### June 2 — Demo Engineering
-
-PM tracks:
-
-- dashboard views,
-- demo script,
-- screenshots,
-- backup recording,
-- narrative alignment.
-
-Exit criteria:
-
-```text
-A non-technical judge can understand why AgentGuard is different within 60 seconds.
-```
-
----
-
-### June 3–4 — Stabilization Buffer
-
-PM tracks:
-
-- bug fixes only,
-- no new features,
-- presentation rehearsal,
-- demo fallback path,
-- final README cleanup,
-- Devpost assets.
-
-Exit criteria:
-
-```text
-Final demo can be run twice in a row without manual rescue.
-```
-
----
-
-## Daily Sync Format
-
-Daily sync should be 20 minutes.
-
-Each person answers:
-
-```text
-1. What did I finish?
-2. What is blocked?
-3. What needs integration today?
-4. What will be demo-visible by tonight?
-```
-
-Do not use daily sync for long architecture debates.
-
-Architecture debates go into research review.
-
----
-
-## Twice-Weekly Research Review
-
-Purpose:
-
-- validate benchmark quality,
-- challenge claims,
-- inspect failure cases,
-- ensure narrative consistency.
-
-Questions to ask:
-
-```text
-1. What does this prove?
-2. What does it not prove?
-3. Would a stateless guard catch this too?
-4. Are we cherry-picking?
-5. Is this demo understandable?
-6. Are claims stronger than evidence?
-```
-
----
-
-## Scope Control Rules
-
-### Allowed
-
-- Google ADK primary demo,
-- mock tools,
-- deterministic scenarios,
-- local JSONL traces,
-- simple retrieval,
-- hand-tuned scoring,
-- three polished demos.
-
-### Not Allowed Without Team Approval
-
-- new domains,
-- real Gmail/calendar credentials,
-- fine-tuned models,
-- complex multi-agent orchestration,
-- production auth,
-- enterprise dashboard features,
-- additional runtime frameworks beyond adapter placeholders.
-
----
-
-## Integration Checklist
-
-PM should verify daily:
-
-```text
-[ ] shared models still import correctly
-[ ] runtime emits valid RawTraceRecord
-[ ] governance consumes RawTraceRecord
-[ ] governance emits GuardDecision
-[ ] evaluation can load traces and labels
-[ ] dashboard can read stored outputs
-[ ] tests pass
-[ ] no one bypassed shared interfaces
-```
-
----
-
-## Demo Narrative
-
-The demo should follow this structure:
-
-### 1. Problem
-
-AI agents can make tool calls that are safe in isolation but wrong in trajectory context.
-
-### 2. Example
-
-User asks for a draft. Agent tries to send.
-
-### 3. Baseline Failure
-
-Stateless guard sees:
-
-```text
-gmail_send with valid args
-```
-
-### 4. AgentGuard Reasoning
-
-AgentGuard sees:
-
-```text
-user asked for draft
-prior steps were search/read
-send exceeds requested autonomy
-similar blocked traces exist
-```
-
-### 5. Result
-
-AgentGuard returns:
-
-```text
-require_approval or block
-```
-
-### 6. Generalization
-
-Same architecture applies to file scope creep and prompt injection from tool output.
-
----
-
-## Devpost Deliverables
-
-PM owns the checklist:
-
-```text
-[ ] project title
-[ ] short description
-[ ] long description
-[ ] problem statement
-[ ] how it uses Google ADK/Gemini
-[ ] architecture diagram
-[ ] demo video
-[ ] screenshots
-[ ] GitHub repo
-[ ] setup instructions
-[ ] benchmark/evaluation summary
-[ ] limitations section
-[ ] future work
-```
-
----
-
-## README Requirements
-
-PM should ensure README includes:
-
-```text
-1. What AgentGuard is
-2. Why trajectory context matters
-3. How to run demo
-4. How to run benchmark
-5. How to view dashboard
-6. Architecture overview
-7. Google ADK usage
-8. Known limitations
-```
-
----
-
-## Risk Register
-
-| Risk | Severity | Mitigation |
-|---|---:|---|
-| Google ADK integration delay | High | MockRuntimeAdapter fallback |
-| Weak evaluation | High | Developer 3 owns metrics + labels early |
-| Scope creep | High | PM enforces freeze |
-| Late integration | High | Daily integration checkpoint |
-| Demo instability | High | backup replay mode + recording |
-| Overclaiming novelty | Medium | keep claims evidence-bound |
-| Retrieval not impressive | Medium | use retrieval as explanation support, not sole claim |
-
----
-
-## PM Milestones
-
-### Milestone P1 — Project Board
-
-Deliver:
-
-- task board,
-- owners,
-- deadlines,
-- integration dependencies.
-
-### Milestone P2 — Demo Script v0
-
-Deliver:
-
-- 3-demo script,
-- judge-facing explanation,
-- screenshot plan.
-
-### Milestone P3 — Devpost Draft
-
-Deliver:
-
-- draft project description,
-- Google ADK usage section,
-- architecture summary.
-
-### Milestone P4 — Final Readiness
-
-Deliver:
-
-- final checklist complete,
-- demo rehearsed,
-- fallback demo ready,
-- README clean.
-
----
-
-## Coding Agent Prompt for PM/Docs Track
-
-```text
-You are supporting the Product + Delivery track for AgentGuard.
-
-Read docs/shared_contract.md and docs/pm_delivery_plan.md first.
-
-Generate operational project-management artifacts only. Do not implement runtime, governance, or evaluation logic.
-
-Tasks:
-1. Create a milestone checklist.
-2. Create a daily integration checklist.
-3. Create a Devpost submission checklist.
-4. Create a demo script outline for three demos.
-5. Create a README outline.
-6. Create a risk register.
-7. Ensure all language positions Google ADK as the primary hackathon runtime.
-8. Avoid overclaiming production readiness or universal agent safety.
-
-The PM materials should help the team finish a credible hackathon demo by June 4.
-```
-
----
-
-## Non-Negotiables
-
-1. No new scope after freeze.
-2. Daily integration is mandatory.
-3. Demo must be understandable to non-specialists.
-4. Metrics must be evidence-bound.
-5. Google ADK must be visible in the hackathon story.
-6. Fallback demo must exist.

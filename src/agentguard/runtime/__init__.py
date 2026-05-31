@@ -1,8 +1,6 @@
 """Runtime adapters and interception utilities."""
 
-from agentguard.runtime.interceptor import ToolInterceptor
-from agentguard.runtime.mock_runtime import MockRuntimeAdapter
 from agentguard.runtime.runtime_adapter import RuntimeAdapter
+from agentguard.runtime.tool_registry import ToolRegistry, build_default_tool_registry
 
-__all__ = ["MockRuntimeAdapter", "RuntimeAdapter", "ToolInterceptor"]
-
+__all__ = ["RuntimeAdapter", "ToolRegistry", "build_default_tool_registry"]

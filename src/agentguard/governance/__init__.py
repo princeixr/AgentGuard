@@ -1,6 +1,5 @@
 """Governance engine and policy components."""
 
-from agentguard.governance.guard_engine import GuardEngine
+from agentguard.governance.firewall_v1 import AgentGuardFirewallV1, FirewallResultV1
 
-__all__ = ["GuardEngine"]
-
+__all__ = ["AgentGuardFirewallV1", "FirewallResultV1"]

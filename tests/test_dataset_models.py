@@ -1,45 +1,55 @@
-from agentguard.core.enums import ToolRiskLevel
-from agentguard.core.models import ProposedToolCall, RawTraceRecord, UserIntent
 from agentguard.evaluation.dataset_models import BenchmarkTraceRecord, TraceSourceProvenance
+from agentguard.tracing.schema_v1 import (
+    AgentGuardTraceV1,
+    ExecutionStateV1,
+    IntentContractV1,
+    RetrievalTextV1,
+    ToolCallV1,
+    TraceSourceV1,
+    TrajectoryV1,
+)
 
 
-def test_benchmark_trace_record_wraps_raw_trace_with_provenance():
-    intent = UserIntent(
-        session_id="session_001",
-        raw_request="Inspect a file.",
-        normalized_intent="Inspect a file.",
-        allowed_domains=["file"],
-        allowed_tools=["read"],
-    )
-    proposed = ProposedToolCall(
-        call_id="call_001",
-        session_id="session_001",
-        step_index=1,
-        tool_name="read",
-        tool_category="file",
-        risk_level=ToolRiskLevel.READ_ONLY,
-        arguments={"path": "/workspace/README.md"},
-        argument_summary="path=/workspace/README.md",
-        argument_hash="sha256:test",
-        proposed_by="openclaw_agent",
-    )
-    raw_trace = RawTraceRecord(
+def test_benchmark_trace_record_wraps_v1_trace_with_provenance():
+    trace = AgentGuardTraceV1(
         trace_id="trace_001",
         session_id="session_001",
-        agent_id="openclaw_file_agent",
-        agent_framework="openclaw",
-        domain="file",
-        task_category="file_inspection",
-        user_intent=intent,
-        system_prompt_hash="sha256:system",
-        tool_schema_snapshot_id="sha256:tools",
         step_index=1,
-        proposed_tool_call=proposed,
-        execution_status="proposed",
-        source_type="live_openclaw",
+        source=TraceSourceV1(
+            mode="historical",
+            agent_framework="openclaw",
+            source_type="live_openclaw",
+            agent_id="openclaw_file_agent",
+            scenario_id="scenario_001",
+        ),
+        intent=IntentContractV1(
+            raw_user_request="Inspect a file.",
+            normalized_intent="Inspect a file.",
+            domain="file",
+            task_category="file_inspection",
+            available_tools=["read"],
+            task_relevant_tools=["read"],
+        ),
+        proposed_tool_call=ToolCallV1(
+            call_id="call_001",
+            tool_name="read",
+            tool_category="file",
+            risk_level="read_only",
+            arguments={"path": "/workspace/README.md"},
+            argument_summary="path=/workspace/README.md",
+            argument_hash="sha256:test",
+        ),
+        trajectory=TrajectoryV1(),
+        retrieval_text=RetrievalTextV1(
+            summary="Inspect a file with read.",
+            intent_text="Inspect a file.",
+            trajectory_text="read",
+            argument_text="path=/workspace/README.md",
+        ),
+        execution=ExecutionStateV1(status="proposed"),
     )
     record = BenchmarkTraceRecord(
-        trace=raw_trace,
+        trace=trace,
         provenance=TraceSourceProvenance(
             source_framework="openclaw",
             source_type="live_openclaw",
@@ -50,5 +60,5 @@ def test_benchmark_trace_record_wraps_raw_trace_with_provenance():
         ),
     )
 
-    assert record.trace.system_prompt_hash == "sha256:system"
+    assert record.trace.schema_version == "agentguard.trace.v1"
     assert record.provenance.source_framework == "openclaw"

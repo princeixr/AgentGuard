@@ -1,16 +1,16 @@
-"""Metric computation for guard decisions."""
+"""Metric computation for v1 guard decisions."""
 
 from collections import Counter
 
-from agentguard.core.enums import Verdict
-from agentguard.core.models import GuardDecision, LabelRecord, MetricReport
+from agentguard.core.models import MetricReport
+from agentguard.tracing.schema_v1 import GuardDecisionV1, LabelRecordV1
 
 
-INTERVENTION_VERDICTS = {Verdict.REVIEW, Verdict.BLOCK, Verdict.REQUIRE_APPROVAL}
+INTERVENTION_VERDICTS = {"review", "block", "require_approval"}
 
 
 class MetricsComputer:
-    def compute(self, labels: list[LabelRecord], decisions: list[GuardDecision]) -> dict:
+    def compute(self, labels: list[LabelRecordV1], decisions: list[GuardDecisionV1]) -> dict:
         label_by_trace = {label.trace_id: label for label in labels}
         matched = [(label_by_trace[d.trace_id], d) for d in decisions if d.trace_id in label_by_trace]
         if not matched:
@@ -54,7 +54,7 @@ def _percentile(values: list[int], percentile: int) -> int | None:
     return values[index]
 
 
-def _macro_f1(labels: list[Verdict], predictions: list[Verdict]) -> float:
+def _macro_f1(labels: list[str], predictions: list[str]) -> float:
     classes = set(labels) | set(predictions)
     scores = []
     label_counts = Counter(labels)
@@ -68,4 +68,3 @@ def _macro_f1(labels: list[Verdict], predictions: list[Verdict]) -> float:
         recall = true_positive / label_counts[class_name] if label_counts[class_name] else 0.0
         scores.append(0.0 if precision + recall == 0 else 2 * precision * recall / (precision + recall))
     return sum(scores) / len(scores) if scores else 0.0
-

@@ -11,6 +11,11 @@ class ToolMetadata:
     name: str
     category: str
     risk_level: ToolRiskLevel
+    side_effect_type: str | None = None
+    requires_confirmation_by_default: bool = False
+    irreversible: bool = False
+    mcp_server: str | None = None
+    description: str | None = None
 
 
 class ToolRegistry:
@@ -24,16 +29,98 @@ class ToolRegistry:
         fn: Callable,
         category: str,
         risk_level: ToolRiskLevel,
+        side_effect_type: str | None = None,
+        requires_confirmation_by_default: bool = False,
+        irreversible: bool = False,
+        mcp_server: str | None = None,
+        description: str | None = None,
     ) -> None:
         self._tools[tool_name] = fn
-        self._metadata[tool_name] = ToolMetadata(tool_name, category, risk_level)
+        self._metadata[tool_name] = ToolMetadata(
+            name=tool_name,
+            category=category,
+            risk_level=risk_level,
+            side_effect_type=side_effect_type,
+            requires_confirmation_by_default=requires_confirmation_by_default,
+            irreversible=irreversible,
+            mcp_server=mcp_server,
+            description=description,
+        )
+
+    def register_metadata(self, metadata: ToolMetadata, fn: Callable | None = None) -> None:
+        self._metadata[metadata.name] = metadata
+        if fn is not None:
+            self._tools[metadata.name] = fn
 
     def get(self, tool_name: str) -> Callable:
         return self._tools[tool_name]
 
     def metadata(self, tool_name: str) -> ToolMetadata:
-        return self._metadata[tool_name]
+        return self._metadata.get(tool_name, infer_tool_metadata(tool_name))
 
     def names(self) -> list[str]:
-        return sorted(self._tools)
+        return sorted(set(self._tools) | set(self._metadata))
 
+
+def infer_tool_metadata(tool_name: str) -> ToolMetadata:
+    if tool_name.startswith("gmail_"):
+        category = "email"
+    elif tool_name.startswith("file_"):
+        category = "file"
+    elif tool_name.startswith("calendar_"):
+        category = "calendar"
+    else:
+        category = "unknown"
+
+    if tool_name in {"gmail_send", "calendar_create_event", "calendar_update_event"}:
+        risk_level = ToolRiskLevel.EXTERNAL_WRITE
+    elif tool_name in {"file_delete", "calendar_delete_event"}:
+        risk_level = ToolRiskLevel.IRREVERSIBLE
+    elif tool_name.endswith("_read") or tool_name.endswith("_search"):
+        risk_level = ToolRiskLevel.READ_ONLY
+    else:
+        risk_level = ToolRiskLevel.LOW_SIDE_EFFECT
+
+    side_effect_type = None
+    if tool_name == "gmail_send":
+        side_effect_type = "external_message_send"
+    elif tool_name == "gmail_draft":
+        side_effect_type = "local_draft_create"
+    elif tool_name == "calendar_create_event":
+        side_effect_type = "calendar_event_create"
+    elif tool_name == "calendar_update_event":
+        side_effect_type = "calendar_event_update"
+    elif tool_name == "file_write":
+        side_effect_type = "file_write"
+    elif tool_name == "file_delete":
+        side_effect_type = "file_delete"
+
+    return ToolMetadata(
+        name=tool_name,
+        category=category,
+        risk_level=risk_level,
+        side_effect_type=side_effect_type,
+        requires_confirmation_by_default=risk_level
+        in {ToolRiskLevel.EXTERNAL_WRITE, ToolRiskLevel.IRREVERSIBLE, ToolRiskLevel.HIGH_RISK},
+        irreversible=risk_level == ToolRiskLevel.IRREVERSIBLE or tool_name == "gmail_send",
+    )
+
+
+def build_default_tool_registry() -> ToolRegistry:
+    registry = ToolRegistry()
+    for name in [
+        "gmail_search",
+        "gmail_read",
+        "gmail_draft",
+        "gmail_send",
+        "file_search",
+        "file_read",
+        "file_write",
+        "file_delete",
+        "calendar_search",
+        "calendar_read",
+        "calendar_create_event",
+        "calendar_update_event",
+    ]:
+        registry.register_metadata(infer_tool_metadata(name))
+    return registry

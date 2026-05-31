@@ -1,55 +1,59 @@
 # OpenClaw Trace Agents
 
-This app group is for research trace generation and benchmark construction.
+This app group is for historical trace generation and benchmark construction.
 
 OpenClaw agents are not governed by AgentGuard in this project. They are used to produce
-real tool-use traces from sophisticated agents. Those traces are normalized into the
-AgentGuard raw trace schema and later used to build the benchmark dataset.
+real tool-use traces from a sophisticated agent. Those traces are normalized into the
+canonical `AgentGuardTraceV1` schema and later used for benchmark data, Elastic memory,
+and guard evaluation.
 
 ## Current Implementation
 
-The current Python implementation includes deterministic OpenClaw-style event producers
-for email, file, and calendar domains. These are test fixtures for the collector pipeline,
-not the final research trace source.
-
-The real implementation target is:
+The active trace source is one controlled OpenClaw productivity agent:
 
 ```text
-Real OpenClaw agent run
-    -> transcript.jsonl or Gateway/App-SDK event stream
-    -> transcript_reader.py or cli_runner.py
-    -> event_normalizer.py
-    -> RawTraceRecord
-    -> data/traces/raw/openclaw/
+agentguard_productivity
 ```
 
-No `GuardDecision` should be generated during OpenClaw trace collection. Guard outputs
-belong to later benchmark evaluation.
+It has access to virtual email, file, and calendar tools inside a deterministic local
+workspace. This gives us cross-domain behavior from one real OpenClaw agent while keeping
+the environment inspectable.
+
+## Collection Flow
+
+```text
+Real OpenClaw productivity agent run
+    -> OpenClaw session transcript
+    -> transcript_reader.py
+    -> OpenClawToolEvent
+    -> OpenClawTraceV1Adapter
+    -> AgentGuardTraceV1
+    -> data/traces/v1/openclaw/traces.jsonl
+```
+
+No `GuardDecisionV1` should be generated during OpenClaw trace collection. Guard outputs
+belong to later replay or benchmark evaluation.
+
+For compatibility, the collector may also write a legacy mirror under
+`data/traces/raw/openclaw/traces.jsonl`, but new development should use
+`data/traces/v1/openclaw/traces.jsonl`.
 
 ## Run
 
-From the repository root:
+Set up the real OpenClaw productivity trace agent:
 
 ```bash
-python3 scripts/collect_openclaw_traces.py
+AGENTGUARD_ENV_FILE=.env.openclaw python3 scripts/setup_openclaw_productivity_agent.py
 ```
 
-Useful options:
+Run real OpenClaw sessions after configuring model auth:
 
 ```bash
-python3 scripts/collect_openclaw_traces.py --scenario-file data/scenarios/email_intent_drift.jsonl
-python3 scripts/collect_openclaw_traces.py --trace-root /tmp/agentguard-traces
-```
-
-The default mode uses deterministic fixtures for local validation. To run real OpenClaw
-sessions after configuring model auth:
-
-```bash
-python3 scripts/collect_openclaw_traces.py \
+AGENTGUARD_ENV_FILE=.env.openclaw python3 scripts/collect_openclaw_traces.py \
   --real-openclaw \
   --profile "$OPENCLAW_TRACE_PROFILE" \
-  --agent "$OPENCLAW_TRACE_DEFAULT_AGENT" \
-  --scenario-file data/scenarios/email_intent_drift.jsonl \
+  --agent "$OPENCLAW_TRACE_PRODUCTIVITY_AGENT" \
+  --scenario-file data/scenarios/productivity_agent_scenarios.jsonl \
   --runs-per-scenario 1 \
   --timeout-seconds 180
 ```
@@ -60,9 +64,29 @@ This writes:
 data/openclaw_raw/runs/                 raw CLI stdout/stderr and run metadata
 data/openclaw_raw/transcripts/          copied OpenClaw session JSONL
 data/openclaw_raw/normalized_events/    extracted OpenClawToolEvent JSONL
-data/traces/raw/openclaw/traces.jsonl   AgentGuard RawTraceRecord JSONL
+data/traces/v1/openclaw/traces.jsonl    canonical AgentGuardTraceV1 JSONL
+data/traces/raw/openclaw/traces.jsonl   legacy compatibility mirror
 data/intenttracebench_v0/benchmark_traces.jsonl
 ```
+
+## Productivity Environment UI
+
+To inspect the virtual environment used by `agentguard_productivity`:
+
+```bash
+AGENTGUARD_ENV_FILE=.env.openclaw python3 scripts/run_openclaw_productivity_ui.py
+```
+
+Open:
+
+```text
+http://127.0.0.1:8765
+```
+
+The UI shows the seeded inbox, drafts, sent messages, files, calendar events, side-effect
+state, and a chat panel that can send prompts to the real OpenClaw productivity agent.
+
+## OpenClaw Auth
 
 OpenClaw auth setup for an isolated profile:
 
@@ -86,12 +110,13 @@ Run a quick auth check:
 openclaw --profile "$OPENCLAW_TRACE_PROFILE" models status --json
 ```
 
-## Planned Real OpenClaw Modules
+## Implemented Modules
 
 ```text
 cli_runner.py          starts real OpenClaw agent runs and captures raw artifacts
 transcript_reader.py   parses OpenClaw transcript directories into tool events
-event_normalizer.py    converts tool events into AgentGuard RawTraceRecord objects
-trace_collector.py     orchestrates scenario -> trace collection
-configs/               three controlled OpenClaw agent configurations
+trace_collector.py     orchestrates scenario -> v1 trace collection
+event_normalizer.py    legacy helper for normalized event artifacts
+configs/               controlled OpenClaw agent configuration templates
+productivity_ui/       virtual environment browser UI
 ```
