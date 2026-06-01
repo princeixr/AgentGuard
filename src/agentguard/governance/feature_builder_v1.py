@@ -9,6 +9,7 @@ from __future__ import annotations
 from difflib import SequenceMatcher
 from uuid import uuid4
 
+from agentguard.governance.retrieval_v1 import NullRetrievalProviderV1, RetrievalProviderV1
 from agentguard.runtime.tool_registry import ToolRegistry, build_default_tool_registry
 from agentguard.tracing.schema_v1 import (
     ContextFeaturesV1,
@@ -21,8 +22,13 @@ from agentguard.tracing.schema_v1 import (
 
 
 class TraceFeatureBuilderV1:
-    def __init__(self, tool_registry: ToolRegistry | None = None):
+    def __init__(
+        self,
+        tool_registry: ToolRegistry | None = None,
+        retrieval_provider: RetrievalProviderV1 | None = None,
+    ):
         self.tool_registry = tool_registry or build_default_tool_registry()
+        self.retrieval_provider = retrieval_provider or NullRetrievalProviderV1()
 
     def build(self, trace: AgentGuardTraceV1) -> TraceFeatureV1:
         tool = trace.proposed_tool_call
@@ -39,15 +45,14 @@ class TraceFeatureBuilderV1:
         )
         data_scope_violation = any(scope in tool.argument_summary for scope in intent.forbidden_data_scopes)
 
+        retrieval = self.retrieval_provider.retrieve(trace)
+
         return TraceFeatureV1(
             feature_id=str(uuid4()),
             trace_id=trace.trace_id,
             session_id=trace.session_id,
             step_index=trace.step_index,
-            retrieval=RetrievalFeatureV1(
-                query_text=trace.retrieval_text.summary,
-                top_k=0,
-            ),
+            retrieval=retrieval,
             historical_statistics=HistoricalStatisticsV1(
                 sequence_percentile_rarity=0.2 if not tool_in_task_relevant_set else 0.0,
                 argument_cluster_distance=0.3 if data_scope_violation else 0.0,

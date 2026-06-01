@@ -132,6 +132,40 @@ class AgentGuardElasticStore:
         }
         return self.client.post(f"{self.config.indices.traces}/_search", query)
 
+    def find_latest_decisions_by_trace_ids(self, trace_ids: list[str]) -> dict[str, dict[str, Any]]:
+        if not trace_ids:
+            return {}
+        query = {
+            "size": max(1, len(trace_ids) * 3),
+            "sort": [{"@timestamp": {"order": "desc"}}],
+            "query": {"terms": {"trace_id": trace_ids}},
+        }
+        response = self.client.post(f"{self.config.indices.guard_decisions}/_search", query)
+        decisions: dict[str, dict[str, Any]] = {}
+        for hit in response.get("hits", {}).get("hits", []):
+            source = hit.get("_source", {})
+            trace_id = source.get("trace_id")
+            if trace_id and trace_id not in decisions:
+                decisions[trace_id] = source
+        return decisions
+
+    def find_labels_by_trace_ids(self, trace_ids: list[str]) -> dict[str, dict[str, Any]]:
+        if not trace_ids:
+            return {}
+        query = {
+            "size": max(1, len(trace_ids) * 3),
+            "sort": [{"@timestamp": {"order": "desc"}}],
+            "query": {"terms": {"trace_id": trace_ids}},
+        }
+        response = self.client.post(f"{self.config.indices.labels}/_search", query)
+        labels: dict[str, dict[str, Any]] = {}
+        for hit in response.get("hits", {}).get("hits", []):
+            source = hit.get("_source", {})
+            trace_id = source.get("trace_id")
+            if trace_id and trace_id not in labels:
+                labels[trace_id] = source
+        return labels
+
     def _index_model(self, index_name: str, document_id: str, model: BaseModel) -> dict[str, Any]:
         return self.client.put(f"{index_name}/_doc/{document_id}", _model_doc(model))
 

@@ -1,0 +1,54 @@
+{
+  "mappings": {
+    "dynamic": true,
+    "properties": {
+      "@timestamp": {
+        "type": "date"
+      },
+      "decision": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "decision_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "decision_rules_fired": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "explanation": {
+        "type": "text"
+      },
+      "final_risk_score": {
+        "type": "float"
+      },
+      "latency_ms": {
+        "type": "integer"
+      },
+      "schema_version": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "score_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "session_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "step_index": {
+        "type": "integer"
+      },
+      "tier_used": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "trace_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      }
+    }
+  }
+}

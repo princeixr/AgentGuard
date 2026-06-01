@@ -8,9 +8,9 @@ The project asks one practical question before every consequential tool call:
 Should this agent take this tool action now, for this user intent, after this trajectory?
 ```
 
-The current implementation uses a canonical v1 schema and a deterministic v1 firewall
-pipeline. Deeper statistical retrieval, Elastic-backed memory, and Google ADK runtime
-interception are being built on top of this working skeleton.
+The current implementation uses a canonical v1 schema, a deterministic v1 firewall
+pipeline, and a verified Elastic Cloud storage path. Deeper statistical retrieval and
+Google ADK runtime interception are being built on top of this working skeleton.
 
 ## Repository Layout
 
@@ -19,6 +19,7 @@ src/agentguard/              reusable AgentGuard framework
 apps/google_adk_demo_agent/  hackathon-facing Google ADK demo path
 apps/openclaw_trace_agents/  OpenClaw historical trace-generation pipeline
 data/scenarios/              benchmark and demo scenario JSONL files
+data/elastic/                Elastic database workspace: mappings, query bodies, notebooks, exports
 data/traces/                 local JSONL trace, feature, score, decision, and event stores
 data/openclaw_raw/           raw OpenClaw run artifacts and transcript samples
 data/intenttracebench_v0/    benchmark-ready trace dataset artifacts
@@ -138,16 +139,31 @@ After setting `ELASTICSEARCH_URL` and auth in an env file:
 ```bash
 AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/setup_elastic_indices.py
 AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/ingest_openclaw_traces_to_elastic.py
+AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/replay_traces.py --elastic --namespace openclaw_replay
 AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/query_elastic_traces.py --size 5
 ```
 
 See [docs/elastic_storage.md](docs/elastic_storage.md).
 
+The database workspace lives under [data/elastic](data/elastic). It contains checked-in
+mapping snapshots, reusable query bodies, database inspection notebooks, and ignored
+local exports. The actual Elastic connector code remains under `src/agentguard/storage`.
+
+Current verified checkpoint:
+
+```text
+7 OpenClaw traces indexed into agentguard-traces-v1
+7 replayed guard decisions indexed into agentguard-guard-decisions-v1
+21 live events indexed into agentguard-live-events-v1
+4 session-risk states indexed into agentguard-session-risk-v1
+```
+
 ## Current Status
 
 The repository has a working v1 trace and firewall path with deterministic placeholder
-logic. Local JSONL storage is implemented now; Elastic is the planned production memory
-and retrieval backend described in [schema_architecture.md](schema_architecture.md).
+logic. Local JSONL storage and Elastic Cloud storage are both running; Elastic is now the
+planned production memory and retrieval backend described in
+[schema_architecture.md](schema_architecture.md).
 
 Detailed current state is tracked in
 [src/agentguard/current_state_of_developement.md](src/agentguard/current_state_of_developement.md).

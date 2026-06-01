@@ -1,0 +1,62 @@
+{
+  "mappings": {
+    "dynamic": true,
+    "properties": {
+      "@timestamp": {
+        "type": "date"
+      },
+      "feature_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "retrieval": {
+        "properties": {
+          "approved_trace_ids": {
+            "ignore_above": 512,
+            "type": "keyword"
+          },
+          "blocked_neighbor_ratio": {
+            "type": "float"
+          },
+          "blocked_trace_ids": {
+            "ignore_above": 512,
+            "type": "keyword"
+          },
+          "max_approved_similarity": {
+            "type": "float"
+          },
+          "max_blocked_similarity": {
+            "type": "float"
+          },
+          "mean_approved_similarity": {
+            "type": "float"
+          },
+          "mean_blocked_similarity": {
+            "type": "float"
+          },
+          "query_text": {
+            "type": "text"
+          },
+          "top_k": {
+            "type": "integer"
+          }
+        }
+      },
+      "schema_version": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "session_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "step_index": {
+        "type": "integer"
+      },
+      "trace_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      }
+    }
+  }
+}
