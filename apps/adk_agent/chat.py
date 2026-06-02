@@ -23,12 +23,12 @@ sys.path.insert(0, os.path.dirname(_AGENT_DIR))
 _REPO_ROOT = os.path.dirname(os.path.dirname(_AGENT_DIR))
 sys.path.insert(0, os.path.join(_REPO_ROOT, "src"))
 
-# Load apps/adk_agent/.env so GOOGLE_API_KEY etc. are available even when this
-# script is run directly (the `adk` CLI does this for you; a plain script does not).
+# Load the repo root .env so GOOGLE_API_KEY etc. are available even when this
+# script is run directly.
 try:
     from dotenv import load_dotenv
 
-    load_dotenv(os.path.join(_AGENT_DIR, ".env"))
+    load_dotenv(os.path.join(_REPO_ROOT, ".env"))
 except ModuleNotFoundError:
     pass
 
@@ -43,7 +43,12 @@ except ModuleNotFoundError:  # pragma: no cover - guidance for first-time setup
         "and set a Gemini API key, e.g. export GOOGLE_API_KEY=..."
     )
 
-from adk_agent.agent import root_agent  # noqa: E402
+from adk_agent.agent import (  # noqa: E402
+    GMAIL_MCP_CREDENTIALS_VOLUME,
+    GMAIL_MCP_DOCKER_IMAGE,
+    GMAIL_MCP_ENABLED,
+    root_agent,
+)
 APP_NAME = "adk_terminal_assistant"
 USER_ID = "local_user"
 SESSION_ID = "local_session"
@@ -72,7 +77,7 @@ def _render_event(event) -> None:
 async def main() -> None:
     if not (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_GENAI_USE_VERTEXAI")):
         print(
-            "Warning: no GOOGLE_API_KEY found in the environment or apps/adk_agent/.env. "
+            "Warning: no GOOGLE_API_KEY found in the environment or repo root .env. "
             "The agent will fail to call the model until you set one.\n",
             file=sys.stderr,
         )
@@ -85,6 +90,13 @@ async def main() -> None:
     trace_path = os.path.join(TRACE_ROOT, "v1", TRACE_NAMESPACE, "traces.jsonl")
 
     print(f"Chatting with '{root_agent.name}' (model: {root_agent.model}).")
+    if GMAIL_MCP_ENABLED:
+        print(
+            "Gmail MCP enabled "
+            f"(Docker image: {GMAIL_MCP_DOCKER_IMAGE}, volume: {GMAIL_MCP_CREDENTIALS_VOLUME})."
+        )
+    else:
+        print("Gmail MCP disabled (set ADK_GMAIL_MCP_ENABLED=true to enable it).")
     print(f"Writing AgentGuard v1 traces to {trace_path}.")
     print("Type a message, or 'exit' to quit.\n")
 

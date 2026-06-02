@@ -1,9 +1,7 @@
 """A conversational Google ADK agent with a terminal-command tool.
 
-This is a self-contained demo agent you can chat with. It exposes a single tool,
-``run_shell_command``, that executes commands on the local machine and returns
-their output, so the model can inspect the filesystem, run scripts, check tool
-versions, etc.
+This is a self-contained demo agent you can chat with. It exposes a terminal
+tool and, optionally, a Docker-backed Gmail MCP toolset.
 
 Run it with the ADK CLI from the repo root:
 
@@ -14,19 +12,29 @@ or with the bundled standalone chat loop:
 
     python apps/adk_agent/chat.py
 
-Requires ``google-adk`` (``pip install google-adk``) and a Gemini API key in the
-environment (``GOOGLE_API_KEY``). ADK auto-loads ``apps/adk_agent/.env``.
+Requires ``google-adk`` (``pip install google-adk``) and configuration in the
+repo root ``.env``.
 """
 
 from __future__ import annotations
 
 import os
 import subprocess
+from pathlib import Path
 from typing import Any
 
 from google.adk.agents import Agent
 
 from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(_REPO_ROOT / ".env")
+except ModuleNotFoundError:
+    pass
 
 # How long a single command may run before we give up on it.
 COMMAND_TIMEOUT_SECONDS = int(os.environ.get("ADK_COMMAND_TIMEOUT_SECONDS", "60"))
@@ -34,10 +42,33 @@ COMMAND_TIMEOUT_SECONDS = int(os.environ.get("ADK_COMMAND_TIMEOUT_SECONDS", "60"
 # Cap returned output so a chatty command can't blow up the model context.
 MAX_OUTPUT_CHARS = int(os.environ.get("ADK_MAX_OUTPUT_CHARS", "20000"))
 TRACE_NAMESPACE = os.environ.get("AGENTGUARD_ADK_TRACE_NAMESPACE", "google_adk")
-TRACE_ROOT = os.environ.get("AGENTGUARD_TRACE_ROOT", "data/traces")
+TRACE_ROOT = os.environ.get("AGENTGUARD_TRACE_ROOT", str(_REPO_ROOT / "data" / "traces"))
 AGENT_ID = "terminal_assistant"
 APP_NAME = "adk_terminal_assistant"
-AVAILABLE_TOOLS = ["run_shell_command"]
+GMAIL_MCP_ENABLED = os.environ.get("ADK_GMAIL_MCP_ENABLED", "").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+GMAIL_MCP_DOCKER_IMAGE = os.environ.get(
+    "GMAIL_MCP_DOCKER_IMAGE", "agentguard-gmail-mcp:artymclabin"
+)
+GMAIL_MCP_CREDENTIALS_VOLUME = os.environ.get("GMAIL_MCP_CREDENTIALS_VOLUME", "mcp-gmail")
+GMAIL_MCP_TOOL_PREFIX = os.environ.get("GMAIL_MCP_TOOL_PREFIX", "gmail").strip("_") or "gmail"
+GMAIL_MCP_RAW_TOOLS = [
+    "search_emails",
+    "read_email",
+    "draft_email",
+    "send_email",
+    "send_draft",
+]
+GMAIL_MCP_TOOLS = [f"{GMAIL_MCP_TOOL_PREFIX}_{name}" for name in GMAIL_MCP_RAW_TOOLS]
+GMAIL_SEND_TOOLS = {
+    f"{GMAIL_MCP_TOOL_PREFIX}_send_email",
+    f"{GMAIL_MCP_TOOL_PREFIX}_send_draft",
+}
+AVAILABLE_TOOLS = ["run_shell_command"] + (GMAIL_MCP_TOOLS if GMAIL_MCP_ENABLED else [])
 
 _TRACE_SESSIONS: dict[str, GoogleADKTraceSession] = {}
 
@@ -91,14 +122,81 @@ def run_shell_command(command: str) -> dict:
         }
 
 
-def _before_tool_callback(tool, args: dict[str, Any], tool_context) -> None:
+def _build_gmail_mcp_toolset() -> list[Any]:
+    if not GMAIL_MCP_ENABLED:
+        return []
+
+    try:
+        from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
+        from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
+        from mcp import StdioServerParameters
+    except ImportError as exc:  # pragma: no cover - startup guidance
+        raise RuntimeError(
+            "Gmail MCP is enabled, but MCP dependencies are not installed. "
+            "Run `uv sync` from the repo root and try again."
+        ) from exc
+
+    return [
+        McpToolset(
+            connection_params=StdioConnectionParams(
+                server_params=StdioServerParameters(
+                    command="docker",
+                    args=[
+                        "run",
+                        "-i",
+                        "--rm",
+                        "-v",
+                        f"{GMAIL_MCP_CREDENTIALS_VOLUME}:/gmail-server",
+                        "-e",
+                        "GMAIL_OAUTH_PATH=/gmail-server/gcp-oauth.keys.json",
+                        "-e",
+                        "GMAIL_CREDENTIALS_PATH=/gmail-server/credentials.json",
+                        GMAIL_MCP_DOCKER_IMAGE,
+                    ],
+                ),
+            ),
+            tool_filter=GMAIL_MCP_RAW_TOOLS,
+            tool_name_prefix=GMAIL_MCP_TOOL_PREFIX,
+        )
+    ]
+
+
+def _before_tool_callback(tool, args: dict[str, Any], tool_context):
     tracer = _get_trace_session(tool_context)
-    tracer.start_turn(_extract_user_text(tool_context))
+    user_text = _extract_user_text(tool_context)
+    tool_name = _tool_name(tool)
+    call_id = getattr(tool_context, "function_call_id", None)
+    tracer.start_turn(user_text)
     tracer.record_tool_call(
-        _tool_name(tool),
+        tool_name,
         args,
-        call_id=getattr(tool_context, "function_call_id", None),
+        call_id=call_id,
     )
+
+    if _should_block_gmail_send(tool_name, user_text):
+        blocked_response = {
+            "error": (
+                "AgentGuard blocked this Gmail send tool because the current user "
+                "turn did not explicitly authorize sending."
+            ),
+            "blocked_by_agentguard": True,
+            "tool_name": tool_name,
+        }
+        tracer.record_tool_response(tool_name, blocked_response, call_id=call_id)
+        return blocked_response
+
+    if _should_block_shell_email_send(tool_name, args, user_text):
+        blocked_response = {
+            "error": (
+                "AgentGuard blocked this shell command because email sending must go "
+                "through the guarded Gmail MCP tools, not command-line fallback."
+            ),
+            "blocked_by_agentguard": True,
+            "tool_name": tool_name,
+        }
+        tracer.record_tool_response(tool_name, blocked_response, call_id=call_id)
+        return blocked_response
+
     return None
 
 
@@ -156,20 +254,90 @@ def _tool_name(tool) -> str:
     return getattr(tool, "name", None) or getattr(tool, "__name__", None) or str(tool)
 
 
+def _should_block_gmail_send(tool_name: str, user_text: str) -> bool:
+    if tool_name not in GMAIL_SEND_TOOLS:
+        return False
+    return _has_negative_send_instruction(user_text) or not _has_explicit_send_intent(user_text)
+
+
+def _should_block_shell_email_send(tool_name: str, args: dict[str, Any], user_text: str) -> bool:
+    if tool_name != "run_shell_command" or not _has_explicit_send_intent(user_text):
+        return False
+    command = str(args.get("command", "")).lower()
+    shell_email_markers = [
+        "mail",
+        "sendmail",
+        "mutt",
+        "msmtp",
+        "swaks",
+        "smtp",
+        "gmail",
+        "smtplib",
+        "nodemailer",
+        "curl",
+    ]
+    return any(marker in command for marker in shell_email_markers)
+
+
+def _has_negative_send_instruction(text: str) -> bool:
+    lowered = text.lower()
+    negative_phrases = [
+        "do not send",
+        "don't send",
+        "dont send",
+        "not send",
+        "never send",
+        "without sending",
+        "draft only",
+        "only draft",
+        "prepare but not send",
+        "write but not send",
+        "create but not send",
+    ]
+    return any(phrase in lowered for phrase in negative_phrases)
+
+
+def _has_explicit_send_intent(text: str) -> bool:
+    lowered = text.lower()
+    send_phrases = [
+        "send an email",
+        "send email",
+        "send the email",
+        "send this email",
+        "send it",
+        "send the draft",
+        "send this draft",
+        "email them",
+        "email him",
+        "email her",
+    ]
+    return any(phrase in lowered for phrase in send_phrases)
+
+
+TOOLS = [run_shell_command] + _build_gmail_mcp_toolset()
+
 root_agent = Agent(
     name=AGENT_ID,
     model=os.environ.get("ADK_MODEL", "gemini-3-flash-preview"),
-    description="A conversational assistant that can run terminal commands on the local machine.",
+    description=(
+        "A conversational assistant that can run terminal commands and, when enabled, "
+        "use a guarded Gmail MCP server."
+    ),
     instruction=(
         "You are a helpful command-line assistant. Chat naturally with the user. "
         "When a request needs information from, or an action on, the local machine, "
         "call the run_shell_command tool with a single non-interactive shell command. "
+        "When Gmail MCP tools are available, use Gmail search/read tools for inbox "
+        "questions and Gmail draft tools when the user asks to prepare email. Only "
+        "use Gmail send tools when the current user message explicitly asks you to "
+        "send an email or send a draft. Never use run_shell_command, command-line "
+        "mail clients, SMTP scripts, curl, or other shell fallbacks to send email. "
         "Inspect the returned exit_code, stdout, and stderr, then explain the result "
         "in plain language. If a command fails, read stderr and either fix and retry "
         "or tell the user what went wrong."
     ),
-    tools=[run_shell_command],
-    before_tool_callback=_before_tool_callback,
-    after_tool_callback=_after_tool_callback,
-    on_tool_error_callback=_on_tool_error_callback,
+    tools=TOOLS,
+    # before_tool_callback=_before_tool_callback,
+    # after_tool_callback=_after_tool_callback,
+    # on_tool_error_callback=_on_tool_error_callback,
 )

@@ -14,6 +14,8 @@ from agentguard.tracing.schema_v1 import AgentGuardTraceV1, LiveEventV1, TraceSo
 from agentguard.tracing.trace_store import TraceStore
 from agentguard.tracing.trace_v1_builder import TraceV1BuildInput, TraceV1Builder
 
+GMAIL_SEND_TOOL_NAMES = {"gmail_send", "gmail_send_email", "gmail_send_draft"}
+
 
 class GoogleADKAdapter:
     def __init__(self, tool_registry=None, firewall=None, trace_builder=None, trace_store=None, max_steps=6):
@@ -105,10 +107,16 @@ class GoogleADKTraceSession:
                 previous_trace_id=self.previous_trace_id,
                 available_tools=self.available_tools,
                 task_relevant_tools=_infer_task_relevant_tools(tool_name, self.available_tools),
+                intent_forbidden_tools=_infer_intent_forbidden_tools(
+                    tool_name,
+                    self.available_tools,
+                    self.raw_user_request,
+                ),
                 confirmation_required_tools=_confirmation_required_tools(tool_name),
                 prior_tool_calls=list(self.prior_tool_calls),
                 previous_output_summary=self.previous_output_summary,
                 execution_status="proposed",
+                mcp_server=_infer_mcp_server(tool_name),
             )
         )
         self.trace_store.append_trace_v1(trace, namespace=self.namespace)
@@ -141,8 +149,12 @@ class GoogleADKTraceSession:
         )
         self.previous_trace_id = trace.trace_id
         self.previous_output_summary = output_summary
+        event_type = {
+            "blocked": "tool_blocked",
+            "failed": "tool_failed",
+        }.get(status, "tool_executed")
         self._append_event(
-            "tool_failed" if status == "failed" else "tool_executed",
+            event_type,
             trace,
             {"call_id": trace.proposed_tool_call.call_id, "output_summary": output_summary},
         )
@@ -197,14 +209,46 @@ def _infer_task_relevant_tools(tool_name: str, available_tools: list[str]) -> li
     return available_tools
 
 
+def _infer_intent_forbidden_tools(
+    tool_name: str,
+    available_tools: list[str],
+    raw_user_request: str,
+) -> list[str]:
+    if tool_name not in GMAIL_SEND_TOOL_NAMES:
+        return []
+    request = raw_user_request.lower()
+    negative_phrases = [
+        "do not send",
+        "don't send",
+        "dont send",
+        "not send",
+        "without sending",
+        "draft only",
+        "only draft",
+    ]
+    if not any(phrase in request for phrase in negative_phrases):
+        return []
+    return [tool for tool in available_tools if tool in GMAIL_SEND_TOOL_NAMES] or [tool_name]
+
+
 def _confirmation_required_tools(tool_name: str) -> list[str]:
     if tool_name == "run_shell_command":
+        return [tool_name]
+    if tool_name in GMAIL_SEND_TOOL_NAMES:
         return [tool_name]
     return []
 
 
+def _infer_mcp_server(tool_name: str) -> str | None:
+    if tool_name.startswith("gmail_") and tool_name != "gmail_send":
+        return "artymclabin_gmail_mcp"
+    return None
+
+
 def _execution_status(response: Any) -> str:
     if isinstance(response, Mapping):
+        if response.get("blocked_by_agentguard"):
+            return "blocked"
         if response.get("error"):
             return "failed"
         if response.get("timed_out"):
@@ -218,6 +262,10 @@ def _execution_status(response: Any) -> str:
 def _summarize_tool_response(response: Any, max_chars: int = 500) -> str:
     if isinstance(response, Mapping):
         pieces = []
+        if response.get("blocked_by_agentguard"):
+            pieces.append("blocked_by_agentguard=true")
+        if response.get("error"):
+            pieces.append(f"error={str(response.get('error'))[:max_chars]}")
         if "exit_code" in response:
             pieces.append(f"exit_code={response.get('exit_code')}")
         stdout = str(response.get("stdout") or "").strip()
