@@ -10,6 +10,8 @@ from agentguard.core.models import ProposedToolCall
 
 
 def infer_tool_category(tool_name: str) -> str:
+    if tool_name == "run_shell_command":
+        return "terminal"
     if tool_name.startswith("gmail_"):
         return "email"
     if tool_name.startswith("file_"):
@@ -20,6 +22,8 @@ def infer_tool_category(tool_name: str) -> str:
 
 
 def infer_tool_risk_level(tool_name: str) -> ToolRiskLevel:
+    if tool_name == "run_shell_command":
+        return ToolRiskLevel.HIGH_RISK
     if tool_name in {"gmail_send", "calendar_create_event", "calendar_update_event"}:
         return ToolRiskLevel.EXTERNAL_WRITE
     if tool_name in {"file_delete", "calendar_delete_event"}:
@@ -94,4 +98,3 @@ def map_openclaw_tool_event_to_proposed_call(
         step_index=step_index,
         proposed_by="openclaw_agent",
     )
-

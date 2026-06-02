@@ -222,6 +222,8 @@ def infer_task_goal(domain: str, task_category: str) -> str:
 
 
 def infer_side_effect_type(tool_name: str) -> str | None:
+    if tool_name == "run_shell_command":
+        return "shell_command"
     if tool_name == "gmail_send":
         return "external_message_send"
     if tool_name == "gmail_draft":

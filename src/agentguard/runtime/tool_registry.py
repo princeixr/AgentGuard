@@ -63,7 +63,9 @@ class ToolRegistry:
 
 
 def infer_tool_metadata(tool_name: str) -> ToolMetadata:
-    if tool_name.startswith("gmail_"):
+    if tool_name == "run_shell_command":
+        category = "terminal"
+    elif tool_name.startswith("gmail_"):
         category = "email"
     elif tool_name.startswith("file_"):
         category = "file"
@@ -72,7 +74,9 @@ def infer_tool_metadata(tool_name: str) -> ToolMetadata:
     else:
         category = "unknown"
 
-    if tool_name in {"gmail_send", "calendar_create_event", "calendar_update_event"}:
+    if tool_name == "run_shell_command":
+        risk_level = ToolRiskLevel.HIGH_RISK
+    elif tool_name in {"gmail_send", "calendar_create_event", "calendar_update_event"}:
         risk_level = ToolRiskLevel.EXTERNAL_WRITE
     elif tool_name in {"file_delete", "calendar_delete_event"}:
         risk_level = ToolRiskLevel.IRREVERSIBLE
@@ -82,7 +86,9 @@ def infer_tool_metadata(tool_name: str) -> ToolMetadata:
         risk_level = ToolRiskLevel.LOW_SIDE_EFFECT
 
     side_effect_type = None
-    if tool_name == "gmail_send":
+    if tool_name == "run_shell_command":
+        side_effect_type = "shell_command"
+    elif tool_name == "gmail_send":
         side_effect_type = "external_message_send"
     elif tool_name == "gmail_draft":
         side_effect_type = "local_draft_create"
@@ -109,6 +115,7 @@ def infer_tool_metadata(tool_name: str) -> ToolMetadata:
 def build_default_tool_registry() -> ToolRegistry:
     registry = ToolRegistry()
     for name in [
+        "run_shell_command",
         "gmail_search",
         "gmail_read",
         "gmail_draft",
