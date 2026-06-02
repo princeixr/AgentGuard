@@ -1,0 +1,37 @@
+{
+  "mappings": {
+    "dynamic": true,
+    "properties": {
+      "@timestamp": {
+        "type": "date"
+      },
+      "feature_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "guard_version": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "schema_version": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "score_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "session_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "step_index": {
+        "type": "integer"
+      },
+      "trace_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      }
+    }
+  }
+}

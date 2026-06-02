@@ -93,3 +93,55 @@ def test_session_risk_state_is_written(tmp_path):
     )
 
     assert state_path.exists()
+
+
+class FakeElasticStore:
+    def __init__(self):
+        self.calls = []
+
+    def search_similar_traces(self, trace, size=8, include_live=False):
+        return {"hits": {"hits": []}}
+
+    def find_latest_decisions_by_trace_ids(self, trace_ids):
+        return {}
+
+    def find_labels_by_trace_ids(self, trace_ids):
+        return {}
+
+    def index_trace(self, trace):
+        self.calls.append(("trace", trace.trace_id))
+
+    def index_live_event(self, event):
+        self.calls.append(("live_event", event.event_type))
+
+    def index_trace_feature(self, feature):
+        self.calls.append(("feature", feature.trace_id))
+
+    def index_guard_score(self, score):
+        self.calls.append(("score", score.trace_id))
+
+    def index_guard_decision(self, decision):
+        self.calls.append(("decision", decision.trace_id))
+
+    def index_session_risk(self, state):
+        self.calls.append(("session_risk", state.session_id))
+
+
+def test_firewall_v1_mirrors_artifacts_to_elastic(tmp_path):
+    elastic_store = FakeElasticStore()
+    firewall = AgentGuardFirewallV1(
+        trace_store=TraceStore(root_dir=tmp_path / "traces"),
+        elastic_store=elastic_store,
+        namespace="test",
+    )
+
+    result = firewall.intercept(build_trace("gmail_send"))
+
+    call_types = [call_type for call_type, _ in elastic_store.calls]
+    assert "trace" in call_types
+    assert "feature" in call_types
+    assert "score" in call_types
+    assert "decision" in call_types
+    assert "session_risk" in call_types
+    assert call_types.count("live_event") >= 3
+    assert result.feature.retrieval.top_k == 0

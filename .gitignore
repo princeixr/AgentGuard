@@ -1,6 +1,7 @@
 .venv/
 .env
 .env.openclaw
+.env.elastic
 __pycache__/
 *.py[cod]
 .pytest_cache/

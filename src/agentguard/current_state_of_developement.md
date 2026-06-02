@@ -1,6 +1,6 @@
 # Current State Of Developement
 
-Last updated: 2026-05-30
+Last updated: 2026-06-01
 
 This file summarizes the AgentGuard implementation that is currently in place inside
 `src/agentguard` and the connected app surfaces.
@@ -48,7 +48,7 @@ Purpose:
 
 ### Trace Storage
 
-Status: running locally; initial Elastic path implemented.
+Status: running locally and mirrored to Elastic.
 
 Implemented in `src/agentguard/tracing/trace_store.py`.
 
@@ -66,29 +66,58 @@ data/traces/v1/<namespace>/session_risk/<session_id>.json
 
 Remaining:
 
-- connect Elastic retrieval results into live `TraceFeatureV1.retrieval`,
-- add semantic/vector retrieval after the first lexical ingestion path is verified.
+- add semantic/vector retrieval after the lexical Elastic path is stable,
+- define retention and export rules for larger benchmark runs.
 
 ### Elastic Storage
 
-Status: initial setup and ingestion path running.
+Status: running against Elastic Cloud Serverless.
 
-Implemented under `src/agentguard/storage/`.
+Implemented under `src/agentguard/storage/`, with database workspace artifacts under
+`data/elastic/`.
 
 Current capabilities:
 
 - environment-based Elastic config,
-- index setup for all v1 stores,
+- index setup for all v1 stores on Elastic Cloud Serverless,
+- checked-in database workspace for mappings, query bodies, notebooks, and exports,
 - bulk ingestion of `AgentGuardTraceV1` from `data/traces/v1/openclaw/traces.jsonl`,
 - lexical similar-trace query using domain/tool filters and retrieval text,
+- Elastic retrieval provider that maps labels/decisions into `TraceFeatureV1.retrieval`,
+- `AgentGuardFirewallV1` can mirror trace, feature, score, decision, live-event, and
+  session-risk artifacts into Elastic,
+- replay script can create decision memory from historical OpenClaw traces,
 - dry-run validation without Elastic credentials.
+
+Verified checkpoint on 2026-06-01:
+
+```text
+Elastic cluster: ecd5d17d80a44eb5b81456b138062893
+OpenClaw traces ingested: 7/7
+OpenClaw traces replayed through AgentGuard: 7
+```
+
+Verified Elastic indices and document counts:
+
+```text
+agentguard-traces-v1           7
+agentguard-live-events-v1      21
+agentguard-trace-features-v1   7
+agentguard-guard-scores-v1     7
+agentguard-guard-decisions-v1  7
+agentguard-session-risk-v1     4
+agentguard-labels-v1           0
+agentguard-scenarios-v1        0
+```
 
 Commands:
 
 ```bash
+python3 scripts/export_elastic_workspace.py
 python3 scripts/ingest_openclaw_traces_to_elastic.py --dry-run
 AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/setup_elastic_indices.py
 AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/ingest_openclaw_traces_to_elastic.py
+AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/replay_traces.py --elastic --namespace openclaw_replay
 AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/query_elastic_traces.py --size 5
 ```
 
@@ -148,9 +177,10 @@ Running behavior:
 
 Remaining:
 
-- replace placeholder retrieval values with Elastic retrieval,
 - calibrate formulas against labeled benchmark data,
-- add LLM-as-judge fallback with retrieved evidence.
+- add LLM-as-judge fallback with retrieved Elastic evidence,
+- add approval/block examples to validate decision thresholds beyond current allow-only
+  replay examples.
 
 ### OpenClaw Trace Generation
 
@@ -246,9 +276,14 @@ AGENTGUARD_ENV_FILE=.env.openclaw python3 scripts/collect_openclaw_traces.py \
 
 ## Immediate Next Work
 
-1. Build the real Google ADK/MCP adapter.
-2. Add Elastic storage and retrieval for the v1 records.
-3. Expand OpenClaw scenarios and produce labeled `IntentTraceBench v0`.
-4. Replace placeholder scoring with calibrated statistical formulas.
-5. Connect dashboard views to `LiveEventV1`, `GuardDecisionV1`, and
-   `SessionRiskStateV1`.
+1. Populate `agentguard-scenarios-v1` from `data/scenarios/productivity_agent_scenarios.jsonl`.
+2. Build the first label pipeline for `agentguard-labels-v1` using human labels and later
+   LLM-assisted labels.
+3. Build the real Google ADK/MCP adapter and enforce `GuardDecisionV1` before tool
+   execution.
+4. Expand OpenClaw scenarios to include blocked, approval-required, prompt-injection,
+   cross-domain, and data-exfiltration cases.
+5. Replace placeholder scoring with calibrated statistical formulas and Elastic-backed
+   retrieval features.
+6. Add Kibana data views/dashboard views for traces, decisions, live events, and session
+   risk.
