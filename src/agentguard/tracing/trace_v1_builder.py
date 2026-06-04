@@ -58,13 +58,18 @@ class TraceV1BuildInput:
     output_influenced_current_call: bool = False
     execution_status: str = "proposed"
     mcp_server: str | None = None
+    tool_category: str | None = None
+    risk_level: str | None = None
+    side_effect_type: str | None = None
 
 
 class TraceV1Builder:
     def build(self, data: TraceV1BuildInput) -> AgentGuardTraceV1:
-        tool_category = infer_tool_category(data.tool_name)
+        tool_category = data.tool_category or infer_tool_category(data.tool_name)
         inferred_risk = infer_tool_risk_level(data.tool_name)
-        risk_level = inferred_risk.value if hasattr(inferred_risk, "value") else str(inferred_risk)
+        risk_level = data.risk_level or (
+            inferred_risk.value if hasattr(inferred_risk, "value") else str(inferred_risk)
+        )
         argument_summary = summarize_arguments(data.arguments)
         trajectory = build_trajectory(data.prior_tool_calls, data.previous_output_summary)
         explicit_constraints = data.explicit_constraints or constraints_from_intent(
@@ -91,7 +96,7 @@ class TraceV1Builder:
             tool_category=tool_category,
             mcp_server=data.mcp_server,
             risk_level=risk_level,
-            side_effect_type=infer_side_effect_type(data.tool_name),
+            side_effect_type=data.side_effect_type or infer_side_effect_type(data.tool_name),
             arguments=data.arguments,
             argument_summary=argument_summary,
             argument_hash=hash_arguments(data.arguments),

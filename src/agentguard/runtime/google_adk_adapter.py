@@ -8,8 +8,10 @@ from typing import Any
 from uuid import uuid4
 
 from agentguard.core.models import ExecutedToolCall
-from agentguard.governance.firewall_v1 import AgentGuardFirewallV1
+from agentguard.governance.firewall_v1 import AgentGuardFirewallV1, FirewallResultV1
+from agentguard.core.enums import ToolRiskLevel
 from agentguard.runtime.tool_event_mapper import infer_tool_category
+from agentguard.runtime.tool_registry import ToolMetadata, infer_tool_metadata
 from agentguard.tracing.schema_v1 import AgentGuardTraceV1, LiveEventV1, TraceSourceV1
 from agentguard.tracing.trace_store import TraceStore
 from agentguard.tracing.trace_v1_builder import TraceV1BuildInput, TraceV1Builder
@@ -52,6 +54,10 @@ class GoogleADKTraceSession:
         runtime_agent_id: str | None = None,
         trace_root: Path | str | None = None,
         builder: TraceV1Builder | None = None,
+        firewall: AgentGuardFirewallV1 | None = None,
+        tool_metadata: dict[str, ToolMetadata] | None = None,
+        enable_elastic: bool | None = None,
+        fail_on_elastic_error: bool = False,
     ):
         self.session_id = session_id
         self.agent_id = agent_id
@@ -62,11 +68,18 @@ class GoogleADKTraceSession:
         self.runtime_agent_id = runtime_agent_id or agent_id
         self.trace_store = trace_store or TraceStore(root_dir=Path(trace_root or "data/traces"))
         self.builder = builder or TraceV1Builder()
+        self.firewall = firewall or AgentGuardFirewallV1(
+            trace_store=self.trace_store,
+            namespace=self.namespace,
+            enable_elastic=enable_elastic,
+            fail_on_elastic_error=fail_on_elastic_error,
+        )
+        self.tool_metadata = tool_metadata or build_adk_tool_metadata(available_tools)
         self.raw_user_request = ""
         self.prior_tool_calls: list[ExecutedToolCall] = []
         self.previous_trace_id: str | None = None
         self.previous_output_summary: str | None = None
-        self.pending_traces: dict[str, AgentGuardTraceV1] = {}
+        self.pending_results: dict[str, FirewallResultV1] = {}
 
     @property
     def trace_path(self) -> Path:
@@ -80,14 +93,15 @@ class GoogleADKTraceSession:
         tool_name: str,
         arguments: Mapping[str, Any] | None = None,
         call_id: str | None = None,
-    ) -> AgentGuardTraceV1:
+    ) -> FirewallResultV1:
         call_id = call_id or str(uuid4())
         args = dict(arguments or {})
-        domain = _infer_domain(tool_name)
+        metadata = self._metadata(tool_name)
+        domain = _infer_domain(metadata)
         trace = self.builder.build(
             TraceV1BuildInput(
                 session_id=self.session_id,
-                step_index=len(self.prior_tool_calls) + len(self.pending_traces) + 1,
+                step_index=len(self.prior_tool_calls) + len(self.pending_results) + 1,
                 source=TraceSourceV1(
                     mode="live",
                     agent_framework="google_adk",
@@ -112,17 +126,21 @@ class GoogleADKTraceSession:
                     self.available_tools,
                     self.raw_user_request,
                 ),
-                confirmation_required_tools=_confirmation_required_tools(tool_name),
+                confirmation_required_tools=_confirmation_required_tools(tool_name, metadata),
                 prior_tool_calls=list(self.prior_tool_calls),
                 previous_output_summary=self.previous_output_summary,
                 execution_status="proposed",
-                mcp_server=_infer_mcp_server(tool_name),
+                mcp_server=metadata.mcp_server,
+                tool_category=metadata.category,
+                risk_level=metadata.risk_level.value
+                if hasattr(metadata.risk_level, "value")
+                else str(metadata.risk_level),
+                side_effect_type=metadata.side_effect_type,
             )
         )
-        self.trace_store.append_trace_v1(trace, namespace=self.namespace)
-        self._append_event("tool_proposed", trace, {"call_id": call_id})
-        self.pending_traces[call_id] = trace
-        return trace
+        result = self.firewall.intercept(trace)
+        self.pending_results[call_id] = result
+        return result
 
     def record_tool_response(
         self,
@@ -130,9 +148,10 @@ class GoogleADKTraceSession:
         response: Any,
         call_id: str | None = None,
     ) -> None:
-        trace = self._pop_pending_trace(tool_name=tool_name, call_id=call_id)
-        if trace is None:
+        result = self._pop_pending_result(tool_name=tool_name, call_id=call_id)
+        if result is None:
             return
+        trace = result.trace
 
         status = _execution_status(response)
         output_summary = _summarize_tool_response(response)
@@ -156,19 +175,23 @@ class GoogleADKTraceSession:
         self._append_event(
             event_type,
             trace,
-            {"call_id": trace.proposed_tool_call.call_id, "output_summary": output_summary},
+            _runtime_event_payload(
+                result=result,
+                execution_status=status,
+                output_summary=output_summary,
+            ),
         )
 
-    def _pop_pending_trace(
+    def _pop_pending_result(
         self,
         tool_name: str,
         call_id: str | None,
-    ) -> AgentGuardTraceV1 | None:
-        if call_id and call_id in self.pending_traces:
-            return self.pending_traces.pop(call_id)
-        for pending_call_id, trace in list(self.pending_traces.items()):
-            if trace.proposed_tool_call.tool_name == tool_name:
-                return self.pending_traces.pop(pending_call_id)
+    ) -> FirewallResultV1 | None:
+        if call_id and call_id in self.pending_results:
+            return self.pending_results.pop(call_id)
+        for pending_call_id, result in list(self.pending_results.items()):
+            if result.trace.proposed_tool_call.tool_name == tool_name:
+                return self.pending_results.pop(pending_call_id)
         return None
 
     def _append_event(
@@ -191,9 +214,62 @@ class GoogleADKTraceSession:
             namespace=self.namespace,
         )
 
+    def _metadata(self, tool_name: str) -> ToolMetadata:
+        return self.tool_metadata.get(tool_name, infer_adk_tool_metadata(tool_name))
 
-def _infer_domain(tool_name: str) -> str:
-    category = infer_tool_category(tool_name)
+
+def build_adk_tool_metadata(available_tools: list[str]) -> dict[str, ToolMetadata]:
+    return {tool_name: infer_adk_tool_metadata(tool_name) for tool_name in available_tools}
+
+
+def infer_adk_tool_metadata(tool_name: str) -> ToolMetadata:
+    if tool_name == "run_shell_command":
+        return ToolMetadata(
+            name=tool_name,
+            category="shell",
+            risk_level=ToolRiskLevel.LOW_SIDE_EFFECT,
+            side_effect_type="shell_command",
+            requires_confirmation_by_default=False,
+            irreversible=False,
+            description="Run a local non-interactive shell command.",
+        )
+    if tool_name.startswith("gmail_"):
+        raw_gmail_tool = tool_name.removeprefix("gmail_")
+        if raw_gmail_tool in {"search", "search_emails", "read", "read_email"}:
+            risk_level = ToolRiskLevel.READ_ONLY
+            side_effect_type = None
+            requires_confirmation = False
+            irreversible = False
+        elif raw_gmail_tool in {"draft", "draft_email"}:
+            risk_level = ToolRiskLevel.LOW_SIDE_EFFECT
+            side_effect_type = "local_draft_create"
+            requires_confirmation = False
+            irreversible = False
+        elif raw_gmail_tool in {"send", "send_email", "send_draft"}:
+            risk_level = ToolRiskLevel.EXTERNAL_WRITE
+            side_effect_type = "external_message_send"
+            requires_confirmation = True
+            irreversible = True
+        else:
+            risk_level = ToolRiskLevel.LOW_SIDE_EFFECT
+            side_effect_type = None
+            requires_confirmation = False
+            irreversible = False
+        return ToolMetadata(
+            name=tool_name,
+            category="email",
+            risk_level=risk_level,
+            side_effect_type=side_effect_type,
+            requires_confirmation_by_default=requires_confirmation,
+            irreversible=irreversible,
+            mcp_server="artymclabin_gmail_mcp",
+            description=f"Gmail MCP tool {raw_gmail_tool}.",
+        )
+    return infer_tool_metadata(tool_name)
+
+
+def _infer_domain(metadata: ToolMetadata) -> str:
+    category = metadata.category
     return category if category != "unknown" else "tool"
 
 
@@ -231,18 +307,10 @@ def _infer_intent_forbidden_tools(
     return [tool for tool in available_tools if tool in GMAIL_SEND_TOOL_NAMES] or [tool_name]
 
 
-def _confirmation_required_tools(tool_name: str) -> list[str]:
-    if tool_name == "run_shell_command":
-        return [tool_name]
-    if tool_name in GMAIL_SEND_TOOL_NAMES:
+def _confirmation_required_tools(tool_name: str, metadata: ToolMetadata) -> list[str]:
+    if metadata.requires_confirmation_by_default:
         return [tool_name]
     return []
-
-
-def _infer_mcp_server(tool_name: str) -> str | None:
-    if tool_name.startswith("gmail_") and tool_name != "gmail_send":
-        return "artymclabin_gmail_mcp"
-    return None
 
 
 def _execution_status(response: Any) -> str:
@@ -279,3 +347,28 @@ def _summarize_tool_response(response: Any, max_chars: int = 500) -> str:
         return "; ".join(pieces) or "tool returned an empty response"
     text = str(response).strip()
     return text[:max_chars] if text else "tool returned an empty response"
+
+
+def adk_runtime_policy(guard_decision: str) -> str:
+    if guard_decision in {"allow", "warn"}:
+        return "allow"
+    return "require_approval"
+
+
+def _runtime_event_payload(
+    result: FirewallResultV1,
+    execution_status: str,
+    output_summary: str,
+) -> dict[str, Any]:
+    runtime_policy = adk_runtime_policy(result.decision.decision)
+    return {
+        "runtime_event_source": "google_adk_adapter",
+        "call_id": result.trace.proposed_tool_call.call_id,
+        "execution_status": execution_status,
+        "output_summary": output_summary,
+        "runtime_policy": runtime_policy,
+        "approval_required": runtime_policy == "require_approval",
+        "firewall_decision": result.decision.decision,
+        "decision_id": result.decision.decision_id,
+        "score_id": result.score.score_id,
+    }

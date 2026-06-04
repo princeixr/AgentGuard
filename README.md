@@ -9,14 +9,14 @@ Should this agent take this tool action now, for this user intent, after this tr
 ```
 
 The current implementation uses a canonical v1 schema, a deterministic v1 firewall
-pipeline, and a verified Elastic Cloud storage path. Deeper statistical retrieval and
-Google ADK runtime interception are being built on top of this working skeleton.
+pipeline, active Google ADK callback interception, and a verified Elastic Cloud storage
+path. Deeper statistical retrieval is being built on top of this working skeleton.
 
 ## Repository Layout
 
 ```text
 src/agentguard/              reusable AgentGuard framework
-apps/google_adk_demo_agent/  hackathon-facing Google ADK demo path
+apps/adk_agent/              guarded Google ADK terminal assistant
 apps/openclaw_trace_agents/  OpenClaw historical trace-generation pipeline
 data/scenarios/              benchmark and demo scenario JSONL files
 data/elastic/                Elastic database workspace: mappings, query bodies, notebooks, exports
@@ -39,7 +39,7 @@ Runtime-specific proposed tool call
     -> GuardScoreV1
     -> GuardDecisionV1
     -> SessionRiskStateV1
-    -> allow / warn / review / require_approval / block
+    -> runtime allow / require_approval
 ```
 
 The canonical schema is documented in [schema_architecture.md](schema_architecture.md)
@@ -47,11 +47,11 @@ and implemented in [src/agentguard/tracing/schema_v1.py](src/agentguard/tracing/
 
 ## Runtime Surfaces
 
-1. `apps/google_adk_demo_agent/`
+1. `apps/adk_agent/`
 
-   The hackathon-facing governed runtime. The current local demo builds an
-   `AgentGuardTraceV1` and sends it through `AgentGuardFirewallV1`. The full Google ADK
-   MCP interception adapter is the next integration step.
+   The governed Google ADK runtime. ADK tool callbacks build `AgentGuardTraceV1`
+   records, call `AgentGuardFirewallV1` before execution, and expose only two runtime
+   policies for now: `allow` and `require_approval`.
 
 2. `apps/openclaw_trace_agents/`
 
@@ -73,7 +73,7 @@ and implemented in [src/agentguard/tracing/schema_v1.py](src/agentguard/tracing/
 | OpenClaw adapter | `src/agentguard/tracing/adapters/openclaw_trace_adapter.py` | Converts OpenClaw tool events into `AgentGuardTraceV1`. |
 | Trace store | `src/agentguard/tracing/trace_store.py` | Persists v1 traces, features, scores, decisions, live events, labels, and session state to local JSONL/JSON. |
 | Tool registry | `src/agentguard/runtime/tool_registry.py` | Stores tool domain, side-effect, confirmation, and risk metadata. |
-| Google ADK adapter | `src/agentguard/runtime/google_adk_adapter.py` | Placeholder for live ADK/MCP interception; currently documents the expected v1 integration point. |
+| Google ADK adapter | `src/agentguard/runtime/google_adk_adapter.py` | Live ADK trace session, tool metadata mapping, firewall call, runtime policy mapping, and lifecycle events. |
 | V1 feature builder | `src/agentguard/governance/feature_builder_v1.py` | Derives policy/context/retrieval/statistical feature records from traces. |
 | V1 scoring | `src/agentguard/governance/scoring_v1.py` | Computes step and cumulative risk scores with placeholder formulas. |
 | V1 decision policy | `src/agentguard/governance/decision_policy_v1.py` | Maps scores and hard policy signals to verdicts. |
@@ -94,7 +94,7 @@ The scripts also work before package installation because they include a local b
 
 ```bash
 python3 scripts/run_mock_session.py
-PYTHONPATH=src python3 apps/google_adk_demo_agent/run_demo.py
+.venv/bin/python -m pytest tests/test_google_adk_runtime.py
 python3 scripts/collect_openclaw_traces.py
 ```
 

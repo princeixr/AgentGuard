@@ -17,7 +17,8 @@ Host runtime proposal
     -> AgentGuardTraceV1
     -> AgentGuardFirewallV1.intercept(trace)
     -> GuardDecisionV1
-    -> runtime executes, warns, requests approval, reviews, or blocks
+    -> runtime maps to allow or require_approval
+    -> runtime executes or returns an approval-required response
 ```
 
 ## Implemented Files
@@ -25,7 +26,7 @@ Host runtime proposal
 ```text
 src/agentguard/runtime/
 ├── runtime_adapter.py       protocol returning AgentGuardTraceV1 records
-├── google_adk_adapter.py    placeholder for live Google ADK/MCP interception
+├── google_adk_adapter.py    live ADK trace session and firewall bridge
 ├── tool_registry.py         tool metadata, side effects, risk, and confirmation rules
 ├── tool_event_mapper.py     legacy helper for simple proposed/executed call mapping
 ├── tool_executor.py         local deterministic executor helper
@@ -39,16 +40,24 @@ Interception now happens by passing a complete `AgentGuardTraceV1` into
 
 ```text
 Google ADK agent proposes MCP tool call
-    -> GoogleADKAdapter captures tool name and arguments before execution
-    -> TraceV1Builder builds AgentGuardTraceV1
-    -> AgentGuardFirewallV1 evaluates the trace
-    -> adapter enforces GuardDecisionV1
-    -> local store and future Elastic store receive events and decisions
+    -> apps/adk_agent before_tool_callback
+    -> GoogleADKTraceSession builds AgentGuardTraceV1 using ADK/MCP tool metadata
+    -> AgentGuardFirewallV1.intercept(trace)
+    -> optional Elastic retrieval adds similar-trace evidence
+    -> trace, feature, score, decision, live events, and session risk are persisted
+    -> runtime maps firewall decision to allow or require_approval
+    -> allow executes; require_approval returns a synthetic response for now
+    -> after_tool_callback records tool_executed or tool_failed
 ```
 
-The current `GoogleADKAdapter` is a placeholder that documents this contract. The local
-demo in `apps/google_adk_demo_agent/run_demo.py` already exercises the same v1 firewall
-with deterministic data.
+`AGENTGUARD_ADK_ENFORCE_APPROVAL=true` is the default. While the approval UI is not
+implemented, `require_approval` means the tool is not executed.
+
+Set `AGENTGUARD_ELASTIC_ENABLED=true` with Elastic credentials to enable live retrieval
+and Elastic mirroring for ADK runtime artifacts. `AGENTGUARD_ADK_ELASTIC_ENABLED` can
+override that global setting for the ADK app only. `AGENTGUARD_ADK_FAIL_ON_ELASTIC_ERROR`
+defaults to `false` so live chats can continue if Elastic writes/retrieval fail after
+startup.
 
 ## OpenClaw Historical Runtime Path
 
@@ -74,6 +83,6 @@ trace is the source of truth for AgentGuard development.
 - Runtime adapters must not leak host-framework objects into governance.
 - OpenClaw collection must not add guard decisions during collection; decisions are added
   later by replay or evaluation.
-- Tool metadata comes from `ToolRegistry` and should include category, side-effect type,
-  confirmation requirement, irreversibility, and MCP server when known.
-
+- ADK tool metadata should come from the active ADK/MCP tool surface when possible and
+  include category, risk level, side-effect type, confirmation requirement,
+  irreversibility, and MCP server.

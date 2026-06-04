@@ -4,6 +4,10 @@ A minimal conversational [Google ADK](https://google.github.io/adk-docs/) agent
 you can chat with. It has one local tool, `run_shell_command`, and can
 optionally expose a Docker-backed Gmail MCP server.
 
+AgentGuard is wired through ADK tool callbacks. Every proposed tool call becomes an
+`AgentGuardTraceV1`, is evaluated by `AgentGuardFirewallV1` before execution, and is
+then mapped to one runtime policy: `allow` or `require_approval`.
+
 ## Files
 
 - `agent.py` — defines the `run_shell_command` tool and the `root_agent`.
@@ -49,6 +53,11 @@ agent: You're in the AgentGuard repo root ... and you're on Python 3.11.
 | `ADK_MODEL` | `gemini-2.0-flash` | Model the agent uses. |
 | `ADK_COMMAND_TIMEOUT_SECONDS` | `60` | Max seconds per command. |
 | `ADK_MAX_OUTPUT_CHARS` | `20000` | Output truncation cap per command. |
+| `AGENTGUARD_ADK_ENFORCE_APPROVAL` | `true` | When true, `require_approval` returns a synthetic response and the tool is not executed. |
+| `AGENTGUARD_ADK_TRACE_NAMESPACE` | `google_adk` | Namespace for local v1 trace artifacts. |
+| `AGENTGUARD_TRACE_ROOT` | `data/traces` | Root directory for local trace artifacts. |
+| `AGENTGUARD_ADK_ELASTIC_ENABLED` | unset | Optional ADK-only override for `AGENTGUARD_ELASTIC_ENABLED`. |
+| `AGENTGUARD_ADK_FAIL_ON_ELASTIC_ERROR` | `false` | When false, live ADK continues if Elastic indexing/retrieval fails after startup. |
 | `ADK_GMAIL_MCP_ENABLED` | `false` | Enables the Docker-backed Gmail MCP toolset. |
 | `GMAIL_MCP_DOCKER_IMAGE` | `agentguard-gmail-mcp:artymclabin` | Local Docker image for the ArtyMcLabin Gmail MCP server. |
 | `GMAIL_MCP_CREDENTIALS_VOLUME` | `mcp-gmail` | Docker volume storing Gmail OAuth credentials. |
@@ -83,9 +92,19 @@ docker run -i --rm \
 
 Then set `ADK_GMAIL_MCP_ENABLED=true` in the repo root `.env` and run the
 chat loop. The agent exposes only `search_emails`, `read_email`, `draft_email`,
-`send_email`, and `send_draft`, prefixed as Gmail tools. AgentGuard records all
-proposed Gmail sends and blocks send tools unless the current user turn
-explicitly asks to send.
+`send_email`, and `send_draft`, prefixed as Gmail tools. AgentGuard records tool
+category, risk, side-effect type, confirmation requirement, and MCP server metadata for
+these tools before the firewall decision.
+
+## Elastic-backed Runtime Memory
+
+Set `AGENTGUARD_ELASTIC_ENABLED=true` plus `ELASTICSEARCH_URL` and auth to mirror live
+ADK traces, features, scores, decisions, live events, and session risk into Elastic.
+When Elastic is enabled, the firewall also retrieves similar historical traces and maps
+their labels/decisions into retrieval features before scoring the current tool call.
+
+Use `AGENTGUARD_ADK_ELASTIC_ENABLED=false` to keep the ADK agent local-only even when
+global Elastic is enabled for other scripts.
 
 The runtime Docker command expects both OAuth files in the `mcp-gmail` volume:
 `/gmail-server/gcp-oauth.keys.json` and `/gmail-server/credentials.json`.

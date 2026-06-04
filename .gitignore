@@ -10,4 +10,6 @@ __pycache__/
 .openclaw-agentguard/
 .openclaw-traces/
 data/*
+src/agentguard.egg-info/
 test_*
+!tests/test_google_adk_runtime.py

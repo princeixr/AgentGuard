@@ -25,7 +25,7 @@ from typing import Any
 
 from google.adk.agents import Agent
 
-from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession
+from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession, adk_runtime_policy
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -64,11 +64,24 @@ GMAIL_MCP_RAW_TOOLS = [
     "send_draft",
 ]
 GMAIL_MCP_TOOLS = [f"{GMAIL_MCP_TOOL_PREFIX}_{name}" for name in GMAIL_MCP_RAW_TOOLS]
-GMAIL_SEND_TOOLS = {
-    f"{GMAIL_MCP_TOOL_PREFIX}_send_email",
-    f"{GMAIL_MCP_TOOL_PREFIX}_send_draft",
-}
 AVAILABLE_TOOLS = ["run_shell_command"] + (GMAIL_MCP_TOOLS if GMAIL_MCP_ENABLED else [])
+ENFORCE_APPROVAL = os.environ.get("AGENTGUARD_ADK_ENFORCE_APPROVAL", "true").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+ENABLE_ELASTIC = os.environ.get("AGENTGUARD_ADK_ELASTIC_ENABLED")
+if ENABLE_ELASTIC is not None:
+    ENABLE_ELASTIC = ENABLE_ELASTIC.strip().lower() in {"1", "true", "yes", "on"}
+FAIL_ON_ELASTIC_ERROR = os.environ.get(
+    "AGENTGUARD_ADK_FAIL_ON_ELASTIC_ERROR", "false"
+).lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 _TRACE_SESSIONS: dict[str, GoogleADKTraceSession] = {}
 
@@ -167,35 +180,29 @@ def _before_tool_callback(tool, args: dict[str, Any], tool_context):
     tool_name = _tool_name(tool)
     call_id = getattr(tool_context, "function_call_id", None)
     tracer.start_turn(user_text)
-    tracer.record_tool_call(
+    result = tracer.record_tool_call(
         tool_name,
         args,
         call_id=call_id,
     )
+    runtime_policy = adk_runtime_policy(result.decision.decision)
 
-    if _should_block_gmail_send(tool_name, user_text):
-        blocked_response = {
+    if runtime_policy == "require_approval" and ENFORCE_APPROVAL:
+        approval_response = {
             "error": (
-                "AgentGuard blocked this Gmail send tool because the current user "
-                "turn did not explicitly authorize sending."
+                "AgentGuard requires approval for this tool call. Approval UI is not "
+                "implemented yet, so the tool was not executed."
             ),
+            "approval_required": True,
             "blocked_by_agentguard": True,
             "tool_name": tool_name,
+            "runtime_policy": runtime_policy,
+            "firewall_decision": result.decision.decision,
+            "guard_explanation": result.decision.explanation,
+            "trace_id": result.trace.trace_id,
         }
-        tracer.record_tool_response(tool_name, blocked_response, call_id=call_id)
-        return blocked_response
-
-    if _should_block_shell_email_send(tool_name, args, user_text):
-        blocked_response = {
-            "error": (
-                "AgentGuard blocked this shell command because email sending must go "
-                "through the guarded Gmail MCP tools, not command-line fallback."
-            ),
-            "blocked_by_agentguard": True,
-            "tool_name": tool_name,
-        }
-        tracer.record_tool_response(tool_name, blocked_response, call_id=call_id)
-        return blocked_response
+        tracer.record_tool_response(tool_name, approval_response, call_id=call_id)
+        return approval_response
 
     return None
 
@@ -229,6 +236,8 @@ def _get_trace_session(context) -> GoogleADKTraceSession:
             available_tools=AVAILABLE_TOOLS,
             namespace=TRACE_NAMESPACE,
             trace_root=TRACE_ROOT,
+            enable_elastic=ENABLE_ELASTIC,
+            fail_on_elastic_error=FAIL_ON_ELASTIC_ERROR,
         )
     return _TRACE_SESSIONS[session_id]
 
@@ -254,66 +263,6 @@ def _tool_name(tool) -> str:
     return getattr(tool, "name", None) or getattr(tool, "__name__", None) or str(tool)
 
 
-def _should_block_gmail_send(tool_name: str, user_text: str) -> bool:
-    if tool_name not in GMAIL_SEND_TOOLS:
-        return False
-    return _has_negative_send_instruction(user_text) or not _has_explicit_send_intent(user_text)
-
-
-def _should_block_shell_email_send(tool_name: str, args: dict[str, Any], user_text: str) -> bool:
-    if tool_name != "run_shell_command" or not _has_explicit_send_intent(user_text):
-        return False
-    command = str(args.get("command", "")).lower()
-    shell_email_markers = [
-        "mail",
-        "sendmail",
-        "mutt",
-        "msmtp",
-        "swaks",
-        "smtp",
-        "gmail",
-        "smtplib",
-        "nodemailer",
-        "curl",
-    ]
-    return any(marker in command for marker in shell_email_markers)
-
-
-def _has_negative_send_instruction(text: str) -> bool:
-    lowered = text.lower()
-    negative_phrases = [
-        "do not send",
-        "don't send",
-        "dont send",
-        "not send",
-        "never send",
-        "without sending",
-        "draft only",
-        "only draft",
-        "prepare but not send",
-        "write but not send",
-        "create but not send",
-    ]
-    return any(phrase in lowered for phrase in negative_phrases)
-
-
-def _has_explicit_send_intent(text: str) -> bool:
-    lowered = text.lower()
-    send_phrases = [
-        "send an email",
-        "send email",
-        "send the email",
-        "send this email",
-        "send it",
-        "send the draft",
-        "send this draft",
-        "email them",
-        "email him",
-        "email her",
-    ]
-    return any(phrase in lowered for phrase in send_phrases)
-
-
 TOOLS = [run_shell_command] + _build_gmail_mcp_toolset()
 
 root_agent = Agent(
@@ -337,7 +286,7 @@ root_agent = Agent(
         "or tell the user what went wrong."
     ),
     tools=TOOLS,
-    # before_tool_callback=_before_tool_callback,
-    # after_tool_callback=_after_tool_callback,
-    # on_tool_error_callback=_on_tool_error_callback,
+    before_tool_callback=_before_tool_callback,
+    after_tool_callback=_after_tool_callback,
+    on_tool_error_callback=_on_tool_error_callback,
 )
