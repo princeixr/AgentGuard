@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from agentguard.storage.elastic_client import ElasticHttpClient
+from agentguard.storage.elastic_client import ElasticHttpClient, ElasticHttpError
 from agentguard.storage.elastic_config import ElasticConfig, load_elastic_config
 from agentguard.storage.index_templates import all_index_mappings
 from agentguard.tracing.schema_v1 import (
@@ -94,6 +94,28 @@ class AgentGuardElasticStore:
             else:
                 indexed += 1
         return BulkIngestResult(attempted=attempted, indexed=indexed, errors=errors)
+
+    def get_trace(self, trace_id: str) -> AgentGuardTraceV1 | None:
+        try:
+            response = self.client.get(f"{self.config.indices.traces}/_doc/{trace_id}")
+        except ElasticHttpError as exc:
+            if "-> 404:" in str(exc):
+                return None
+            raise
+        source = response.get("_source")
+        return AgentGuardTraceV1.model_validate(source) if source else None
+
+    def get_latest_trace(self) -> AgentGuardTraceV1 | None:
+        query = {
+            "size": 1,
+            "sort": [{"@timestamp": {"order": "desc"}}],
+            "query": {"match_all": {}},
+        }
+        response = self.client.post(f"{self.config.indices.traces}/_search", query)
+        hits = response.get("hits", {}).get("hits", [])
+        if not hits:
+            return None
+        return AgentGuardTraceV1.model_validate(hits[0].get("_source", {}))
 
     def search_similar_traces(
         self,

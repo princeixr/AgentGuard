@@ -16,10 +16,16 @@ class FakeElasticClient:
         self.existing = set()
         self.put_calls = []
         self.bulk_lines = []
+        self.get_response = {}
+        self.post_response = {"hits": {"hits": []}}
         self.search_body = None
+        self.search_path = None
 
     def head(self, path):
         return path in self.existing
+
+    def get(self, path):
+        return self.get_response
 
     def put(self, path, body):
         self.put_calls.append((path, body))
@@ -30,8 +36,9 @@ class FakeElasticClient:
         return {"items": [{"index": {"status": 201}} for _ in range(len(lines) // 2)]}
 
     def post(self, path, body):
+        self.search_path = path
         self.search_body = body
-        return {"hits": {"hits": []}}
+        return self.post_response
 
 
 def test_setup_indices_creates_missing_indices():
@@ -69,6 +76,22 @@ def test_search_similar_traces_filters_by_domain_and_tool_category():
     assert {"term": {"intent.domain": "email"}} in filters
     assert {"term": {"proposed_tool_call.tool_category": "email"}} in filters
     assert {"term": {"source.mode": "historical"}} in filters
+
+
+def test_get_latest_trace_reads_newest_trace_from_elastic():
+    client = FakeElasticClient()
+    trace = _trace("trace_latest")
+    client.post_response = {
+        "hits": {"hits": [{"_source": trace.model_dump(mode="json", by_alias=True)}]}
+    }
+    store = AgentGuardElasticStore(config=_config(), client=client)
+
+    latest = store.get_latest_trace()
+
+    assert latest is not None
+    assert latest.trace_id == "trace_latest"
+    assert client.search_path == "agentguard-traces-v1/_search"
+    assert client.search_body["sort"] == [{"@timestamp": {"order": "desc"}}]
 
 
 def _config() -> ElasticConfig:

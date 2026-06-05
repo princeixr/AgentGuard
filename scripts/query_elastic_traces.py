@@ -1,4 +1,8 @@
-"""Query similar traces from Elasticsearch for a canonical trace."""
+"""Query similar traces from Elasticsearch for a canonical trace.
+
+If the local trace file is empty, the script uses the latest trace already indexed in
+Elastic as the query seed.
+"""
 
 from __future__ import annotations
 
@@ -20,7 +24,7 @@ def parse_args() -> argparse.Namespace:
         "--trace-file",
         type=Path,
         default=Path("data/traces/v1/openclaw/traces.jsonl"),
-        help="Trace JSONL file containing the query trace.",
+        help="Optional local trace JSONL containing the query trace.",
     )
     parser.add_argument(
         "--trace-id",
@@ -32,10 +36,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    trace = _select_trace(args.trace_file, args.trace_id)
     config = load_elastic_config()
     config.require_configured()
     store = AgentGuardElasticStore(config=config)
+    trace = _select_trace(args.trace_file, args.trace_id, store)
     response = store.search_similar_traces(trace, size=args.size)
     hits = response.get("hits", {}).get("hits", [])
     print(
@@ -53,16 +57,29 @@ def main() -> None:
         )
 
 
-def _select_trace(path: Path, trace_id: str | None) -> AgentGuardTraceV1:
+def _select_trace(
+    path: Path,
+    trace_id: str | None,
+    store: AgentGuardElasticStore,
+) -> AgentGuardTraceV1:
     records = [AgentGuardTraceV1.model_validate(record) for record in load_jsonl(path)]
-    if not records:
-        raise ValueError(f"No traces found in {path}")
-    if trace_id is None:
+    if trace_id is None and records:
         return records[-1]
-    for record in records:
-        if record.trace_id == trace_id:
-            return record
-    raise ValueError(f"Trace ID not found: {trace_id}")
+    if trace_id is not None:
+        for record in records:
+            if record.trace_id == trace_id:
+                return record
+        elastic_trace = store.get_trace(trace_id)
+        if elastic_trace is not None:
+            return elastic_trace
+        raise ValueError(f"Trace ID not found locally or in Elastic: {trace_id}")
+
+    elastic_trace = store.get_latest_trace()
+    if elastic_trace is not None:
+        print(f"No local traces found in {path}; using latest trace from Elastic.")
+        return elastic_trace
+
+    raise ValueError(f"No traces found in {path} or {store.config.indices.traces}")
 
 
 if __name__ == "__main__":
