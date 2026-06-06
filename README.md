@@ -17,6 +17,7 @@ path. Deeper statistical retrieval is being built on top of this working skeleto
 ```text
 src/agentguard/              reusable AgentGuard framework
 apps/adk_agent/              guarded Google ADK terminal assistant
+apps/web/                    AgentGuard product dashboard
 apps/openclaw_trace_agents/  OpenClaw historical trace-generation pipeline
 data/scenarios/              benchmark and demo scenario JSONL files
 data/elastic/                Elastic database workspace: mappings, query bodies, notebooks, exports
@@ -96,6 +97,38 @@ The scripts also work before package installation because they include a local b
 python3 scripts/run_mock_session.py
 .venv/bin/python -m pytest tests/test_google_adk_runtime.py
 python3 scripts/collect_openclaw_traces.py
+```
+
+## Product Demo
+
+Install the frontend once:
+
+```bash
+cd apps/web
+npm install
+cd ../..
+```
+
+Start the FastAPI backend and React dashboard together:
+
+```bash
+make demo
+```
+
+Open `http://127.0.0.1:5173`. The deterministic local dataset is initialized
+automatically and does not require Gemini, Gmail, Docker, or Elastic credentials.
+
+Reset the demo dataset:
+
+```bash
+make demo-data
+```
+
+Verify both applications:
+
+```bash
+make test
+make build-frontend
 ```
 
 ## OpenClaw Productivity Agent

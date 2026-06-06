@@ -3,6 +3,15 @@ from __future__ import annotations
 import importlib
 from types import SimpleNamespace
 
+import pytest
+
+from agentguard.control_plane.registry import (
+    DEMO_AGENT_ID,
+    DEMO_DEPLOYMENT_ID,
+    DEMO_INTEGRATION_ID,
+    DEMO_WORKSPACE_ID,
+    DemoAgentRegistry,
+)
 from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession, adk_runtime_policy
 from agentguard.tracing.serializers import load_jsonl
 from agentguard.tracing.trace_store import TraceStore
@@ -35,12 +44,39 @@ def test_google_adk_trace_session_runs_firewall_before_execution(tmp_path):
     assert (tmp_path / "traces" / "v1" / "google_adk_test" / "session_risk").exists()
 
 
+def test_google_adk_trace_session_propagates_runtime_identity(tmp_path):
+    session = GoogleADKTraceSession(
+        session_id="adk_owned_session",
+        agent_id="runtime_alias",
+        runtime_agent_id="terminal_assistant",
+        agent_config_id="adk_terminal_assistant",
+        runtime_identity=DemoAgentRegistry().runtime_identity(DEMO_AGENT_ID),
+        available_tools=["run_shell_command"],
+        trace_store=TraceStore(root_dir=tmp_path / "traces"),
+        namespace="google_adk_test",
+    )
+    session.start_turn("Show me the current directory.")
+
+    result = session.record_tool_call(
+        "run_shell_command",
+        {"command": "pwd"},
+        call_id="call_owned",
+    )
+
+    assert result.trace.source.workspace_id == DEMO_WORKSPACE_ID
+    assert result.trace.source.agent_id == DEMO_AGENT_ID
+    assert result.trace.source.deployment_id == DEMO_DEPLOYMENT_ID
+    assert result.trace.source.integration_id == DEMO_INTEGRATION_ID
+    assert result.feature.agent_id == DEMO_AGENT_ID
+    assert result.score.agent_id == DEMO_AGENT_ID
+    assert result.decision.agent_id == DEMO_AGENT_ID
+
+
 def test_before_tool_callback_blocks_approval_required_call(monkeypatch, tmp_path):
     monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "true")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
-    adk_agent = importlib.import_module("apps.adk_agent.agent")
-    adk_agent = importlib.reload(adk_agent)
+    adk_agent = _load_adk_agent()
     adk_agent._TRACE_SESSIONS.clear()
 
     response = adk_agent._before_tool_callback(
@@ -60,8 +96,7 @@ def test_before_tool_callback_respects_approval_enforcement_flag(monkeypatch, tm
     monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "false")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
-    adk_agent = importlib.import_module("apps.adk_agent.agent")
-    adk_agent = importlib.reload(adk_agent)
+    adk_agent = _load_adk_agent()
     adk_agent._TRACE_SESSIONS.clear()
 
     response = adk_agent._before_tool_callback(
@@ -184,8 +219,7 @@ def test_before_tool_callback_allows_normal_shell_command(monkeypatch, tmp_path)
     monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "true")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
-    adk_agent = importlib.import_module("apps.adk_agent.agent")
-    adk_agent = importlib.reload(adk_agent)
+    adk_agent = _load_adk_agent()
     adk_agent._TRACE_SESSIONS.clear()
 
     response = adk_agent._before_tool_callback(
@@ -204,8 +238,7 @@ def test_adk_elastic_override_can_disable_global_elastic(monkeypatch, tmp_path):
     monkeypatch.delenv("ELASTICSEARCH_API_KEY", raising=False)
     monkeypatch.setenv("AGENTGUARD_ADK_ELASTIC_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
-    adk_agent = importlib.import_module("apps.adk_agent.agent")
-    adk_agent = importlib.reload(adk_agent)
+    adk_agent = _load_adk_agent()
     adk_agent._TRACE_SESSIONS.clear()
 
     response = adk_agent._before_tool_callback(
@@ -221,8 +254,7 @@ def test_before_tool_callback_records_approval_blocked_runtime_event(monkeypatch
     monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "true")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
-    adk_agent = importlib.import_module("apps.adk_agent.agent")
-    adk_agent = importlib.reload(adk_agent)
+    adk_agent = _load_adk_agent()
     adk_agent._TRACE_SESSIONS.clear()
 
     adk_agent._before_tool_callback(
@@ -245,6 +277,28 @@ def test_before_tool_callback_records_approval_blocked_runtime_event(monkeypatch
     assert blocked_events[0]["payload"]["runtime_policy"] == "require_approval"
 
 
+def test_adk_callback_uses_registered_dashboard_agent_identity(monkeypatch, tmp_path):
+    monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
+    monkeypatch.setenv("AGENTGUARD_ADK_ELASTIC_ENABLED", "false")
+    monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
+    adk_agent = _load_adk_agent()
+    adk_agent._TRACE_SESSIONS.clear()
+
+    adk_agent._before_tool_callback(
+        SimpleNamespace(name="run_shell_command"),
+        {"command": "pwd"},
+        _fake_tool_context("Show me the current directory."),
+    )
+
+    trace = load_jsonl(
+        tmp_path / "traces" / "v1" / "google_adk" / "traces.jsonl"
+    )[0]
+    assert trace["source"]["workspace_id"] == DEMO_WORKSPACE_ID
+    assert trace["source"]["agent_id"] == DEMO_AGENT_ID
+    assert trace["source"]["deployment_id"] == DEMO_DEPLOYMENT_ID
+    assert trace["source"]["integration_id"] == DEMO_INTEGRATION_ID
+
+
 def _fake_tool_context(user_text: str):
     return SimpleNamespace(
         session=SimpleNamespace(id="adk_callback_session"),
@@ -253,6 +307,12 @@ def _fake_tool_context(user_text: str):
         user_content=SimpleNamespace(parts=[SimpleNamespace(text=user_text)]),
         function_call_id="call_001",
     )
+
+
+def _load_adk_agent():
+    pytest.importorskip("google.adk", reason="google-adk is an optional runtime dependency")
+    module = importlib.import_module("apps.adk_agent.agent")
+    return importlib.reload(module)
 
 
 def _trace_session(tmp_path):

@@ -188,6 +188,23 @@ class AgentGuardElasticStore:
                 labels[trace_id] = source
         return labels
 
+    def search_documents(
+        self,
+        index_name: str,
+        size: int = 1000,
+    ) -> list[dict[str, Any]]:
+        query = {
+            "size": size,
+            "sort": [{"@timestamp": {"order": "asc", "unmapped_type": "date"}}],
+            "query": {"match_all": {}},
+        }
+        response = self.client.post(f"{index_name}/_search", query)
+        return [
+            hit.get("_source", {})
+            for hit in response.get("hits", {}).get("hits", [])
+            if hit.get("_source")
+        ]
+
     def _index_model(self, index_name: str, document_id: str, model: BaseModel) -> dict[str, Any]:
         return self.client.put(f"{index_name}/_doc/{document_id}", _model_doc(model))
 

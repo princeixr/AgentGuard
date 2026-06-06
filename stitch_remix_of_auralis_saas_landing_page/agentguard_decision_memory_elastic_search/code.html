@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Decision Memory - AgentGuard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary": "#000000",
+                    "on-surface": "#1c1b1b",
+                    "on-secondary-container": "#fefcff",
+                    "surface-variant": "#e5e2e1",
+                    "on-error": "#ffffff",
+                    "surface-container": "#f1edec",
+                    "surface-tint": "#5f5e5e",
+                    "on-primary-fixed-variant": "#474746",
+                    "error-container": "#ffdad6",
+                    "on-secondary": "#ffffff",
+                    "inverse-surface": "#313030",
+                    "surface": "#fdf8f8",
+                    "secondary-container": "#2170e4",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "primary": "#000000",
+                    "outline": "#747878",
+                    "inverse-primary": "#c8c6c5",
+                    "on-tertiary": "#ffffff",
+                    "primary-container": "#1c1b1b",
+                    "on-tertiary-fixed-variant": "#484645",
+                    "tertiary-container": "#1c1b1a",
+                    "outline-variant": "#c4c7c7",
+                    "inverse-on-surface": "#f4f0ef",
+                    "primary-fixed-dim": "#c8c6c5",
+                    "on-secondary-fixed-variant": "#004395",
+                    "background": "#fdf8f8",
+                    "on-error-container": "#93000a",
+                    "primary-fixed": "#e5e2e1",
+                    "secondary": "#0058be",
+                    "surface-container-high": "#ebe7e6",
+                    "surface-bright": "#fdf8f8",
+                    "on-tertiary-fixed": "#1c1b1a",
+                    "on-background": "#1c1b1b",
+                    "on-primary-fixed": "#1c1b1b",
+                    "tertiary-fixed-dim": "#cac6c4",
+                    "secondary-fixed": "#d8e2ff",
+                    "on-surface-variant": "#444748",
+                    "surface-container-highest": "#e5e2e1",
+                    "error": "#ba1a1a",
+                    "on-secondary-fixed": "#001a42",
+                    "on-tertiary-container": "#868382",
+                    "tertiary-fixed": "#e6e2df",
+                    "surface-container-low": "#f7f3f2",
+                    "surface-dim": "#ddd9d8",
+                    "on-primary-container": "#858383",
+                    "secondary-fixed-dim": "#adc6ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "sidebar-width": "240px",
+                    "stack-compact": "8px",
+                    "gutter": "16px",
+                    "stack-dense": "4px",
+                    "margin": "24px",
+                    "rail-width": "64px"
+            },
+            "fontFamily": {
+                    "label-sm": ["Geist"],
+                    "label-md": ["Geist"],
+                    "body-md": ["Geist"],
+                    "headline-md": ["Geist"],
+                    "body-sm": ["Geist"],
+                    "headline-lg": ["Geist"],
+                    "mono": ["monospace"]
+            },
+            "fontSize": {
+                    "label-sm": ["11px", {"lineHeight": "14px", "fontWeight": "500"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-md": ["18px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "mono": ["12px", {"lineHeight": "16px", "fontWeight": "400"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Geist', sans-serif; background-color: #F9F8F6; color: #1c1b1b; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .table-row-hover:hover { background-color: #F2F1EE; cursor: pointer; }
+        .drawer-open { transform: translateX(0); }
+        .drawer-closed { transform: translateX(100%); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c4c7c7; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #747878; }
+    </style>
+</head>
+<body class="flex flex-row h-screen overflow-hidden">
+<!-- SideNavBar (Shared Component) -->
+<aside class="fixed left-0 top-0 h-full w-sidebar-width flex flex-col bg-surface-container border-r border-outline-variant z-20">
+<!-- Brand/Header -->
+<div class="h-14 flex items-center px-gutter border-b border-outline-variant shrink-0">
+<div class="w-8 h-8 rounded-DEFAULT bg-primary flex items-center justify-center mr-3">
+<span class="material-symbols-outlined text-on-primary text-sm" style="font-variation-settings: 'FILL' 1;">shield_locked</span>
+</div>
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-surface leading-tight">AgentGuard</h1>
+<p class="text-label-sm font-label-sm text-on-surface-variant leading-tight">Hackathon Demo</p>
+</div>
+</div>
+<!-- CTA -->
+<div class="p-4">
+<button class="w-full bg-primary text-on-primary text-label-md font-label-md py-2 rounded-DEFAULT flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                New Agent
+            </button>
+</div>
+<!-- Nav Links -->
+<nav class="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">security</span>
+<span class="text-body-sm font-body-sm">Live Interception</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">history</span>
+<span class="text-body-sm font-body-sm">Sessions</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">timeline</span>
+<span class="text-body-sm font-body-sm">Trace Replay</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT bg-secondary-container text-on-secondary-container font-semibold opacity-90 transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">storage</span>
+<span class="text-body-sm font-body-sm">Decision Memory</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">policy</span>
+<span class="text-body-sm font-body-sm">Policies</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">analytics</span>
+<span class="text-body-sm font-body-sm">Risk &amp; Operations</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">extension</span>
+<span class="text-body-sm font-body-sm">Integrations</span>
+</a>
+</nav>
+<!-- Footer Nav -->
+<div class="border-t border-outline-variant p-2 flex flex-col gap-1 shrink-0">
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span class="text-body-sm font-body-sm">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">description</span>
+<span class="text-body-sm font-body-sm">Docs</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">account_circle</span>
+<span class="text-body-sm font-body-sm">Profile</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 ml-[240px] flex flex-col min-w-0 bg-background relative">
+<!-- TopNavBar (Adapted for page context) -->
+<header class="h-14 bg-surface border-b border-outline-variant flex justify-between items-center px-gutter shrink-0 z-10">
+<div class="flex items-center gap-4 flex-1">
+<h2 class="text-headline-sm font-headline-md font-semibold text-primary hidden md:block">Decision Memory</h2>
+<!-- Global Search -->
+<div class="relative w-full max-w-md ml-4">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-DEFAULT pl-9 pr-3 py-1.5 text-body-sm font-body-sm focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-colors placeholder:text-on-surface-variant/70" placeholder="Search governance memory via ID, metadata, or content..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-3 ml-4">
+<div class="flex gap-1 border-r border-outline-variant pr-3 mr-1">
+<button class="w-8 h-8 rounded-DEFAULT flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+</button>
+<button class="w-8 h-8 rounded-DEFAULT flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+</button>
+</div>
+<button class="bg-surface-container border border-outline-variant text-primary text-label-md font-label-md px-3 py-1.5 rounded-DEFAULT flex items-center gap-2 hover:bg-surface-container-high transition-colors">
+<span class="w-2 h-2 rounded-full bg-error animate-pulse"></span>
+                    Live
+                </button>
+</div>
+</header>
+<!-- Filters Bar -->
+<div class="bg-surface-container-lowest border-b border-outline-variant py-2 px-gutter flex items-center gap-3 overflow-x-auto shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">filter_list</span>
+<div class="flex items-center gap-2">
+<select class="bg-surface border border-outline-variant rounded-DEFAULT text-body-sm font-body-sm py-1 pl-2 pr-6 focus:outline-none focus:border-secondary appearance-none cursor-pointer">
+<option>Agent: All</option>
+<option>CustomerSupport-v2</option>
+<option>DataAnalyst-Alpha</option>
+</select>
+<div class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
+<span class="material-symbols-outlined text-[16px]">arrow_drop_down</span>
+</div>
+</div>
+<select class="bg-surface border border-outline-variant rounded-DEFAULT text-body-sm font-body-sm py-1 px-2 focus:outline-none focus:border-secondary cursor-pointer">
+<option>Tool: All</option>
+<option>SQL_Query</option>
+<option>Email_Draft</option>
+</select>
+<select class="bg-surface border border-outline-variant rounded-DEFAULT text-body-sm font-body-sm py-1 px-2 focus:outline-none focus:border-secondary cursor-pointer">
+<option>Risk: All</option>
+<option>High (&gt;0.8)</option>
+<option>Medium (0.4-0.8)</option>
+<option>Low (&lt;0.4)</option>
+</select>
+<select class="bg-surface border border-outline-variant rounded-DEFAULT text-body-sm font-body-sm py-1 px-2 focus:outline-none focus:border-secondary cursor-pointer">
+<option>Decision: All</option>
+<option>BLOCK</option>
+<option>ALLOW</option>
+<option>FLAG</option>
+</select>
+<div class="h-4 w-px bg-outline-variant mx-1"></div>
+<button class="text-label-md font-label-md text-secondary hover:underline px-2">Clear Filters</button>
+<div class="flex-1"></div>
+<div class="text-label-sm font-label-sm text-on-surface-variant">
+                1,402 records found
+            </div>
+</div>
+<!-- Data Table Area -->
+<div class="flex-1 overflow-auto bg-surface-container-lowest p-margin">
+<div class="border border-outline-variant rounded-DEFAULT overflow-hidden bg-surface-container-lowest">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container border-b border-outline-variant sticky top-0 z-10">
+<tr>
+<th class="py-2 px-3 text-label-sm font-label-sm text-on-surface-variant font-medium w-40">Timestamp</th>
+<th class="py-2 px-3 text-label-sm font-label-sm text-on-surface-variant font-medium">Agent</th>
+<th class="py-2 px-3 text-label-sm font-label-sm text-on-surface-variant font-medium">Tool</th>
+<th class="py-2 px-3 text-label-sm font-label-sm text-on-surface-variant font-medium w-24">Risk Score</th>
+<th class="py-2 px-3 text-label-sm font-label-sm text-on-surface-variant font-medium">Label</th>
+<th class="py-2 px-3 text-label-sm font-label-sm text-on-surface-variant font-medium w-24">Decision</th>
+</tr>
+</thead>
+<tbody class="text-mono font-mono text-on-surface">
+<!-- Row 1 -->
+<tr class="border-b border-outline-variant table-row-hover" onclick="toggleDrawer(true)">
+<td class="py-2 px-3 text-on-surface-variant">2023-10-27 14:32:01</td>
+<td class="py-2 px-3">CustomerSupport-v2</td>
+<td class="py-2 px-3">Refund_API</td>
+<td class="py-2 px-3">
+<span class="bg-error/10 text-error px-1.5 py-0.5 rounded-DEFAULT text-label-sm font-label-sm">0.92</span>
+</td>
+<td class="py-2 px-3">
+<div class="flex gap-1 flex-wrap">
+<span class="border border-outline-variant px-1.5 py-0.5 rounded-DEFAULT text-[10px] bg-surface">Intent Drift</span>
+<span class="border border-outline-variant px-1.5 py-0.5 rounded-DEFAULT text-[10px] bg-surface">Financial Risk</span>
+</div>
+</td>
+<td class="py-2 px-3">
+<span class="flex items-center gap-1 text-error font-medium"><span class="material-symbols-outlined text-[14px]">block</span> BLOCK</span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="border-b border-outline-variant table-row-hover">
+<td class="py-2 px-3 text-on-surface-variant">2023-10-27 14:28:45</td>
+<td class="py-2 px-3">DataAnalyst-Alpha</td>
+<td class="py-2 px-3">SQL_Query</td>
+<td class="py-2 px-3">
+<span class="bg-secondary/10 text-secondary px-1.5 py-0.5 rounded-DEFAULT text-label-sm font-label-sm">0.15</span>
+</td>
+<td class="py-2 px-3">
+<div class="flex gap-1 flex-wrap">
+<span class="border border-outline-variant px-1.5 py-0.5 rounded-DEFAULT text-[10px] bg-surface">Safe</span>
+</div>
+</td>
+<td class="py-2 px-3">
+<span class="flex items-center gap-1 text-secondary font-medium"><span class="material-symbols-outlined text-[14px]">check_circle</span> ALLOW</span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="border-b border-outline-variant table-row-hover bg-surface-container-low">
+<td class="py-2 px-3 text-on-surface-variant">2023-10-27 14:15:12</td>
+<td class="py-2 px-3">HR_Assistant</td>
+<td class="py-2 px-3">Employee_Directory</td>
+<td class="py-2 px-3">
+<span class="bg-primary/20 text-primary px-1.5 py-0.5 rounded-DEFAULT text-label-sm font-label-sm">0.65</span>
+</td>
+<td class="py-2 px-3">
+<div class="flex gap-1 flex-wrap">
+<span class="border border-outline-variant px-1.5 py-0.5 rounded-DEFAULT text-[10px] bg-surface">PII Exposure</span>
+</div>
+</td>
+<td class="py-2 px-3">
+<span class="flex items-center gap-1 text-primary font-medium"><span class="material-symbols-outlined text-[14px]">flag</span> FLAG</span>
+</td>
+</tr>
+<!-- Repeat rows for density -->
+<tr class="border-b border-outline-variant table-row-hover">
+<td class="py-2 px-3 text-on-surface-variant">2023-10-27 13:55:00</td>
+<td class="py-2 px-3">CustomerSupport-v2</td>
+<td class="py-2 px-3">KnowledgeBase</td>
+<td class="py-2 px-3">
+<span class="bg-secondary/10 text-secondary px-1.5 py-0.5 rounded-DEFAULT text-label-sm font-label-sm">0.05</span>
+</td>
+<td class="py-2 px-3">
+<div class="flex gap-1 flex-wrap">
+<span class="border border-outline-variant px-1.5 py-0.5 rounded-DEFAULT text-[10px] bg-surface">Safe</span>
+</div>
+</td>
+<td class="py-2 px-3">
+<span class="flex items-center gap-1 text-secondary font-medium"><span class="material-symbols-outlined text-[14px]">check_circle</span> ALLOW</span>
+</td>
+</tr>
+<tr class="border-b border-outline-variant table-row-hover">
+<td class="py-2 px-3 text-on-surface-variant">2023-10-27 13:42:18</td>
+<td class="py-2 px-3">DevOps_Bot</td>
+<td class="py-2 px-3">AWS_CLI</td>
+<td class="py-2 px-3">
+<span class="bg-error/10 text-error px-1.5 py-0.5 rounded-DEFAULT text-label-sm font-label-sm">0.88</span>
+</td>
+<td class="py-2 px-3">
+<div class="flex gap-1 flex-wrap">
+<span class="border border-outline-variant px-1.5 py-0.5 rounded-DEFAULT text-[10px] bg-surface">Privilege Escalation</span>
+</div>
+</td>
+<td class="py-2 px-3">
+<span class="flex items-center gap-1 text-error font-medium"><span class="material-symbols-outlined text-[14px]">block</span> BLOCK</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Detail Drawer (Slide-over) -->
+<div class="absolute top-0 right-0 h-full w-[400px] bg-surface-container-lowest border-l border-outline-variant shadow-xl transition-transform duration-300 ease-in-out drawer-closed z-20 flex flex-col" id="detailDrawer">
+<!-- Drawer Header -->
+<div class="h-14 border-b border-outline-variant flex items-center justify-between px-4 shrink-0 bg-surface">
+<div class="flex items-center gap-2">
+<span class="bg-error/10 text-error px-2 py-0.5 rounded-DEFAULT text-label-sm font-label-sm font-bold">BLOCK</span>
+<h3 class="text-body-md font-body-md font-semibold">Trace Details</h3>
+</div>
+<button class="w-8 h-8 flex items-center justify-center rounded-DEFAULT hover:bg-surface-container-high text-on-surface-variant" onclick="toggleDrawer(false)">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Drawer Content -->
+<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
+<!-- Meta Info Grid -->
+<div class="grid grid-cols-2 gap-4">
+<div>
+<div class="text-label-sm font-label-sm text-on-surface-variant mb-1">Trace ID</div>
+<div class="text-mono font-mono text-[11px] text-on-surface bg-surface-container p-1 rounded-DEFAULT">trc_8f9a2b1c4e</div>
+</div>
+<div>
+<div class="text-label-sm font-label-sm text-on-surface-variant mb-1">Timestamp</div>
+<div class="text-mono font-mono text-[11px] text-on-surface">2023-10-27 14:32:01 UTC</div>
+</div>
+<div>
+<div class="text-label-sm font-label-sm text-on-surface-variant mb-1">Agent / Model</div>
+<div class="text-body-sm font-body-sm text-on-surface">CustomerSupport-v2<br/><span class="text-on-surface-variant text-[11px]">gpt-4-turbo-0125</span></div>
+</div>
+<div>
+<div class="text-label-sm font-label-sm text-on-surface-variant mb-1">Tool Invocation</div>
+<div class="text-mono font-mono text-[11px] text-on-surface bg-surface-container p-1 rounded-DEFAULT break-all">Refund_API.execute(...)</div>
+</div>
+</div>
+<!-- Governance Analysis -->
+<div class="border border-outline-variant rounded-DEFAULT overflow-hidden">
+<div class="bg-surface border-b border-outline-variant px-3 py-2 text-label-md font-label-md font-semibold text-primary">Governance Analysis</div>
+<div class="p-3 flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<span class="text-body-sm font-body-sm text-on-surface">Primary Risk Factor</span>
+<span class="text-label-sm font-label-sm bg-error/10 text-error px-2 py-0.5 rounded-DEFAULT">Intent Drift (0.92)</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-body-sm font-body-sm text-on-surface">Similarity to known violations</span>
+<span class="text-mono font-mono text-[11px] text-on-surface">87.4%</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-body-sm font-body-sm text-on-surface">Policy Triggered</span>
+<span class="text-mono font-mono text-[11px] text-on-surface underline cursor-pointer">POL_FIN_04</span>
+</div>
+</div>
+</div>
+<!-- Input/Output Content -->
+<div>
+<h4 class="text-label-md font-label-md font-semibold mb-2">Agent Prompt (Intercepted)</h4>
+<div class="bg-tertiary-container text-on-tertiary p-3 rounded-DEFAULT text-mono font-mono text-[11px] leading-relaxed whitespace-pre-wrap">User is complaining about late delivery. I will issue a full refund to placate them without requiring manager approval via the backend API.
+{
+  "action": "Refund_API",
+  "amount": 150.00,
+  "override_auth": true
+}</div>
+</div>
+<!-- Human Review State -->
+<div class="bg-surface-container-low border border-outline-variant p-3 rounded-DEFAULT">
+<h4 class="text-label-md font-label-md font-semibold mb-2 flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">gavel</span> Human Review Required</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-3">This trace was blocked autonomously. Acknowledge or adjust policy based on this event.</p>
+<div class="flex gap-2">
+<button class="flex-1 bg-surface border border-outline-variant text-body-sm font-body-sm py-1 rounded-DEFAULT hover:bg-surface-container transition-colors">Acknowledge</button>
+<button class="flex-1 bg-primary text-on-primary text-body-sm font-body-sm py-1 rounded-DEFAULT hover:opacity-90 transition-opacity">Tune Policy</button>
+</div>
+</div>
+<!-- Elastic Metadata -->
+<div>
+<h4 class="text-label-md font-label-md text-on-surface-variant mb-2">Index Metadata</h4>
+<div class="bg-surface-container p-2 rounded-DEFAULT text-mono font-mono text-[10px] text-on-surface-variant opacity-80 break-all">
+_index: "ag_memory_2023_10"<br/>
+_id: "doc_78192a"<br/>
+routing_node: "us-east-1a"
+                     </div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        function toggleDrawer(open) {
+            const drawer = document.getElementById('detailDrawer');
+            if (open) {
+                drawer.classList.remove('drawer-closed');
+                drawer.classList.add('drawer-open');
+            } else {
+                drawer.classList.remove('drawer-open');
+                drawer.classList.add('drawer-closed');
+            }
+        }
+    </script>
+</body></html>

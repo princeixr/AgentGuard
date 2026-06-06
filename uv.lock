@@ -7,9 +7,11 @@ name = "agentguard"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "fastapi" },
     { name = "google-adk" },
     { name = "mcp" },
     { name = "pydantic" },
+    { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
@@ -23,12 +25,14 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "fastapi", specifier = ">=0.115" },
     { name = "google-adk", specifier = ">=2.1.0" },
     { name = "google-adk", marker = "extra == 'adk'", specifier = ">=1.0" },
     { name = "mcp", specifier = ">=1.27.1" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
+    { name = "uvicorn", specifier = ">=0.30" },
 ]
 provides-extras = ["dev", "adk"]
 

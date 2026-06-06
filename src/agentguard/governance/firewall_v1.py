@@ -117,6 +117,9 @@ class AgentGuardFirewallV1:
             step_index=trace.step_index,
             agent_framework=trace.source.agent_framework,
             agent_id=trace.source.agent_id,
+            workspace_id=trace.source.workspace_id,
+            deployment_id=trace.source.deployment_id,
+            integration_id=trace.source.integration_id,
             payload=payload or {},
         )
         self.trace_store.append_live_event_v1(event, namespace=self.namespace)

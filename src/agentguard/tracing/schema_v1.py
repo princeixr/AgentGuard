@@ -23,6 +23,9 @@ class TraceSourceV1(AgentGuardSchemaV1Model):
     agent_framework: Literal["openclaw", "google_adk", "mock", "synthetic"]
     source_type: str
     agent_id: str
+    workspace_id: str | None = None
+    deployment_id: str | None = None
+    integration_id: str | None = None
     runtime_agent_id: str | None = None
     agent_config_id: str | None = None
     scenario_id: str | None = None
@@ -130,6 +133,9 @@ class LiveEventV1(AgentGuardSchemaV1Model):
     step_index: int | None = None
     agent_framework: str
     agent_id: str
+    workspace_id: str | None = None
+    deployment_id: str | None = None
+    integration_id: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -180,6 +186,9 @@ class TraceFeatureV1(AgentGuardSchemaV1Model):
     feature_id: str
     trace_id: str
     session_id: str
+    workspace_id: str | None = None
+    agent_id: str | None = None
+    deployment_id: str | None = None
     step_index: int
     timestamp: datetime = Field(default_factory=utc_now, alias="@timestamp")
     retrieval: RetrievalFeatureV1
@@ -214,6 +223,9 @@ class GuardScoreV1(AgentGuardSchemaV1Model):
     trace_id: str
     feature_id: str
     session_id: str
+    workspace_id: str | None = None
+    agent_id: str | None = None
+    deployment_id: str | None = None
     step_index: int
     guard_version: str
     timestamp: datetime = Field(default_factory=utc_now, alias="@timestamp")
@@ -251,6 +263,9 @@ class GuardDecisionV1(AgentGuardSchemaV1Model):
     trace_id: str
     score_id: str | None = None
     session_id: str
+    workspace_id: str | None = None
+    agent_id: str | None = None
+    deployment_id: str | None = None
     step_index: int
     timestamp: datetime = Field(default_factory=utc_now, alias="@timestamp")
     decision: Literal["allow", "warn", "review", "require_approval", "block"]
@@ -285,6 +300,8 @@ class SessionRiskCountersV1(AgentGuardSchemaV1Model):
 class SessionRiskStateV1(AgentGuardSchemaV1Model):
     schema_version: Literal["agentguard.session_risk.v1"] = "agentguard.session_risk.v1"
     session_id: str
+    workspace_id: str | None = None
+    deployment_id: str | None = None
     agent_framework: str
     agent_id: str
     last_trace_id: str | None = None

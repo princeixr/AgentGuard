@@ -50,6 +50,8 @@ class SessionRiskManagerV1:
         tool_sequence.append(trace.proposed_tool_call.tool_name)
         state = SessionRiskStateV1(
             session_id=trace.session_id,
+            workspace_id=trace.source.workspace_id,
+            deployment_id=trace.source.deployment_id,
             agent_framework=trace.source.agent_framework,
             agent_id=trace.source.agent_id,
             last_trace_id=trace.trace_id,
