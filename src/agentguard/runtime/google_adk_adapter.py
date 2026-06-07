@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from agentguard.control_plane.models import RuntimeIdentity
+from agentguard.core.enums import ToolRiskLevel
 from agentguard.core.models import ExecutedToolCall
 from agentguard.governance.firewall_v1 import AgentGuardFirewallV1, FirewallResultV1
-from agentguard.core.enums import ToolRiskLevel
-from agentguard.runtime.tool_event_mapper import infer_tool_category
 from agentguard.runtime.tool_registry import ToolMetadata, infer_tool_metadata
 from agentguard.tracing.schema_v1 import AgentGuardTraceV1, LiveEventV1, TraceSourceV1
 from agentguard.tracing.trace_store import TraceStore
@@ -58,6 +58,7 @@ class GoogleADKTraceSession:
         tool_metadata: dict[str, ToolMetadata] | None = None,
         enable_elastic: bool | None = None,
         fail_on_elastic_error: bool = False,
+        runtime_identity: RuntimeIdentity | None = None,
     ):
         self.session_id = session_id
         self.agent_id = agent_id
@@ -66,6 +67,7 @@ class GoogleADKTraceSession:
         self.agent_config_id = agent_config_id
         self.environment_id = environment_id
         self.runtime_agent_id = runtime_agent_id or agent_id
+        self.runtime_identity = runtime_identity
         self.trace_store = trace_store or TraceStore(root_dir=Path(trace_root or "data/traces"))
         self.builder = builder or TraceV1Builder()
         self.firewall = firewall or AgentGuardFirewallV1(
@@ -106,7 +108,26 @@ class GoogleADKTraceSession:
                     mode="live",
                     agent_framework="google_adk",
                     source_type="live_google_adk",
-                    agent_id=self.agent_id,
+                    agent_id=(
+                        self.runtime_identity.agent_id
+                        if self.runtime_identity
+                        else self.agent_id
+                    ),
+                    workspace_id=(
+                        self.runtime_identity.workspace_id
+                        if self.runtime_identity
+                        else None
+                    ),
+                    deployment_id=(
+                        self.runtime_identity.deployment_id
+                        if self.runtime_identity
+                        else None
+                    ),
+                    integration_id=(
+                        self.runtime_identity.integration_id
+                        if self.runtime_identity
+                        else None
+                    ),
                     runtime_agent_id=self.runtime_agent_id,
                     agent_config_id=self.agent_config_id,
                     environment_id=self.environment_id,
@@ -208,7 +229,10 @@ class GoogleADKTraceSession:
                 session_id=trace.session_id,
                 step_index=trace.step_index,
                 agent_framework="google_adk",
-                agent_id=self.agent_id,
+                agent_id=trace.source.agent_id,
+                workspace_id=trace.source.workspace_id,
+                deployment_id=trace.source.deployment_id,
+                integration_id=trace.source.integration_id,
                 payload=payload or {},
             ),
             namespace=self.namespace,

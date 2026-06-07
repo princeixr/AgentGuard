@@ -13,11 +13,19 @@
         "ignore_above": 512,
         "type": "keyword"
       },
+      "deployment_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
       "event_id": {
         "ignore_above": 512,
         "type": "keyword"
       },
       "event_type": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "integration_id": {
         "ignore_above": 512,
         "type": "keyword"
       },
@@ -36,6 +44,10 @@
         "type": "integer"
       },
       "trace_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "workspace_id": {
         "ignore_above": 512,
         "type": "keyword"
       }

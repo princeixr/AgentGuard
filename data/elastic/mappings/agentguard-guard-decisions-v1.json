@@ -5,6 +5,10 @@
       "@timestamp": {
         "type": "date"
       },
+      "agent_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
       "decision": {
         "ignore_above": 512,
         "type": "keyword"
@@ -14,6 +18,10 @@
         "type": "keyword"
       },
       "decision_rules_fired": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "deployment_id": {
         "ignore_above": 512,
         "type": "keyword"
       },
@@ -46,6 +54,10 @@
         "type": "keyword"
       },
       "trace_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "workspace_id": {
         "ignore_above": 512,
         "type": "keyword"
       }

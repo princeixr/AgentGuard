@@ -25,6 +25,17 @@ from typing import Any
 
 from google.adk.agents import Agent
 
+from agentguard.control_plane.demo_adk_definition import (
+    DEMO_ADK_APP_NAME,
+    DEMO_ADK_DESCRIPTION,
+    GMAIL_RAW_TOOLS,
+    agent_instruction,
+    enabled_tools,
+    gmail_enabled,
+    gmail_runtime_ready,
+    gmail_tool_prefix,
+)
+from agentguard.control_plane.registry import DEMO_AGENT_ID, DemoAgentRegistry
 from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession, adk_runtime_policy
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -43,28 +54,18 @@ COMMAND_TIMEOUT_SECONDS = int(os.environ.get("ADK_COMMAND_TIMEOUT_SECONDS", "60"
 MAX_OUTPUT_CHARS = int(os.environ.get("ADK_MAX_OUTPUT_CHARS", "20000"))
 TRACE_NAMESPACE = os.environ.get("AGENTGUARD_ADK_TRACE_NAMESPACE", "google_adk")
 TRACE_ROOT = os.environ.get("AGENTGUARD_TRACE_ROOT", str(_REPO_ROOT / "data" / "traces"))
-AGENT_ID = "terminal_assistant"
-APP_NAME = "adk_terminal_assistant"
-GMAIL_MCP_ENABLED = os.environ.get("ADK_GMAIL_MCP_ENABLED", "").lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
+AGENT_ID = DEMO_AGENT_ID
+APP_NAME = DEMO_ADK_APP_NAME
+RUNTIME_IDENTITY = DemoAgentRegistry().runtime_identity(AGENT_ID)
+GMAIL_MCP_ENABLED = gmail_enabled()
 GMAIL_MCP_DOCKER_IMAGE = os.environ.get(
     "GMAIL_MCP_DOCKER_IMAGE", "agentguard-gmail-mcp:artymclabin"
 )
 GMAIL_MCP_CREDENTIALS_VOLUME = os.environ.get("GMAIL_MCP_CREDENTIALS_VOLUME", "mcp-gmail")
-GMAIL_MCP_TOOL_PREFIX = os.environ.get("GMAIL_MCP_TOOL_PREFIX", "gmail").strip("_") or "gmail"
-GMAIL_MCP_RAW_TOOLS = [
-    "search_emails",
-    "read_email",
-    "draft_email",
-    "send_email",
-    "send_draft",
-]
+GMAIL_MCP_TOOL_PREFIX = gmail_tool_prefix()
+GMAIL_MCP_RAW_TOOLS = GMAIL_RAW_TOOLS
 GMAIL_MCP_TOOLS = [f"{GMAIL_MCP_TOOL_PREFIX}_{name}" for name in GMAIL_MCP_RAW_TOOLS]
-AVAILABLE_TOOLS = ["run_shell_command"] + (GMAIL_MCP_TOOLS if GMAIL_MCP_ENABLED else [])
+AVAILABLE_TOOLS = enabled_tools()
 ENFORCE_APPROVAL = os.environ.get("AGENTGUARD_ADK_ENFORCE_APPROVAL", "true").lower() in {
     "1",
     "true",
@@ -136,7 +137,7 @@ def run_shell_command(command: str) -> dict:
 
 
 def _build_gmail_mcp_toolset() -> list[Any]:
-    if not GMAIL_MCP_ENABLED:
+    if not GMAIL_MCP_ENABLED or not gmail_runtime_ready():
         return []
 
     try:
@@ -233,6 +234,7 @@ def _get_trace_session(context) -> GoogleADKTraceSession:
             agent_id=AGENT_ID,
             runtime_agent_id=getattr(context, "agent_name", None) or AGENT_ID,
             agent_config_id=APP_NAME,
+            runtime_identity=RUNTIME_IDENTITY,
             available_tools=AVAILABLE_TOOLS,
             namespace=TRACE_NAMESPACE,
             trace_root=TRACE_ROOT,
@@ -268,23 +270,8 @@ TOOLS = [run_shell_command] + _build_gmail_mcp_toolset()
 root_agent = Agent(
     name=AGENT_ID,
     model=os.environ.get("ADK_MODEL", "gemini-3-flash-preview"),
-    description=(
-        "A conversational assistant that can run terminal commands and, when enabled, "
-        "use a guarded Gmail MCP server."
-    ),
-    instruction=(
-        "You are a helpful command-line assistant. Chat naturally with the user. "
-        "When a request needs information from, or an action on, the local machine, "
-        "call the run_shell_command tool with a single non-interactive shell command. "
-        "When Gmail MCP tools are available, use Gmail search/read tools for inbox "
-        "questions and Gmail draft tools when the user asks to prepare email. Only "
-        "use Gmail send tools when the current user message explicitly asks you to "
-        "send an email or send a draft. Never use run_shell_command, command-line "
-        "mail clients, SMTP scripts, curl, or other shell fallbacks to send email. "
-        "Inspect the returned exit_code, stdout, and stderr, then explain the result "
-        "in plain language. If a command fails, read stderr and either fix and retry "
-        "or tell the user what went wrong."
-    ),
+    description=DEMO_ADK_DESCRIPTION,
+    instruction=agent_instruction(),
     tools=TOOLS,
     before_tool_callback=_before_tool_callback,
     after_tool_callback=_after_tool_callback,

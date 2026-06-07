@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from agentguard.storage.elastic_client import ElasticHttpClient
+from agentguard.storage.elastic_client import ElasticHttpClient, ElasticHttpError
 from agentguard.storage.elastic_config import ElasticConfig, load_elastic_config
 from agentguard.storage.index_templates import all_index_mappings
 from agentguard.tracing.schema_v1 import (
@@ -95,6 +95,28 @@ class AgentGuardElasticStore:
                 indexed += 1
         return BulkIngestResult(attempted=attempted, indexed=indexed, errors=errors)
 
+    def get_trace(self, trace_id: str) -> AgentGuardTraceV1 | None:
+        try:
+            response = self.client.get(f"{self.config.indices.traces}/_doc/{trace_id}")
+        except ElasticHttpError as exc:
+            if "-> 404:" in str(exc):
+                return None
+            raise
+        source = response.get("_source")
+        return AgentGuardTraceV1.model_validate(source) if source else None
+
+    def get_latest_trace(self) -> AgentGuardTraceV1 | None:
+        query = {
+            "size": 1,
+            "sort": [{"@timestamp": {"order": "desc"}}],
+            "query": {"match_all": {}},
+        }
+        response = self.client.post(f"{self.config.indices.traces}/_search", query)
+        hits = response.get("hits", {}).get("hits", [])
+        if not hits:
+            return None
+        return AgentGuardTraceV1.model_validate(hits[0].get("_source", {}))
+
     def search_similar_traces(
         self,
         trace: AgentGuardTraceV1,
@@ -165,6 +187,23 @@ class AgentGuardElasticStore:
             if trace_id and trace_id not in labels:
                 labels[trace_id] = source
         return labels
+
+    def search_documents(
+        self,
+        index_name: str,
+        size: int = 1000,
+    ) -> list[dict[str, Any]]:
+        query = {
+            "size": size,
+            "sort": [{"@timestamp": {"order": "asc", "unmapped_type": "date"}}],
+            "query": {"match_all": {}},
+        }
+        response = self.client.post(f"{index_name}/_search", query)
+        return [
+            hit.get("_source", {})
+            for hit in response.get("hits", {}).get("hits", [])
+            if hit.get("_source")
+        ]
 
     def _index_model(self, index_name: str, document_id: str, model: BaseModel) -> dict[str, Any]:
         return self.client.put(f"{index_name}/_doc/{document_id}", _model_doc(model))

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AgentGuard - Trace Replay</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#000000",
+                        "on-surface": "#1c1b1b",
+                        "on-secondary-container": "#fefcff",
+                        "surface-variant": "#e5e2e1",
+                        "on-error": "#ffffff",
+                        "surface-container": "#f1edec",
+                        "surface-tint": "#5f5e5e",
+                        "on-primary-fixed-variant": "#474746",
+                        "error-container": "#ffdad6",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#313030",
+                        "surface": "#fdf8f8",
+                        "secondary-container": "#2170e4",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "primary": "#000000",
+                        "outline": "#747878",
+                        "inverse-primary": "#c8c6c5",
+                        "on-tertiary": "#ffffff",
+                        "primary-container": "#1c1b1b",
+                        "on-tertiary-fixed-variant": "#484645",
+                        "tertiary-container": "#1c1b1a",
+                        "outline-variant": "#c4c7c7",
+                        "inverse-on-surface": "#f4f0ef",
+                        "primary-fixed-dim": "#c8c6c5",
+                        "on-secondary-fixed-variant": "#004395",
+                        "background": "#fdf8f8",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#e5e2e1",
+                        "secondary": "#0058be",
+                        "surface-container-high": "#ebe7e6",
+                        "surface-bright": "#fdf8f8",
+                        "on-tertiary-fixed": "#1c1b1a",
+                        "on-background": "#1c1b1b",
+                        "on-primary-fixed": "#1c1b1b",
+                        "tertiary-fixed-dim": "#cac6c4",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-surface-variant": "#444748",
+                        "surface-container-highest": "#e5e2e1",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed": "#001a42",
+                        "on-tertiary-container": "#868382",
+                        "tertiary-fixed": "#e6e2df",
+                        "surface-container-low": "#f7f3f2",
+                        "surface-dim": "#ddd9d8",
+                        "on-primary-container": "#858383",
+                        "secondary-fixed-dim": "#adc6ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sidebar-width": "240px",
+                        "stack-compact": "8px",
+                        "gutter": "16px",
+                        "stack-dense": "4px",
+                        "margin": "24px",
+                        "rail-width": "64px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Geist"],
+                        "label-md": ["Geist"],
+                        "body-md": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "body-sm": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "mono": ["monospace"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["11px", {"lineHeight": "14px", "fontWeight": "500"}],
+                        "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "headline-md": ["18px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "mono": ["12px", {"lineHeight": "16px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Geist', sans-serif; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-row">
+<!-- SideNavBar Component -->
+<nav class="fixed left-0 top-0 h-full w-[304px] flex border-r border-outline-variant bg-surface-container z-50">
+<!-- Inner content container matching the styling needs -->
+<div class="flex flex-col w-full h-full">
+<!-- Header -->
+<div class="p-margin border-b border-outline-variant flex items-center gap-gutter">
+<div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-on-primary font-headline-md">
+                    AG
+                </div>
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-surface">AgentGuard</h1>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Hackathon Demo</p>
+</div>
+</div>
+<!-- Main Nav Tabs -->
+<div class="flex-1 overflow-y-auto py-stack-compact flex flex-col gap-stack-dense px-stack-compact">
+<!-- Nav Item 1 -->
+<a class="flex items-center gap-stack-compact px-gutter py-stack-compact rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="security">security</span>
+<span class="text-label-md font-label-md">Live Interception</span>
+</a>
+<!-- Nav Item 2 -->
+<a class="flex items-center gap-stack-compact px-gutter py-stack-compact rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="text-label-md font-label-md">Sessions</span>
+</a>
+<!-- Nav Item 3 (Active) -->
+<a class="flex items-center gap-stack-compact px-gutter py-stack-compact rounded bg-secondary-container text-on-secondary-container font-semibold opacity-90 transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="timeline">timeline</span>
+<span class="text-label-md font-label-md">Trace Replay</span>
+</a>
+<!-- Nav Item 4 -->
+<a class="flex items-center gap-stack-compact px-gutter py-stack-compact rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="storage">storage</span>
+<span class="text-label-md font-label-md">Decision Memory</span>
+</a>
+<!-- Nav Item 5 -->
+<a class="flex items-center gap-stack-compact px-gutter py-stack-compact rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="policy">policy</span>
+<span class="text-label-md font-label-md">Policies</span>
+</a>
+<!-- Nav Item 6 -->
+<a class="flex items-center gap-stack-compact px-gutter py-stack-compact rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="text-label-md font-label-md">Risk &amp; Operations</span>
+</a>
+<!-- Nav Item 7 -->
+<a class="flex items-center gap-stack-compact px-gutter py-stack-compact rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="extension">extension</span>
+<span class="text-label-md font-label-md">Integrations</span>
+</a>
+</div>
+<!-- Footer Action & Nav -->
+<div class="p-gutter border-t border-outline-variant flex flex-col gap-stack-compact">
+<button class="w-full bg-primary text-on-primary py-stack-compact rounded text-label-md font-label-md border border-primary hover:bg-tertiary transition-colors">
+                    New Agent
+                </button>
+<div class="flex flex-col gap-stack-dense mt-stack-compact">
+<a class="flex items-center gap-stack-compact px-stack-compact py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="settings">settings</span>
+<span class="text-label-md font-label-md">Settings</span>
+</a>
+<a class="flex items-center gap-stack-compact px-stack-compact py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="description">description</span>
+<span class="text-label-md font-label-md">Docs</span>
+</a>
+<a class="flex items-center gap-stack-compact px-stack-compact py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="account_circle">account_circle</span>
+<span class="text-label-md font-label-md">Profile</span>
+</a>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 ml-[304px] flex flex-col h-screen overflow-hidden">
+<!-- TopNavBar Component -->
+<header class="flex justify-between items-center h-14 px-gutter w-full border-b border-outline-variant bg-surface shrink-0 z-40">
+<div class="flex items-center gap-margin">
+<h2 class="text-headline-md font-headline-md font-bold text-primary">Trace Replay</h2>
+<!-- Session Selector -->
+<div class="flex items-center bg-surface-container-low border border-outline-variant rounded px-stack-compact py-1 text-body-sm font-body-sm cursor-pointer hover:bg-surface-container-highest transition-colors">
+<span class="text-on-surface-variant mr-2">Session:</span>
+<span class="font-medium mr-1">REQ-8472-ALX</span>
+<span class="material-symbols-outlined text-[16px]" data-icon="arrow_drop_down">arrow_drop_down</span>
+</div>
+</div>
+<div class="flex items-center gap-gutter">
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded text-label-md font-label-md border border-primary hover:bg-tertiary transition-colors flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-error block animate-pulse"></span>
+                    Live
+                </button>
+<div class="flex items-center gap-stack-compact text-on-surface-variant">
+<button class="p-1 hover:text-primary transition-colors"><span class="material-symbols-outlined" data-icon="notifications">notifications</span></button>
+<button class="p-1 hover:text-primary transition-colors"><span class="material-symbols-outlined" data-icon="settings">settings</span></button>
+</div>
+<div class="w-8 h-8 rounded-full bg-surface-variant border border-outline-variant overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCazS3hlH3fGq4d8QBwqoco_mhKEPykWxI9S9wmd0wC7fT9rRdBqfndM9kWkruIhbNf4puiwDY7kl_2GoQREaHN8dCwfC6GyHMA3eFcfkQ4qdb2zg8rTPdUnDExIuEC3YGMFMtgWvhmgLg5X1SShw0ryjAPsoc8SupfdFGXQK5EU2hW8ufZXoApb8i7rQjGkrrzc4CwGvvercwv-10YMe1-Du1mYo8sCDvL8Lfc8DH_Ro94oH_sZmaBt9DwntByKMNYgXBmwBK9CZg"/>
+</div>
+</div>
+</header>
+<!-- Workspace -->
+<div class="flex-1 flex flex-row overflow-hidden bg-background p-margin gap-margin">
+<!-- Left Column: Timeline -->
+<div class="w-1/2 flex flex-col bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden">
+<div class="p-gutter border-b border-outline-variant bg-surface flex justify-between items-center">
+<h3 class="text-body-md font-body-md font-semibold text-on-surface">Execution Timeline</h3>
+<div class="flex gap-2">
+<span class="px-2 py-0.5 rounded bg-error-container text-on-error-container text-label-sm font-label-sm border border-error/20">Blocked</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant flex items-center">14:02:45 UTC</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-gutter relative">
+<!-- Timeline Line -->
+<div class="absolute left-[39px] top-gutter bottom-gutter w-px bg-outline-variant z-0"></div>
+<!-- Timeline Items -->
+<div class="flex flex-col gap-margin relative z-10">
+<!-- Step 1 -->
+<div class="flex gap-gutter group">
+<div class="w-12 flex flex-col items-center shrink-0">
+<div class="w-8 h-8 rounded-full bg-surface border border-outline-variant flex items-center justify-center text-on-surface-variant z-10 group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-[16px]" data-icon="input">input</span>
+</div>
+<span class="text-label-sm font-label-sm text-outline mt-1">T+0s</span>
+</div>
+<div class="flex-1 bg-surface border border-outline-variant rounded p-stack-compact">
+<div class="flex justify-between items-start mb-1">
+<span class="text-label-md font-label-md text-on-surface">User Input Received</span>
+<span class="px-1.5 py-0.5 rounded bg-[#e6f4ea] text-[#137333] text-label-sm font-label-sm">Allowed</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant font-mono text-[11px] truncate">"Summarize the Q3 financials and extract customer emails from the database."</p>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="flex gap-gutter group">
+<div class="w-12 flex flex-col items-center shrink-0">
+<div class="w-8 h-8 rounded-full bg-surface border border-outline-variant flex items-center justify-center text-on-surface-variant z-10 group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-[16px]" data-icon="smart_toy">smart_toy</span>
+</div>
+<span class="text-label-sm font-label-sm text-outline mt-1">T+1.2s</span>
+</div>
+<div class="flex-1 bg-surface border border-outline-variant rounded p-stack-compact">
+<div class="flex justify-between items-start mb-1">
+<span class="text-label-md font-label-md text-on-surface">Agent Tool Selection</span>
+<span class="px-1.5 py-0.5 rounded bg-[#e6f4ea] text-[#137333] text-label-sm font-label-sm">Allowed</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Selected <code class="font-mono text-[11px] bg-surface-container px-1 rounded">SQL_Query_Tool</code> and <code class="font-mono text-[11px] bg-surface-container px-1 rounded">Doc_Summarizer</code>.</p>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="flex gap-gutter group">
+<div class="w-12 flex flex-col items-center shrink-0">
+<div class="w-8 h-8 rounded-full bg-surface border border-outline-variant flex items-center justify-center text-on-surface-variant z-10 group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-[16px]" data-icon="database">database</span>
+</div>
+<span class="text-label-sm font-label-sm text-outline mt-1">T+2.5s</span>
+</div>
+<div class="flex-1 bg-surface border border-outline-variant rounded p-stack-compact">
+<div class="flex justify-between items-start mb-1">
+<span class="text-label-md font-label-md text-on-surface">Data Retrieval</span>
+<span class="px-1.5 py-0.5 rounded bg-[#fef7e0] text-[#b06000] text-label-sm font-label-sm">Warning</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-2">Executed query against <code class="font-mono text-[11px] bg-surface-container px-1 rounded">production_db.customers</code>.</p>
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-2 text-mono font-mono text-on-surface-variant opacity-80">
+                                    SELECT email FROM customers WHERE active = 1 LIMIT 500;
+                                </div>
+</div>
+</div>
+<!-- Step 4 (Selected/Blocked) -->
+<div class="flex gap-gutter group relative">
+<!-- Active indicator -->
+<div class="absolute -left-gutter top-0 bottom-0 w-1 bg-error rounded-r"></div>
+<div class="w-12 flex flex-col items-center shrink-0">
+<div class="w-8 h-8 rounded-full bg-error text-on-error border border-error flex items-center justify-center z-10 shadow-[0_0_0_4px_rgba(186,26,26,0.1)]">
+<span class="material-symbols-outlined text-[16px]" data-icon="block">block</span>
+</div>
+<span class="text-label-sm font-label-sm text-error font-medium mt-1">T+3.1s</span>
+</div>
+<div class="flex-1 bg-error/5 border border-error rounded p-stack-compact shadow-sm cursor-pointer">
+<div class="flex justify-between items-start mb-1">
+<span class="text-label-md font-label-md text-error font-bold">Data Exfiltration Attempt</span>
+<span class="px-1.5 py-0.5 rounded bg-error text-on-error text-label-sm font-label-sm">Blocked</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-2">Agent attempted to format 500 customer emails for external output.</p>
+<div class="flex items-center gap-2 mt-2">
+<span class="text-label-sm font-label-sm text-on-surface-variant">Risk Score:</span>
+<div class="flex-1 h-1.5 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-error w-[94%]"></div>
+</div>
+<span class="text-label-sm font-label-sm font-bold text-error">94</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Event Details -->
+<div class="w-1/2 flex flex-col gap-margin">
+<!-- Detail Header Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-margin flex flex-col gap-gutter">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="text-headline-md font-headline-md font-bold text-on-surface">Data Exfiltration Attempt</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Policy Violation: PII_EXPORT_RESTRICTED</p>
+</div>
+<div class="text-right">
+<div class="text-[32px] font-headline-lg font-bold text-error leading-none">94</div>
+<div class="text-label-sm font-label-sm text-outline uppercase tracking-wider">Risk Score</div>
+</div>
+</div>
+<!-- Intent vs Action -->
+<div class="grid grid-cols-2 gap-stack-compact mt-2">
+<div class="border border-outline-variant rounded p-stack-compact bg-surface">
+<span class="text-label-sm font-label-sm text-outline block mb-1 uppercase">Stated Intent</span>
+<p class="text-body-sm font-body-sm text-on-surface">"Fulfill user request to summarize financials and list customer emails."</p>
+</div>
+<div class="border border-error/30 rounded p-stack-compact bg-error/5">
+<span class="text-label-sm font-label-sm text-error block mb-1 uppercase">Actual Action</span>
+<p class="text-body-sm font-body-sm text-on-surface">Attempted to route 500 raw PII records to standard output stream.</p>
+</div>
+</div>
+</div>
+<!-- Risk Trajectory Graph (Simulated) -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-margin flex-1 flex flex-col">
+<h4 class="text-label-md font-label-md text-on-surface mb-margin uppercase tracking-wider">Risk Trajectory</h4>
+<div class="flex-1 relative flex items-end justify-between px-4 pb-6 border-b border-l border-outline-variant ml-6">
+<!-- Y Axis labels -->
+<div class="absolute -left-6 bottom-0 top-0 flex flex-col justify-between text-label-sm font-label-sm text-outline py-2">
+<span>100</span>
+<span>50</span>
+<span>0</span>
+</div>
+<!-- Grid lines -->
+<div class="absolute left-0 right-0 top-1/2 h-px bg-outline-variant/30 border-dashed border-b"></div>
+<div class="absolute left-0 right-0 top-0 h-px bg-outline-variant/30 border-dashed border-b"></div>
+<!-- Data Points & Trend Line (CSS simulated) -->
+<!-- Line segment 1 -->
+<div class="absolute left-[10%] bottom-[10%] w-[20%] border-t-2 border-primary origin-left rotate-[-15deg]"></div>
+<!-- Line segment 2 -->
+<div class="absolute left-[30%] bottom-[20%] w-[20%] border-t-2 border-[#b06000] origin-left rotate-[-45deg]"></div>
+<!-- Line segment 3 -->
+<div class="absolute left-[50%] bottom-[55%] w-[20%] border-t-2 border-[#b06000] origin-left rotate-[-10deg]"></div>
+<!-- Line segment 4 (Spike) -->
+<div class="absolute left-[70%] bottom-[60%] w-[20%] border-t-2 border-error origin-left rotate-[-60deg]"></div>
+<!-- Points -->
+<div class="w-3 h-3 rounded-full bg-primary border-2 border-surface z-10 relative -bottom-1" style="height: 10%"></div>
+<div class="w-3 h-3 rounded-full bg-[#137333] border-2 border-surface z-10 relative -bottom-1" style="height: 20%"></div>
+<div class="w-3 h-3 rounded-full bg-[#b06000] border-2 border-surface z-10 relative -bottom-1" style="height: 55%"></div>
+<div class="w-3 h-3 rounded-full bg-[#b06000] border-2 border-surface z-10 relative -bottom-1" style="height: 60%"></div>
+<div class="w-4 h-4 rounded-full bg-error border-2 border-surface z-10 relative -bottom-1 shadow-[0_0_8px_rgba(186,26,26,0.5)]" style="height: 94%"></div>
+<!-- X Axis Labels -->
+<div class="absolute -bottom-6 left-0 w-full flex justify-between text-label-sm font-label-sm text-outline px-4">
+<span>Input</span>
+<span>Tool</span>
+<span>Query</span>
+<span>Format</span>
+<span class="text-error font-bold">Output</span>
+</div>
+</div>
+</div>
+<!-- Precedents / Elastic Retrieval -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-margin flex flex-col gap-stack-compact">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-[16px] text-outline" data-icon="search">search</span>
+<h4 class="text-label-md font-label-md text-on-surface uppercase tracking-wider">Similar Precedents</h4>
+</div>
+<div class="border border-outline-variant rounded p-stack-compact bg-surface flex justify-between items-center hover:bg-surface-container-low cursor-pointer transition-colors">
+<div>
+<div class="text-body-sm font-body-sm font-semibold text-on-surface">Mass Email Extraction Blocked</div>
+<div class="text-label-sm font-label-sm text-on-surface-variant">Policy: PII_EXPORT_RESTRICTED • 2 days ago</div>
+</div>
+<span class="px-2 py-0.5 rounded bg-surface-variant text-on-surface text-label-sm font-label-sm">92% Match</span>
+</div>
+<div class="border border-outline-variant rounded p-stack-compact bg-surface flex justify-between items-center hover:bg-surface-container-low cursor-pointer transition-colors">
+<div>
+<div class="text-body-sm font-body-sm font-semibold text-on-surface">Unauthorized DB Dump</div>
+<div class="text-label-sm font-label-sm text-on-surface-variant">Policy: DATA_VOLUME_LIMIT • 1 week ago</div>
+</div>
+<span class="px-2 py-0.5 rounded bg-surface-variant text-on-surface text-label-sm font-label-sm">78% Match</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

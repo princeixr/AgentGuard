@@ -1,6 +1,6 @@
 # Current State Of Developement
 
-Last updated: 2026-06-01
+Last updated: 2026-06-05
 
 This file summarizes the AgentGuard implementation that is currently in place inside
 `src/agentguard` and the connected app surfaces.
@@ -42,7 +42,7 @@ Implemented:
 
 Purpose:
 
-- one shared schema for historical OpenClaw traces and future live Google ADK traces,
+- one shared schema for historical OpenClaw traces and the live Google ADK traces,
 - strict separation between trace facts, features, scores, decisions, labels, and session
   risk.
 
@@ -139,8 +139,9 @@ It stores:
 
 Remaining:
 
-- load registry from Google ADK/MCP tool definitions automatically,
-- keep OpenClaw and Google ADK tool metadata aligned.
+- keep OpenClaw and Google ADK tool metadata aligned as both surfaces evolve,
+- replace remaining rule-based fallback metadata with direct runtime/MCP metadata where
+  the host framework exposes it.
 
 ### V1 Firewall
 
@@ -211,22 +212,68 @@ Remaining:
 - build final `IntentTraceBench v0` packaging step,
 - label the resulting traces.
 
-### Google ADK Demo Path
+### Google ADK Runtime Path
 
-Status: local smoke path running; real ADK interception pending.
+Status: callback-level interception implemented; full real-runtime verification pending.
 
 Implemented:
 
-- `apps/google_adk_demo_agent/run_demo.py` creates a deterministic v1 trace,
-- the trace runs through `AgentGuardFirewallV1`,
-- artifacts are written under `data/traces/v1/google_adk_demo/`.
+- `apps/adk_agent/agent.py` defines a Google ADK `root_agent` with a local
+  `run_shell_command` tool,
+- optional Docker-backed Gmail MCP tools can be exposed through `McpToolset`,
+- ADK `before_tool_callback` calls `GoogleADKTraceSession.record_tool_call()` before
+  tool execution,
+- `GoogleADKTraceSession` builds `AgentGuardTraceV1` records with ADK/MCP tool metadata,
+- each proposed ADK tool call is sent through `AgentGuardFirewallV1`,
+- ADK runtime maps firewall decisions to `allow` or `require_approval`,
+- `AGENTGUARD_ADK_ENFORCE_APPROVAL=true` stops approval-required calls by returning a
+  synthetic tool response instead of executing the tool,
+- ADK `after_tool_callback` and `on_tool_error_callback` record runtime events for
+  `tool_executed`, `tool_failed`, and approval-stopped `tool_blocked`,
+- local artifacts are written under `data/traces/v1/google_adk/` by default,
+- ADK runtime can inherit global Elastic settings or override them with
+  `AGENTGUARD_ADK_ELASTIC_ENABLED`,
+- `apps/adk_agent/chat.py` provides a standalone terminal chat loop.
+
+Current tested behavior:
+
+- direct `GoogleADKTraceSession` tests pass without importing the real ADK package,
+- the session adapter builds v1 traces, calls the firewall before execution, persists
+  traces/features/scores/decisions/session risk, and records post-tool runtime events,
+- callback tests are present for approval blocking, approval-enforcement toggle, shell
+  allow path, and ADK Elastic override behavior.
+
+Partial or placeholder behavior:
+
+- `GoogleADKAdapter.run_session()` still raises `NotImplementedError`; the active
+  implementation is the callback/session bridge, not the `RuntimeAdapter.run_session()`
+  protocol,
+- runtime policy is currently compressed to two actions: `allow` for `allow`/`warn`,
+  and `require_approval` for `review`/`require_approval`/`block`,
+- there is no real approval UI yet; approval-required calls are blocked with a synthetic
+  response when enforcement is enabled,
+- post-tool runtime events created by `GoogleADKTraceSession._append_event()` are written
+  locally, but are not yet mirrored directly to Elastic,
+- real ADK execution was not verified in the current Python environment because
+  `google-adk` is not installed for the interpreter used during this audit,
+- Docker/Gmail MCP setup is wired and documented but not yet verified end to end with a
+  real Gmail account in this environment.
 
 Remaining:
 
-- implement real `GoogleADKAdapter` pre-tool-call interception,
-- map MCP tool calls into `AgentGuardTraceV1`,
-- enforce `GuardDecisionV1` before real tool execution,
-- show decisions and live events in the demo UI.
+- install/sync ADK dependencies and run the full ADK callback test suite in the project
+  environment,
+- verify `apps/adk_agent/chat.py`, `adk run apps/adk_agent`, and `adk web` with a real
+  Gemini key,
+- verify Gmail MCP Docker image, OAuth volume, Gmail read/draft/send tool exposure, and
+  AgentGuard blocking behavior on a test account,
+- decide whether `GoogleADKAdapter.run_session()` should be implemented or removed in
+  favor of the callback/session bridge,
+- mirror ADK post-execution runtime events to Elastic,
+- add UI/approval flow so `require_approval` can pause and resume instead of always
+  returning a synthetic blocked response,
+- consider exposing all five guard decisions to the runtime instead of compressing them
+  into `allow` and `require_approval`.
 
 ### Evaluation
 
@@ -253,8 +300,16 @@ Remaining:
 ```bash
 python3 -m pytest
 python3 scripts/run_mock_session.py
-PYTHONPATH=src python3 apps/google_adk_demo_agent/run_demo.py
+.venv/bin/python -m pytest tests/test_google_adk_runtime.py
+uv run apps/adk_agent/chat.py
 ```
+
+Verification note:
+
+- `python3 -m pytest` currently reports 31 passing tests and 5 failures in this checkout
+  when run with the system Python because `google.adk` is not installed.
+- The failing tests import `apps.adk_agent.agent`; they should be rerun after
+  `uv sync` or package installation in the intended ADK environment.
 
 OpenClaw UI:
 
@@ -279,11 +334,15 @@ AGENTGUARD_ENV_FILE=.env.openclaw python3 scripts/collect_openclaw_traces.py \
 1. Populate `agentguard-scenarios-v1` from `data/scenarios/productivity_agent_scenarios.jsonl`.
 2. Build the first label pipeline for `agentguard-labels-v1` using human labels and later
    LLM-assisted labels.
-3. Build the real Google ADK/MCP adapter and enforce `GuardDecisionV1` before tool
-   execution.
-4. Expand OpenClaw scenarios to include blocked, approval-required, prompt-injection,
+3. Verify the merged ADK callback runtime with installed `google-adk`, a Gemini key, and
+   local trace output.
+4. Verify Gmail MCP through Docker/OAuth on a test account and confirm AgentGuard blocks
+   approval-required send actions.
+5. Decide the fate of the placeholder `GoogleADKAdapter.run_session()` protocol path.
+6. Mirror ADK post-tool runtime events to Elastic.
+7. Expand OpenClaw scenarios to include blocked, approval-required, prompt-injection,
    cross-domain, and data-exfiltration cases.
-5. Replace placeholder scoring with calibrated statistical formulas and Elastic-backed
+8. Replace placeholder scoring with calibrated statistical formulas and Elastic-backed
    retrieval features.
-6. Add Kibana data views/dashboard views for traces, decisions, live events, and session
+9. Add Kibana data views/dashboard views for traces, decisions, live events, and session
    risk.
