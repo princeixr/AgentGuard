@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+:root {
+  color: #1c1b1b;
+  background: #fdf8f8;
+  font-family:
+    Geist, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --surface: #fdf8f8;
+  --surface-lowest: #ffffff;
+  --surface-low: #f7f3f2;
+  --surface-container: #f1edec;
+  --surface-high: #ebe7e6;
+  --surface-highest: #e5e2e1;
+  --ink: #1c1b1b;
+  --ink-muted: #646565;
+  --border: #d5d2d1;
+  --blue: #246fdc;
+  --green: #0f8a55;
+  --green-bg: #def6e8;
+  --amber: #c56a00;
+  --amber-bg: #fff3d2;
+  --red: #c62828;
+  --red-bg: #fde5e5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 1180px;
+  min-height: 100vh;
+  background: var(--surface);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+code,
+.mono {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-lowest);
+}
+
+.eyebrow {
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-grid {
+  display: grid;
+  gap: 16px;
+  min-height: 0;
+}
+
+.subtle-scrollbar {
+  scrollbar-color: #c8c5c3 transparent;
+  scrollbar-width: thin;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.live-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}

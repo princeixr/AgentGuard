@@ -5,6 +5,9 @@ from typing import Callable
 
 from agentguard.core.enums import ToolRiskLevel
 
+GMAIL_SEND_TOOL_NAMES = {"gmail_send", "gmail_send_email", "gmail_send_draft"}
+GMAIL_DRAFT_TOOL_NAMES = {"gmail_draft", "gmail_draft_email"}
+
 
 @dataclass(frozen=True)
 class ToolMetadata:
@@ -63,7 +66,9 @@ class ToolRegistry:
 
 
 def infer_tool_metadata(tool_name: str) -> ToolMetadata:
-    if tool_name.startswith("gmail_"):
+    if tool_name == "run_shell_command":
+        category = "terminal"
+    elif tool_name.startswith("gmail_"):
         category = "email"
     elif tool_name.startswith("file_"):
         category = "file"
@@ -72,7 +77,9 @@ def infer_tool_metadata(tool_name: str) -> ToolMetadata:
     else:
         category = "unknown"
 
-    if tool_name in {"gmail_send", "calendar_create_event", "calendar_update_event"}:
+    if tool_name == "run_shell_command":
+        risk_level = ToolRiskLevel.HIGH_RISK
+    elif tool_name in GMAIL_SEND_TOOL_NAMES | {"calendar_create_event", "calendar_update_event"}:
         risk_level = ToolRiskLevel.EXTERNAL_WRITE
     elif tool_name in {"file_delete", "calendar_delete_event"}:
         risk_level = ToolRiskLevel.IRREVERSIBLE
@@ -82,9 +89,11 @@ def infer_tool_metadata(tool_name: str) -> ToolMetadata:
         risk_level = ToolRiskLevel.LOW_SIDE_EFFECT
 
     side_effect_type = None
-    if tool_name == "gmail_send":
+    if tool_name == "run_shell_command":
+        side_effect_type = "shell_command"
+    elif tool_name in GMAIL_SEND_TOOL_NAMES:
         side_effect_type = "external_message_send"
-    elif tool_name == "gmail_draft":
+    elif tool_name in GMAIL_DRAFT_TOOL_NAMES:
         side_effect_type = "local_draft_create"
     elif tool_name == "calendar_create_event":
         side_effect_type = "calendar_event_create"
@@ -102,17 +111,23 @@ def infer_tool_metadata(tool_name: str) -> ToolMetadata:
         side_effect_type=side_effect_type,
         requires_confirmation_by_default=risk_level
         in {ToolRiskLevel.EXTERNAL_WRITE, ToolRiskLevel.IRREVERSIBLE, ToolRiskLevel.HIGH_RISK},
-        irreversible=risk_level == ToolRiskLevel.IRREVERSIBLE or tool_name == "gmail_send",
+        irreversible=risk_level == ToolRiskLevel.IRREVERSIBLE or tool_name in GMAIL_SEND_TOOL_NAMES,
     )
 
 
 def build_default_tool_registry() -> ToolRegistry:
     registry = ToolRegistry()
     for name in [
+        "run_shell_command",
         "gmail_search",
         "gmail_read",
         "gmail_draft",
         "gmail_send",
+        "gmail_search_emails",
+        "gmail_read_email",
+        "gmail_draft_email",
+        "gmail_send_email",
+        "gmail_send_draft",
         "file_search",
         "file_read",
         "file_write",

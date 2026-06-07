@@ -47,10 +47,21 @@ Host agent proposes tool call
     -> AgentGuardFirewallV1.intercept(trace)
     -> TraceFeatureV1, GuardScoreV1, GuardDecisionV1 are persisted
     -> SessionRiskStateV1 is updated
-    -> runtime enforces decision before tool execution
+    -> runtime maps the decision to allow, require_approval, or block
+    -> runtime executes or returns an approval-required/blocked response
 ```
 
 No governed host agent should execute a side-effecting tool before this flow runs.
+
+The Google ADK runtime exposes three runtime policies:
+
+```text
+allow             execute the tool
+require_approval  do not execute until an approval path exists
+block             never execute the tool
+```
+
+`AGENTGUARD_ADK_ENFORCE_APPROVAL=true` is the default.
 
 ## OpenClaw Dataset Flow
 
@@ -97,12 +108,18 @@ session_risk_v1.py      cumulative session risk manager
 
 ```text
 runtime_adapter.py       runtime protocol
-google_adk_adapter.py    future live Google ADK/MCP adapter
+google_adk_adapter.py    live ADK trace session and firewall bridge
 tool_registry.py         tool metadata and risk registry
 tool_executor.py         deterministic local executor helper
 tool_event_mapper.py     legacy compatibility mapper
 mock_tools/              local email, file, and calendar tools
 ```
+
+`GoogleADKTraceSession` is the active callback bridge used by `apps/adk_agent`. It
+builds `AgentGuardTraceV1` records with ADK/MCP tool metadata, calls
+`AgentGuardFirewallV1` before execution, stores firewall artifacts, and records
+post-decision runtime events such as `tool_executed`, `tool_failed`, and
+approval-stopped `tool_blocked`.
 
 ### `apps/openclaw_trace_agents/`
 
@@ -115,12 +132,11 @@ configs/productivity_agent/ controlled OpenClaw workspace and tool fixtures
 productivity_ui/         browser UI for the virtual productivity environment
 ```
 
-### `apps/google_adk_demo_agent/`
+### `apps/adk_agent/`
 
 ```text
-run_demo.py   local v1 firewall smoke path
-agent.py      host-agent placeholder
-tools.py      demo tool definitions
+agent.py      ADK root_agent, callbacks, shell tool, optional Gmail MCP toolset
+chat.py       standalone terminal chat loop
 README.md     app-specific notes
 ```
 
@@ -129,7 +145,7 @@ README.md     app-specific notes
 ```bash
 python3 -m pytest
 python3 scripts/run_mock_session.py
-PYTHONPATH=src python3 apps/google_adk_demo_agent/run_demo.py
+.venv/bin/python -m pytest tests/test_google_adk_runtime.py
 AGENTGUARD_ENV_FILE=.env.openclaw python3 scripts/run_openclaw_productivity_ui.py
 ```
 
@@ -137,9 +153,9 @@ AGENTGUARD_ENV_FILE=.env.openclaw python3 scripts/run_openclaw_productivity_ui.p
 
 - Use `AgentGuardTraceV1` as the boundary object for all new live or historical trace work.
 - Keep labels, scores, decisions, and raw trace facts in separate records.
-- Use `ToolRegistry` for side-effect and confirmation metadata.
+- Use runtime tool metadata for side-effect and confirmation metadata; ADK should derive
+  this from active ADK/MCP tool definitions when possible.
 - Treat OpenClaw as historical trace generation, not the live governed runtime.
 - Treat Google ADK as the live governed runtime target.
 - Placeholder logic is acceptable only when the full component interface is implemented
   and tested end to end.
-

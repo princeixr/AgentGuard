@@ -196,7 +196,15 @@
             "ignore_above": 512,
             "type": "keyword"
           },
+          "deployment_id": {
+            "ignore_above": 512,
+            "type": "keyword"
+          },
           "environment_id": {
+            "ignore_above": 512,
+            "type": "keyword"
+          },
+          "integration_id": {
             "ignore_above": 512,
             "type": "keyword"
           },
@@ -217,6 +225,10 @@
             "type": "keyword"
           },
           "source_type": {
+            "ignore_above": 512,
+            "type": "keyword"
+          },
+          "workspace_id": {
             "ignore_above": 512,
             "type": "keyword"
           }

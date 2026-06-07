@@ -1,0 +1,15 @@
+{
+  "counts": {
+    "decisions": 13,
+    "features": 13,
+    "labels": 13,
+    "live_events": 52,
+    "scenarios": 4,
+    "scores": 13,
+    "session_risk": 4,
+    "traces": 13
+  },
+  "fixture_version": "agentguard.demo.v1",
+  "generated_for": "AgentGuard local product demo",
+  "namespace": "demo"
+}

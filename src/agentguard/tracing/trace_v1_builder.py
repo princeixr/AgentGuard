@@ -26,6 +26,9 @@ from agentguard.tracing.schema_v1 import (
     TrajectoryV1,
 )
 
+GMAIL_SEND_TOOL_NAMES = {"gmail_send", "gmail_send_email", "gmail_send_draft"}
+GMAIL_DRAFT_TOOL_NAMES = {"gmail_draft", "gmail_draft_email"}
+
 
 @dataclass(frozen=True)
 class TraceV1BuildInput:
@@ -55,13 +58,18 @@ class TraceV1BuildInput:
     output_influenced_current_call: bool = False
     execution_status: str = "proposed"
     mcp_server: str | None = None
+    tool_category: str | None = None
+    risk_level: str | None = None
+    side_effect_type: str | None = None
 
 
 class TraceV1Builder:
     def build(self, data: TraceV1BuildInput) -> AgentGuardTraceV1:
-        tool_category = infer_tool_category(data.tool_name)
+        tool_category = data.tool_category or infer_tool_category(data.tool_name)
         inferred_risk = infer_tool_risk_level(data.tool_name)
-        risk_level = inferred_risk.value if hasattr(inferred_risk, "value") else str(inferred_risk)
+        risk_level = data.risk_level or (
+            inferred_risk.value if hasattr(inferred_risk, "value") else str(inferred_risk)
+        )
         argument_summary = summarize_arguments(data.arguments)
         trajectory = build_trajectory(data.prior_tool_calls, data.previous_output_summary)
         explicit_constraints = data.explicit_constraints or constraints_from_intent(
@@ -88,7 +96,7 @@ class TraceV1Builder:
             tool_category=tool_category,
             mcp_server=data.mcp_server,
             risk_level=risk_level,
-            side_effect_type=infer_side_effect_type(data.tool_name),
+            side_effect_type=data.side_effect_type or infer_side_effect_type(data.tool_name),
             arguments=data.arguments,
             argument_summary=argument_summary,
             argument_hash=hash_arguments(data.arguments),
@@ -222,9 +230,11 @@ def infer_task_goal(domain: str, task_category: str) -> str:
 
 
 def infer_side_effect_type(tool_name: str) -> str | None:
-    if tool_name == "gmail_send":
+    if tool_name == "run_shell_command":
+        return "shell_command"
+    if tool_name in GMAIL_SEND_TOOL_NAMES:
         return "external_message_send"
-    if tool_name == "gmail_draft":
+    if tool_name in GMAIL_DRAFT_TOOL_NAMES:
         return "local_draft_create"
     if tool_name == "calendar_create_event":
         return "calendar_event_create"
@@ -255,7 +265,10 @@ def constraints_from_intent(
             ExplicitConstraintV1(
                 constraint_type="negative_action",
                 text="Do not send.",
-                forbidden_tool="gmail_send" if "gmail_send" in forbidden_tools else None,
+                forbidden_tool=next(
+                    (tool for tool in forbidden_tools if tool in GMAIL_SEND_TOOL_NAMES),
+                    None,
+                ),
             )
         )
     if "do not create" in request or "don't create" in request:

@@ -10,7 +10,11 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
+    "fastapi>=0.115",
+    "google-adk>=2.1.0",
+    "mcp>=1.27.1",
     "pydantic>=2.7",
+    "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -18,15 +22,17 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.4",
 ]
+adk = [
+    "google-adk>=1.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = [".", "src"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-

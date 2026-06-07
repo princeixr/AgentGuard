@@ -12,12 +12,11 @@ from uuid import uuid4
 from agentguard.governance.retrieval_v1 import NullRetrievalProviderV1, RetrievalProviderV1
 from agentguard.runtime.tool_registry import ToolRegistry, build_default_tool_registry
 from agentguard.tracing.schema_v1 import (
+    AgentGuardTraceV1,
     ContextFeaturesV1,
     HistoricalStatisticsV1,
     PolicyFeaturesV1,
-    RetrievalFeatureV1,
     TraceFeatureV1,
-    AgentGuardTraceV1,
 )
 
 
@@ -51,6 +50,9 @@ class TraceFeatureBuilderV1:
             feature_id=str(uuid4()),
             trace_id=trace.trace_id,
             session_id=trace.session_id,
+            workspace_id=trace.source.workspace_id,
+            agent_id=trace.source.agent_id,
+            deployment_id=trace.source.deployment_id,
             step_index=trace.step_index,
             retrieval=retrieval,
             historical_statistics=HistoricalStatisticsV1(

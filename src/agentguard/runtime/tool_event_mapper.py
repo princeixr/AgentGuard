@@ -8,8 +8,13 @@ from uuid import uuid4
 from agentguard.core.enums import ToolRiskLevel
 from agentguard.core.models import ProposedToolCall
 
+GMAIL_SEND_TOOL_NAMES = {"gmail_send", "gmail_send_email", "gmail_send_draft"}
+GMAIL_DRAFT_TOOL_NAMES = {"gmail_draft", "gmail_draft_email"}
+
 
 def infer_tool_category(tool_name: str) -> str:
+    if tool_name == "run_shell_command":
+        return "terminal"
     if tool_name.startswith("gmail_"):
         return "email"
     if tool_name.startswith("file_"):
@@ -20,7 +25,9 @@ def infer_tool_category(tool_name: str) -> str:
 
 
 def infer_tool_risk_level(tool_name: str) -> ToolRiskLevel:
-    if tool_name in {"gmail_send", "calendar_create_event", "calendar_update_event"}:
+    if tool_name == "run_shell_command":
+        return ToolRiskLevel.HIGH_RISK
+    if tool_name in GMAIL_SEND_TOOL_NAMES | {"calendar_create_event", "calendar_update_event"}:
         return ToolRiskLevel.EXTERNAL_WRITE
     if tool_name in {"file_delete", "calendar_delete_event"}:
         return ToolRiskLevel.IRREVERSIBLE
@@ -94,4 +101,3 @@ def map_openclaw_tool_event_to_proposed_call(
         step_index=step_index,
         proposed_by="openclaw_agent",
     )
-

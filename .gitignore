@@ -1,4 +1,6 @@
 .venv/
+node_modules/
+dist/
 .env
 .env.openclaw
 .env.elastic
@@ -7,16 +9,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .DS_Store
-data/traces/raw/*/traces.jsonl
-data/traces/v1/*/*.jsonl
-data/traces/v1/*/session_risk/
-data/traces/labeled/labels.jsonl
-data/traces/guard_outputs/decisions.jsonl
-data/intenttracebench_v0/benchmark_traces.jsonl
-data/openclaw_raw/runs/
-data/openclaw_raw/transcripts/
-data/openclaw_raw/normalized_events/
-data/elastic/exports/*
-!data/elastic/exports/.gitkeep
 .openclaw-agentguard/
 .openclaw-traces/
+data/*
+src/agentguard.egg-info/
+test_*
+!tests/test_google_adk_runtime.py

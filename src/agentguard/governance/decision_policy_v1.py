@@ -16,8 +16,13 @@ from agentguard.tracing.schema_v1 import (
 
 
 class DecisionPolicyV1:
-    def __init__(self, thresholds: DecisionThresholdsV1 | None = None):
+    def __init__(
+        self,
+        thresholds: DecisionThresholdsV1 | None = None,
+        force_block: bool = False,
+    ):
         self.thresholds = thresholds or DecisionThresholdsV1()
+        self.force_block = force_block
 
     def decide(
         self,
@@ -34,7 +39,11 @@ class DecisionPolicyV1:
         decision = "allow"
         tier = "decision_policy"
 
-        if feature.policy_features.tool_in_intent_forbidden_set:
+        if self.force_block:
+            rules.append("force_block_enabled")
+            decision = "block"
+            tier = "static_policy"
+        elif feature.policy_features.tool_in_intent_forbidden_set:
             rules.append("tool_in_intent_forbidden_set")
             tier = "static_policy"
             if feature.policy_features.irreversible_side_effect:
@@ -73,6 +82,9 @@ class DecisionPolicyV1:
             trace_id=trace.trace_id,
             score_id=score.score_id,
             session_id=trace.session_id,
+            workspace_id=trace.source.workspace_id,
+            agent_id=trace.source.agent_id,
+            deployment_id=trace.source.deployment_id,
             step_index=trace.step_index,
             decision=decision,
             tier_used=tier,
