@@ -84,6 +84,14 @@ class DashboardQueryService:
                     status="operational",
                     detail="Tool callback integration configured for the demo agent.",
                 ),
+                ComponentHealth(
+                    name="Guard engine",
+                    status="operational",
+                    detail=(
+                        "Functional deterministic policy and weighted heuristic scorer "
+                        "(v0.1); not a trained production anomaly model."
+                    ),
+                ),
             ],
         )
 
@@ -394,6 +402,14 @@ class DashboardQueryService:
 
     def _agent_traces(self, agent_id: str | None):
         traces = self.repository.traces()
+        completed_trace_ids = (
+            {record.trace_id for record in self.repository.features()}
+            & {record.trace_id for record in self.repository.scores()}
+            & {record.trace_id for record in self.repository.decisions()}
+        )
+        traces = [
+            trace for trace in traces if trace.trace_id in completed_trace_ids
+        ]
         if agent_id is None:
             return traces
         return [

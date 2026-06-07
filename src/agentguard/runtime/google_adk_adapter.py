@@ -10,6 +10,7 @@ from uuid import uuid4
 from agentguard.control_plane.models import RuntimeIdentity
 from agentguard.core.enums import ToolRiskLevel
 from agentguard.core.models import ExecutedToolCall
+from agentguard.governance.decision_policy_v1 import DecisionPolicyV1
 from agentguard.governance.firewall_v1 import AgentGuardFirewallV1, FirewallResultV1
 from agentguard.runtime.tool_registry import ToolMetadata, infer_tool_metadata
 from agentguard.tracing.schema_v1 import AgentGuardTraceV1, LiveEventV1, TraceSourceV1
@@ -59,6 +60,7 @@ class GoogleADKTraceSession:
         enable_elastic: bool | None = None,
         fail_on_elastic_error: bool = False,
         runtime_identity: RuntimeIdentity | None = None,
+        force_block: bool = False,
     ):
         self.session_id = session_id
         self.agent_id = agent_id
@@ -75,6 +77,7 @@ class GoogleADKTraceSession:
             namespace=self.namespace,
             enable_elastic=enable_elastic,
             fail_on_elastic_error=fail_on_elastic_error,
+            decision_policy=DecisionPolicyV1(force_block=force_block),
         )
         self.tool_metadata = tool_metadata or build_adk_tool_metadata(available_tools)
         self.raw_user_request = ""
@@ -376,6 +379,8 @@ def _summarize_tool_response(response: Any, max_chars: int = 500) -> str:
 def adk_runtime_policy(guard_decision: str) -> str:
     if guard_decision in {"allow", "warn"}:
         return "allow"
+    if guard_decision == "block":
+        return "block"
     return "require_approval"
 
 

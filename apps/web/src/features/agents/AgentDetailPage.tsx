@@ -171,6 +171,9 @@ export function AgentDetailPage() {
               />
             </div>
             <div className="border-t border-[var(--border)] p-5">
+              <div className="rounded border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+                {config.guardrails.implementation}
+              </div>
               <div className="eyebrow">Callbacks</div>
               <div className="mt-3 space-y-2">
                 {config.callbacks.map((callback) => (

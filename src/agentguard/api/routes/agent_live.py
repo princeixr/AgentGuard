@@ -7,7 +7,11 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from starlette.responses import StreamingResponse
 
-from agentguard.api.dependencies import get_agent_registry, get_demo_runtime
+from agentguard.api.dependencies import (
+    get_agent_live_runtime,
+    get_agent_registry,
+    get_demo_runtime,
+)
 from agentguard.api.models import (
     ApprovalRecord,
     ApprovalRequest,
@@ -15,6 +19,7 @@ from agentguard.api.models import (
     DemoStartResponse,
 )
 from agentguard.api.services.live import DemoRuntimeService
+from agentguard.api.services.agent_live import AgentLiveRuntimeService
 from agentguard.control_plane.registry import DemoAgentRegistry
 
 router = APIRouter(prefix="/agents/{agent_id}", tags=["agent live"])
@@ -28,7 +33,7 @@ def _require_agent(agent_id: str, registry: DemoAgentRegistry) -> None:
 @router.get("/interceptions/current", response_model=CurrentInterception)
 def current(
     agent_id: str,
-    runtime: DemoRuntimeService = Depends(get_demo_runtime),
+    runtime: AgentLiveRuntimeService = Depends(get_agent_live_runtime),
     registry: DemoAgentRegistry = Depends(get_agent_registry),
 ) -> CurrentInterception:
     _require_agent(agent_id, registry)
@@ -48,10 +53,8 @@ async def events(
             "state",
             runtime.current(agent_id).model_dump(mode="json"),
         )
-        async for envelope in runtime.broker.subscribe():
-            envelope_agent = envelope.data.get("agent_id")
-            if envelope_agent in {None, agent_id}:
-                yield _format_sse(envelope.event, envelope.data)
+        async for envelope in runtime.subscribe(agent_id):
+            yield _format_sse(envelope.event, envelope.data)
 
     return StreamingResponse(
         generate(),
@@ -82,16 +85,17 @@ async def resolve(
     agent_id: str,
     trace_id: str,
     request: ApprovalRequest,
-    runtime: DemoRuntimeService = Depends(get_demo_runtime),
+    runtime: AgentLiveRuntimeService = Depends(get_agent_live_runtime),
     registry: DemoAgentRegistry = Depends(get_agent_registry),
 ) -> ApprovalRecord:
     _require_agent(agent_id, registry)
-    if runtime.current(agent_id).current_trace_id != trace_id:
-        raise HTTPException(status_code=409, detail="Trace is not awaiting approval.")
-    try:
-        return await runtime.resolve(trace_id, request)
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    raise HTTPException(
+        status_code=501,
+        detail=(
+            "Live ADK approval resume is not implemented. AgentGuard currently "
+            "prevents the tool execution and records the intervention."
+        ),
+    )
 
 
 def _format_sse(event: str, data: dict) -> str:

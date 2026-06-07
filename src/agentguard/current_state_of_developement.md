@@ -225,7 +225,7 @@ Implemented:
   tool execution,
 - `GoogleADKTraceSession` builds `AgentGuardTraceV1` records with ADK/MCP tool metadata,
 - each proposed ADK tool call is sent through `AgentGuardFirewallV1`,
-- ADK runtime maps firewall decisions to `allow` or `require_approval`,
+- ADK runtime maps firewall decisions to `allow`, `require_approval`, or `block`,
 - `AGENTGUARD_ADK_ENFORCE_APPROVAL=true` stops approval-required calls by returning a
   synthetic tool response instead of executing the tool,
 - ADK `after_tool_callback` and `on_tool_error_callback` record runtime events for
@@ -248,8 +248,8 @@ Partial or placeholder behavior:
 - `GoogleADKAdapter.run_session()` still raises `NotImplementedError`; the active
   implementation is the callback/session bridge, not the `RuntimeAdapter.run_session()`
   protocol,
-- runtime policy is currently compressed to two actions: `allow` for `allow`/`warn`,
-  and `require_approval` for `review`/`require_approval`/`block`,
+- runtime policy maps `allow`/`warn` to `allow`, `review`/`require_approval` to
+  `require_approval`, and preserves `block` as an unconditional stop,
 - there is no real approval UI yet; approval-required calls are blocked with a synthetic
   response when enforcement is enabled,
 - post-tool runtime events created by `GoogleADKTraceSession._append_event()` are written
@@ -272,8 +272,8 @@ Remaining:
 - mirror ADK post-execution runtime events to Elastic,
 - add UI/approval flow so `require_approval` can pause and resume instead of always
   returning a synthetic blocked response,
-- consider exposing all five guard decisions to the runtime instead of compressing them
-  into `allow` and `require_approval`.
+- consider exposing `warn` and `review` distinctly instead of mapping them to the
+  nearest runtime enforcement action.
 
 ### Evaluation
 

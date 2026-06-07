@@ -146,6 +146,10 @@ def agent_definition() -> dict[str, Any]:
         ],
         "guardrails": {
             "policy_id": "pol_strict_intent_v1",
+            "implementation": (
+                "Functional deterministic policy plus weighted heuristic scorer v0.1; "
+                "not a trained production anomaly model."
+            ),
             "approval_enforced": os.environ.get(
                 "AGENTGUARD_ADK_ENFORCE_APPROVAL", "true"
             ).lower()

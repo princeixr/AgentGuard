@@ -47,17 +47,18 @@ Host agent proposes tool call
     -> AgentGuardFirewallV1.intercept(trace)
     -> TraceFeatureV1, GuardScoreV1, GuardDecisionV1 are persisted
     -> SessionRiskStateV1 is updated
-    -> runtime maps the decision to allow or require_approval
-    -> runtime executes or returns an approval-required response
+    -> runtime maps the decision to allow, require_approval, or block
+    -> runtime executes or returns an approval-required/blocked response
 ```
 
 No governed host agent should execute a side-effecting tool before this flow runs.
 
-For the current Google ADK runtime, only two runtime policies are exposed:
+The Google ADK runtime exposes three runtime policies:
 
 ```text
 allow             execute the tool
 require_approval  do not execute until an approval path exists
+block             never execute the tool
 ```
 
 `AGENTGUARD_ADK_ENFORCE_APPROVAL=true` is the default.

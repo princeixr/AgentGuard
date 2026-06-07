@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agentguard.api.repositories.elastic import ElasticDashboardRepository
 from agentguard.api.repositories.local import LocalDashboardRepository
+from agentguard.api.repositories.merged import MergedDashboardRepository
+from agentguard.api.repositories.runtime import RuntimeFirstDashboardRepository
 from agentguard.api.routes import (
     agent_dashboard,
     agent_live,
@@ -26,6 +28,7 @@ from agentguard.api.routes import (
 from agentguard.api.services.live import DemoRuntimeService
 from agentguard.api.services.query import DashboardQueryService
 from agentguard.api.services.adk_test import GoogleADKTestService
+from agentguard.api.services.agent_live import AgentLiveRuntimeService
 from agentguard.demo import reset_demo_runtime
 from agentguard.control_plane.registry import DemoAgentRegistry
 from agentguard.storage import AgentGuardElasticStore, load_elastic_config
@@ -34,6 +37,7 @@ from agentguard.storage import AgentGuardElasticStore, load_elastic_config
 def create_app(
     data_root: Path | str | None = None,
     fixture_root: Path | str | None = None,
+    agent_trace_root: Path | str | None = None,
 ) -> FastAPI:
     repo_root = Path(__file__).resolve().parents[3]
     try:
@@ -53,10 +57,38 @@ def create_app(
     if not fixtures.is_absolute():
         fixtures = repo_root / fixtures
 
-    local_repository = LocalDashboardRepository(runtime_root)
-    if not local_repository.is_ready() and (fixtures / "v1" / "demo").exists():
+    demo_repository = LocalDashboardRepository(runtime_root)
+    if not demo_repository.is_ready() and (fixtures / "v1" / "demo").exists():
         reset_demo_runtime(fixtures, runtime_root)
-    repository = local_repository
+    trace_root = Path(
+        agent_trace_root
+        or (
+            Path(data_root).parent / "agent_traces"
+            if data_root is not None
+            else os.environ.get("AGENTGUARD_TRACE_ROOT", "data/traces")
+        )
+    )
+    if not trace_root.is_absolute():
+        trace_root = repo_root / trace_root
+    trace_namespace = os.environ.get(
+        "AGENTGUARD_ADK_TRACE_NAMESPACE", "google_adk"
+    )
+    runtime_sources = [
+        LocalDashboardRepository(trace_root, namespace=trace_namespace)
+    ]
+    legacy_trace_root = repo_root / "apps" / "adk_agent" / "data" / "traces"
+    if agent_trace_root is None and data_root is None and legacy_trace_root != trace_root:
+        runtime_sources.append(
+            LocalDashboardRepository(
+                legacy_trace_root,
+                namespace=trace_namespace,
+            )
+        )
+    live_repository = MergedDashboardRepository(runtime_sources)
+    repository = RuntimeFirstDashboardRepository(
+        runtime=live_repository,
+        fallback=demo_repository,
+    )
     elastic_config = load_elastic_config()
     if elastic_config.enabled and elastic_config.is_configured:
         try:
@@ -66,9 +98,12 @@ def create_app(
             elastic_repository.is_ready()
             repository = elastic_repository
         except Exception as exc:
-            repository = LocalDashboardRepository(
-                runtime_root,
-                fallback_reason=f"Elastic unavailable; using local data: {exc}",
+            repository = RuntimeFirstDashboardRepository(
+                runtime=live_repository,
+                fallback=demo_repository,
+            )
+            repository.fallback_reason = (
+                f"Elastic unavailable; using local data: {exc}"
             )
 
     app = FastAPI(
@@ -95,6 +130,10 @@ def create_app(
     app.state.agent_registry = DemoAgentRegistry()
     app.state.adk_test_service = GoogleADKTestService(repo_root=repo_root)
     app.state.query_service = DashboardQueryService(repository)
+    app.state.agent_live_runtime = AgentLiveRuntimeService(
+        repository,
+        app.state.query_service,
+    )
     app.state.demo_runtime = DemoRuntimeService(
         repository,
         app.state.query_service,

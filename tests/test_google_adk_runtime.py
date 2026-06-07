@@ -35,7 +35,7 @@ def test_google_adk_trace_session_runs_firewall_before_execution(tmp_path):
         call_id="call_001",
     )
 
-    assert adk_runtime_policy(result.decision.decision) == "require_approval"
+    assert adk_runtime_policy(result.decision.decision) in {"require_approval", "block"}
     assert result.decision.decision in {"require_approval", "block"}
     assert (tmp_path / "traces" / "v1" / "google_adk_test" / "traces.jsonl").exists()
     assert (tmp_path / "traces" / "v1" / "google_adk_test" / "features.jsonl").exists()
@@ -72,7 +72,7 @@ def test_google_adk_trace_session_propagates_runtime_identity(tmp_path):
     assert result.decision.agent_id == DEMO_AGENT_ID
 
 
-def test_before_tool_callback_blocks_approval_required_call(monkeypatch, tmp_path):
+def test_before_tool_callback_blocks_forbidden_call(monkeypatch, tmp_path):
     monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "true")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
@@ -86,13 +86,13 @@ def test_before_tool_callback_blocks_approval_required_call(monkeypatch, tmp_pat
     )
 
     assert response is not None
-    assert response["approval_required"] is True
+    assert response["approval_required"] is False
     assert response["blocked_by_agentguard"] is True
-    assert response["runtime_policy"] == "require_approval"
-    assert response["firewall_decision"] in {"require_approval", "block"}
+    assert response["runtime_policy"] == "block"
+    assert response["firewall_decision"] == "block"
 
 
-def test_before_tool_callback_respects_approval_enforcement_flag(monkeypatch, tmp_path):
+def test_before_tool_callback_always_enforces_explicit_block(monkeypatch, tmp_path):
     monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "false")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
@@ -105,7 +105,49 @@ def test_before_tool_callback_respects_approval_enforcement_flag(monkeypatch, tm
         _fake_tool_context("Draft a reply but do not send it."),
     )
 
-    assert response is None
+    assert response is not None
+    assert response["runtime_policy"] == "block"
+    assert response["blocked_by_agentguard"] is True
+
+
+def test_before_tool_callback_force_blocks_every_tool_call(monkeypatch, tmp_path):
+    monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
+    monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "false")
+    monkeypatch.setenv("AGENTGUARD_FORCE_BLOCK", "true")
+    monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
+    adk_agent = _load_adk_agent()
+    adk_agent._TRACE_SESSIONS.clear()
+
+    response = adk_agent._before_tool_callback(
+        SimpleNamespace(name="run_shell_command"),
+        {"command": "touch should-not-exist"},
+        _fake_tool_context("Create a file."),
+    )
+
+    assert response is not None
+    assert response["approval_required"] is False
+    assert response["blocked_by_agentguard"] is True
+    assert response["runtime_policy"] == "block"
+    assert response["firewall_decision"] == "block"
+
+    decisions = load_jsonl(
+        tmp_path / "traces" / "v1" / "google_adk" / "decisions.jsonl"
+    )
+    assert decisions[0]["decision"] == "block"
+    assert decisions[0]["decision_rules_fired"] == ["force_block_enabled"]
+    assert "force_block_enabled" in decisions[0]["explanation"]
+
+    blocked_events = [
+        event
+        for event in load_jsonl(
+            tmp_path / "traces" / "v1" / "google_adk" / "live_events.jsonl"
+        )
+        if event["event_type"] == "tool_blocked"
+        and event["payload"].get("runtime_event_source") == "google_adk_adapter"
+    ]
+    assert len(blocked_events) == 1
+    assert blocked_events[0]["payload"]["runtime_policy"] == "block"
+    assert blocked_events[0]["payload"]["approval_required"] is False
 
 
 def test_google_adk_trace_session_records_tool_executed_event(tmp_path):
@@ -273,8 +315,8 @@ def test_before_tool_callback_records_approval_blocked_runtime_event(monkeypatch
     ]
     assert len(blocked_events) == 1
     assert blocked_events[0]["payload"]["execution_status"] == "blocked"
-    assert blocked_events[0]["payload"]["approval_required"] is True
-    assert blocked_events[0]["payload"]["runtime_policy"] == "require_approval"
+    assert blocked_events[0]["payload"]["approval_required"] is False
+    assert blocked_events[0]["payload"]["runtime_policy"] == "block"
 
 
 def test_adk_callback_uses_registered_dashboard_agent_identity(monkeypatch, tmp_path):

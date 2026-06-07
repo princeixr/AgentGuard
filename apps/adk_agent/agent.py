@@ -53,7 +53,11 @@ COMMAND_TIMEOUT_SECONDS = int(os.environ.get("ADK_COMMAND_TIMEOUT_SECONDS", "60"
 # Cap returned output so a chatty command can't blow up the model context.
 MAX_OUTPUT_CHARS = int(os.environ.get("ADK_MAX_OUTPUT_CHARS", "20000"))
 TRACE_NAMESPACE = os.environ.get("AGENTGUARD_ADK_TRACE_NAMESPACE", "google_adk")
-TRACE_ROOT = os.environ.get("AGENTGUARD_TRACE_ROOT", str(_REPO_ROOT / "data" / "traces"))
+TRACE_ROOT = Path(
+    os.environ.get("AGENTGUARD_TRACE_ROOT", str(_REPO_ROOT / "data" / "traces"))
+)
+if not TRACE_ROOT.is_absolute():
+    TRACE_ROOT = _REPO_ROOT / TRACE_ROOT
 AGENT_ID = DEMO_AGENT_ID
 APP_NAME = DEMO_ADK_APP_NAME
 RUNTIME_IDENTITY = DemoAgentRegistry().runtime_identity(AGENT_ID)
@@ -67,6 +71,15 @@ GMAIL_MCP_RAW_TOOLS = GMAIL_RAW_TOOLS
 GMAIL_MCP_TOOLS = [f"{GMAIL_MCP_TOOL_PREFIX}_{name}" for name in GMAIL_MCP_RAW_TOOLS]
 AVAILABLE_TOOLS = enabled_tools()
 ENFORCE_APPROVAL = os.environ.get("AGENTGUARD_ADK_ENFORCE_APPROVAL", "true").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+FORCE_BLOCK = os.environ.get(
+    "AGENTGUARD_FORCE_BLOCK",
+    os.environ.get("FORCE_BLOCK", "false"),
+).lower() in {
     "1",
     "true",
     "yes",
@@ -188,13 +201,19 @@ def _before_tool_callback(tool, args: dict[str, Any], tool_context):
     )
     runtime_policy = adk_runtime_policy(result.decision.decision)
 
-    if runtime_policy == "require_approval" and ENFORCE_APPROVAL:
-        approval_response = {
+    should_stop = runtime_policy == "block" or (
+        runtime_policy == "require_approval" and ENFORCE_APPROVAL
+    )
+    if should_stop:
+        is_approval = runtime_policy == "require_approval"
+        blocked_response = {
             "error": (
                 "AgentGuard requires approval for this tool call. Approval UI is not "
                 "implemented yet, so the tool was not executed."
+                if is_approval
+                else "AgentGuard blocked this tool call. The tool was not executed."
             ),
-            "approval_required": True,
+            "approval_required": is_approval,
             "blocked_by_agentguard": True,
             "tool_name": tool_name,
             "runtime_policy": runtime_policy,
@@ -202,8 +221,8 @@ def _before_tool_callback(tool, args: dict[str, Any], tool_context):
             "guard_explanation": result.decision.explanation,
             "trace_id": result.trace.trace_id,
         }
-        tracer.record_tool_response(tool_name, approval_response, call_id=call_id)
-        return approval_response
+        tracer.record_tool_response(tool_name, blocked_response, call_id=call_id)
+        return blocked_response
 
     return None
 
@@ -240,6 +259,7 @@ def _get_trace_session(context) -> GoogleADKTraceSession:
             trace_root=TRACE_ROOT,
             enable_elastic=ENABLE_ELASTIC,
             fail_on_elastic_error=FAIL_ON_ELASTIC_ERROR,
+            force_block=FORCE_BLOCK,
         )
     return _TRACE_SESSIONS[session_id]
 

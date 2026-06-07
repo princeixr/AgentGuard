@@ -210,6 +210,7 @@ export interface AgentDefinition {
   callbacks: string[];
   guardrails: {
     policy_id: string;
+    implementation: string;
     approval_enforced: boolean;
     trace_namespace: string;
   };

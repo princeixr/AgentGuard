@@ -1,14 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   Check,
-  CircleStop,
-  Play,
   Search,
   ShieldAlert,
-  X,
 } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { api } from "../../api/client";
 import { useLiveEvents } from "../../api/useLiveEvents";
@@ -18,16 +15,11 @@ import { StatusBadge } from "../../components/StatusBadge";
 
 export function LiveInterceptionPage() {
   const { agentId = "" } = useParams();
-  const queryClient = useQueryClient();
   const connected = useLiveEvents(agentId);
   const interception = useQuery({
     queryKey: ["interception", agentId],
     queryFn: () => api.currentInterception(agentId),
     refetchInterval: connected ? false : 1_000,
-  });
-  const scenarios = useQuery({
-    queryKey: ["scenarios"],
-    queryFn: api.scenarios,
   });
   const sessionId = interception.data?.session_id;
   const session = useQuery({
@@ -35,36 +27,10 @@ export function LiveInterceptionPage() {
     queryFn: () => api.session(agentId, sessionId!),
     enabled: Boolean(sessionId),
   });
-  const start = useMutation({
-    mutationFn: () => api.startScenario(agentId, "draft_vs_send"),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: ["interception", agentId],
-      }),
-  });
-  const resolve = useMutation({
-    mutationFn: (action: "approve" | "reject" | "abort") =>
-      api.resolveApproval(
-        agentId,
-        interception.data!.current_trace_id!,
-        action,
-    ),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: ["interception", agentId],
-      }),
-  });
-  const reset = useMutation({
-    mutationFn: api.resetDemo,
-    onSuccess: () => {
-      void queryClient.invalidateQueries();
-    },
-  });
-
-  if (interception.isLoading || scenarios.isLoading) {
+  if (interception.isLoading) {
     return <LoadingState label="Loading interception console" />;
   }
-  if (interception.error || scenarios.error) {
+  if (interception.error) {
     return <ErrorState message="The interception API is unavailable." />;
   }
 
@@ -82,14 +48,13 @@ export function LiveInterceptionPage() {
             <div className="eyebrow">Intent</div>
             <div className="mt-1 max-w-[520px] text-sm font-medium">
               {detail?.trace.intent.normalized_intent ??
-                scenarios.data?.items[1]?.user_request ??
-                "Start a scenario to inspect a guarded agent session."}
+                "Run the selected Google ADK agent to inspect its tool calls."}
             </div>
           </div>
           <div>
             <div className="eyebrow">Progress</div>
             <div className="mt-1 mono text-sm">
-              Step {state.current_step}/{state.total_steps || 4}
+              Step {state.current_step}/{state.total_steps}
             </div>
           </div>
           <div>
@@ -98,26 +63,18 @@ export function LiveInterceptionPage() {
               <span
                 className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-500"}`}
               />
-              {connected ? "SSE connected" : "Polling fallback"}
+              {connected ? "Runtime events connected" : "Polling fallback"}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge value={state.status} />
-          <button
-            className="rounded border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold"
-            onClick={() => reset.mutate()}
+          <Link
+            className="rounded bg-black px-4 py-2 text-xs font-semibold text-white"
+            to={`/agents/${agentId}`}
           >
-            Reset
-          </button>
-          <button
-            className="flex items-center gap-2 rounded bg-black px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
-            disabled={state.status === "running" || state.status === "paused"}
-            onClick={() => start.mutate()}
-          >
-            <Play size={14} fill="currentColor" />
-            Run Draft vs Send
-          </button>
+            Run Agent Test
+          </Link>
         </div>
       </section>
 
@@ -131,12 +88,12 @@ export function LiveInterceptionPage() {
             {idle ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-container)]">
-                  <Play size={20} />
+                  <ShieldAlert size={20} />
                 </div>
                 <div className="font-semibold">No active interception</div>
                 <p className="mt-2 max-w-[260px] text-sm text-[var(--ink-muted)]">
-                  Run the deterministic Draft vs Send scenario to watch the
-                  firewall evaluate each tool call.
+                  Run the Google ADK agent from its Agent Details page. Real
+                  tool proposals and AgentGuard decisions will stream here.
                 </p>
               </div>
             ) : (
@@ -248,28 +205,10 @@ export function LiveInterceptionPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 border-t border-[var(--border)] p-4">
-                <button
-                  className="flex items-center justify-center gap-2 rounded border border-[var(--border)] py-2 text-xs font-semibold disabled:opacity-40"
-                  disabled={state.status !== "paused"}
-                  onClick={() => resolve.mutate("approve")}
-                >
-                  <Check size={15} /> Approve
-                </button>
-                <button
-                  className="flex items-center justify-center gap-2 rounded border border-red-200 py-2 text-xs font-semibold text-red-700 disabled:opacity-40"
-                  disabled={state.status !== "paused"}
-                  onClick={() => resolve.mutate("reject")}
-                >
-                  <X size={15} /> Reject
-                </button>
-                <button
-                  className="flex items-center justify-center gap-2 rounded bg-black py-2 text-xs font-semibold text-white disabled:opacity-40"
-                  disabled={state.status !== "paused"}
-                  onClick={() => resolve.mutate("abort")}
-                >
-                  <CircleStop size={15} /> Abort
-                </button>
+              <div className="border-t border-[var(--border)] bg-[var(--surface-low)] p-4 text-xs leading-5 text-[var(--ink-muted)]">
+                AgentGuard enforcement is active before tool execution. Approval-required
+                calls are currently prevented and recorded; resuming a paused ADK call
+                from this dashboard is not implemented yet.
               </div>
             </div>
           ) : (
