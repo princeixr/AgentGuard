@@ -17,8 +17,8 @@ Host runtime proposal
     -> AgentGuardTraceV1
     -> AgentGuardFirewallV1.intercept(trace)
     -> GuardDecisionV1
-    -> runtime maps to allow or require_approval
-    -> runtime executes or returns an approval-required response
+    -> runtime maps to allow, require_approval, or block
+    -> runtime executes or returns an approval-required/blocked response
 ```
 
 ## Implemented Files
@@ -48,13 +48,14 @@ Google ADK agent proposes MCP tool call
     -> AgentGuardFirewallV1.intercept(trace)
     -> optional Elastic retrieval adds similar-trace evidence
     -> trace, feature, score, decision, live events, and session risk are persisted
-    -> runtime maps firewall decision to allow or require_approval
-    -> allow executes; require_approval returns a synthetic response for now
+    -> runtime maps firewall decision to allow, require_approval, or block
+    -> allow executes; require_approval and block return synthetic responses for now
     -> after_tool_callback records tool_executed or tool_failed
 ```
 
 `AGENTGUARD_ADK_ENFORCE_APPROVAL=true` is the default. While the approval UI is not
-implemented, `require_approval` means the tool is not executed.
+implemented, `require_approval` means the tool is not executed. A `block` decision is
+always enforced regardless of the approval-enforcement setting.
 
 Set `AGENTGUARD_ELASTIC_ENABLED=true` with Elastic credentials to enable live retrieval
 and Elastic mirroring for ADK runtime artifacts. `AGENTGUARD_ADK_ELASTIC_ENABLED` can

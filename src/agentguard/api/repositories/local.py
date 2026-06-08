@@ -41,7 +41,10 @@ class LocalDashboardRepository:
         return self.root / "v1" / self.namespace
 
     def is_ready(self) -> bool:
-        return (self.namespace_root / "manifest.json").exists()
+        return (
+            (self.namespace_root / "manifest.json").exists()
+            or (self.namespace_root / "traces.jsonl").exists()
+        )
 
     def traces(self) -> list[AgentGuardTraceV1]:
         return self._load_models("traces.jsonl", AgentGuardTraceV1)
@@ -76,7 +79,14 @@ class LocalDashboardRepository:
     def manifest(self) -> dict:
         path = self.namespace_root / "manifest.json"
         if not path.exists():
-            return {}
+            return {
+                "namespace": self.namespace,
+                "counts": {
+                    "traces": len(self.traces()),
+                    "decisions": len(self.decisions()),
+                    "live_events": len(self.live_events()),
+                },
+            }
         return json.loads(path.read_text(encoding="utf-8"))
 
     def _load_models(self, name: str, model_type: type[ModelT]) -> list[ModelT]:

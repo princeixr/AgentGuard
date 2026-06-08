@@ -22,6 +22,7 @@ from agentguard.api.models import (
     SessionSummary,
 )
 from agentguard.api.repositories.base import DashboardRepository
+from agentguard.tracing.schema_v1 import GuardDecisionV1
 
 DECISION_SEVERITY = {
     "allow": 0,
@@ -84,6 +85,14 @@ class DashboardQueryService:
                     status="operational",
                     detail="Tool callback integration configured for the demo agent.",
                 ),
+                ComponentHealth(
+                    name="Guard engine",
+                    status="operational",
+                    detail=(
+                        "Functional deterministic policy and weighted heuristic scorer "
+                        "(v0.1); not a trained production anomaly model."
+                    ),
+                ),
             ],
         )
 
@@ -104,7 +113,7 @@ class DashboardQueryService:
 
     def sessions(self, agent_id: str | None = None) -> list[SessionSummary]:
         traces_by_session = self._traces_by_session(agent_id)
-        decisions = self._by_trace(self.repository.decisions())
+        decisions = self._effective_decisions()
         summaries = [
             self._session_summary(session_id, traces, decisions)
             for session_id, traces in traces_by_session.items()
@@ -120,12 +129,13 @@ class DashboardQueryService:
         if not traces:
             return None
         scores = self._by_trace(self.repository.scores())
-        decisions = self._by_trace(self.repository.decisions())
+        decisions = self._effective_decisions()
         events_by_trace = self._events_by_trace()
         steps = []
         for trace in traces:
             score = scores[trace.trace_id]
             decision = decisions[trace.trace_id]
+            v2_summary = _v2_summary(events_by_trace.get(trace.trace_id, []))
             runtime_event = next(
                 (
                     event
@@ -158,6 +168,11 @@ class DashboardQueryService:
                     output_summary=(
                         runtime_event.payload.get("output_summary") if runtime_event else None
                     ),
+                    enforced_by=v2_summary["enforced_by"],
+                    v1_decision=v2_summary["v1_decision"],
+                    v2_recommendation=v2_summary["v2_recommendation"],
+                    v2_effective_decision=v2_summary["v2_effective_decision"],
+                    v2_enforcement_status=v2_summary["v2_enforcement_status"],
                 )
             )
         summary = self._session_summary(session_id, traces, decisions)
@@ -229,7 +244,7 @@ class DashboardQueryService:
             return None
         features = self._by_trace(self.repository.features())
         scores = self._by_trace(self.repository.scores())
-        decisions = self._by_trace(self.repository.decisions())
+        decisions = self._effective_decisions()
         labels = self._by_trace(self.repository.labels())
         item = next(
             item
@@ -259,7 +274,7 @@ class DashboardQueryService:
         trace_ids = {trace.trace_id for trace in traces_list}
         decisions = [
             decision
-            for decision in self.repository.decisions()
+            for decision in self._effective_decisions().values()
             if decision.trace_id in trace_ids
         ]
         traces = self._by_trace(traces_list)
@@ -294,13 +309,15 @@ class DashboardQueryService:
 
     def _memory_items(self, agent_id: str | None = None) -> list[MemoryItem]:
         traces = self._by_trace(self._agent_traces(agent_id))
-        decisions = self._by_trace(self.repository.decisions())
+        decisions = self._effective_decisions()
         scores = self._by_trace(self.repository.scores())
         labels = self._by_trace(self.repository.labels())
+        events_by_trace = self._events_by_trace()
         items = []
         for trace_id, trace in traces.items():
             decision = decisions[trace_id]
             score = scores[trace_id]
+            v2_summary = _v2_summary(events_by_trace.get(trace_id, []))
             label_values = list(score.dominant_signals)
             if trace_id in labels and labels[trace_id].failure_type != "none":
                 label_values.append(labels[trace_id].failure_type)
@@ -319,6 +336,11 @@ class DashboardQueryService:
                     decision=decision.decision,
                     labels=sorted(set(label_values)),
                     explanation=decision.explanation,
+                    enforced_by=v2_summary["enforced_by"],
+                    v1_decision=v2_summary["v1_decision"],
+                    v2_recommendation=v2_summary["v2_recommendation"],
+                    v2_effective_decision=v2_summary["v2_effective_decision"],
+                    v2_enforcement_status=v2_summary["v2_enforcement_status"],
                 )
             )
         return items
@@ -330,7 +352,7 @@ class DashboardQueryService:
         agent_id: str | None = None,
     ) -> list[PrecedentSummary]:
         traces = self._by_trace(self._agent_traces(agent_id))
-        decisions = self._by_trace(self.repository.decisions())
+        decisions = self._effective_decisions()
         target = traces[trace_id]
         candidates = [
             trace
@@ -394,6 +416,14 @@ class DashboardQueryService:
 
     def _agent_traces(self, agent_id: str | None):
         traces = self.repository.traces()
+        completed_trace_ids = (
+            {record.trace_id for record in self.repository.features()}
+            & {record.trace_id for record in self.repository.scores()}
+            & {record.trace_id for record in self.repository.decisions()}
+        )
+        traces = [
+            trace for trace in traces if trace.trace_id in completed_trace_ids
+        ]
         if agent_id is None:
             return traces
         return [
@@ -408,6 +438,20 @@ class DashboardQueryService:
         for events in grouped.values():
             events.sort(key=lambda item: item.timestamp)
         return dict(grouped)
+
+    def _effective_decisions(self) -> dict[str, GuardDecisionV1]:
+        decisions = self._by_trace(self.repository.decisions())
+        for event in sorted(self.repository.live_events(), key=lambda item: item.timestamp):
+            if event.event_type != "firewall_v2_evaluated" or not event.trace_id:
+                continue
+            payload = event.payload.get("effective_decision")
+            if not isinstance(payload, dict):
+                continue
+            try:
+                decisions[event.trace_id] = GuardDecisionV1.model_validate(payload)
+            except Exception:
+                continue
+        return decisions
 
     @staticmethod
     def _by_trace(records):
@@ -438,3 +482,34 @@ def _named_metrics(counter: Counter, total: int) -> list[NamedMetric]:
 
 def _search_text(*values: str) -> str:
     return " ".join(values).lower().replace("_", " ").replace("-", " ")
+
+
+def _v2_summary(events) -> dict:
+    event = next(
+        (
+            item
+            for item in reversed(events)
+            if item.event_type == "firewall_v2_evaluated"
+        ),
+        None,
+    )
+    if event is None:
+        return {
+            "enforced_by": "firewall_v1",
+            "v1_decision": None,
+            "v2_recommendation": None,
+            "v2_effective_decision": None,
+            "v2_enforcement_status": None,
+        }
+    payload = event.payload
+    evaluation = payload.get("evaluation") or {}
+    policy_evaluation = evaluation.get("policy_evaluation") or {}
+    v1_decision = (payload.get("v1_decision") or {}).get("decision")
+    effective_decision = (payload.get("effective_decision") or {}).get("decision")
+    return {
+        "enforced_by": str(payload.get("enforced_by") or "firewall_v1"),
+        "v1_decision": v1_decision,
+        "v2_recommendation": policy_evaluation.get("recommendation"),
+        "v2_effective_decision": effective_decision,
+        "v2_enforcement_status": evaluation.get("enforcement_status"),
+    }

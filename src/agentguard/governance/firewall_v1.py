@@ -48,6 +48,7 @@ class AgentGuardFirewallV1:
         namespace: str = "live",
     ):
         self.trace_store = trace_store or TraceStore()
+        self.namespace = namespace
         self.elastic_store = elastic_store or _build_elastic_store(enable_elastic)
         self.fail_on_elastic_error = fail_on_elastic_error
         if feature_builder is None and self.elastic_store is not None:
@@ -58,9 +59,9 @@ class AgentGuardFirewallV1:
         self.scorer = scorer or GuardScorerV1()
         self.decision_policy = decision_policy or DecisionPolicyV1()
         self.session_risk_manager = session_risk_manager or SessionRiskManagerV1(
-            trace_store=self.trace_store
+            trace_store=self.trace_store,
+            namespace=self.namespace,
         )
-        self.namespace = namespace
 
     def intercept(self, trace: AgentGuardTraceV1) -> FirewallResultV1:
         self.trace_store.append_trace_v1(trace, namespace=self.namespace)
@@ -93,8 +94,6 @@ class AgentGuardFirewallV1:
             namespace=self.namespace,
         )
         self._index_session_state(session_state)
-        if decision.decision == "block":
-            self._append_event("tool_blocked", trace, {"decision_id": decision.decision_id})
         return FirewallResultV1(
             trace=trace,
             feature=feature,

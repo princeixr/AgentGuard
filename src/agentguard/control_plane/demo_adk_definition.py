@@ -9,6 +9,8 @@ from typing import Any
 
 from agentguard.control_plane.registry import DEMO_AGENT_ID
 from agentguard.runtime.google_adk_adapter import infer_adk_tool_metadata
+from agentguard.firewall_v2.policy.resolver import resolve_demo_policy
+from agentguard.firewall_v2.tools.registry import descriptor_for_tool
 
 DEMO_ADK_APP_NAME = "adk_terminal_assistant"
 DEMO_ADK_RUNTIME_NAME = "terminal_assistant"
@@ -107,6 +109,7 @@ def tool_registry() -> list[dict[str, Any]]:
     tools = []
     for name in ["run_shell_command", *gmail_tools()]:
         metadata = infer_adk_tool_metadata(name)
+        descriptor = descriptor_for_tool(name)
         tools.append(
             {
                 "name": name,
@@ -122,6 +125,11 @@ def tool_registry() -> list[dict[str, Any]]:
                 "irreversible": metadata.irreversible,
                 "enabled": name == "run_shell_command" or gmail_runtime_ready(),
                 "provider": "local" if name == "run_shell_command" else "gmail_mcp",
+                "capabilities": descriptor.capabilities,
+                "impact": descriptor.impact,
+                "reversible": descriptor.reversible,
+                "normalizer": descriptor.normalizer,
+                "metadata_status": descriptor.metadata_status,
             }
         )
     return tools
@@ -130,6 +138,10 @@ def tool_registry() -> list[dict[str, Any]]:
 def agent_definition() -> dict[str, Any]:
     model = os.environ.get("ADK_MODEL", "gemini-3-flash-preview")
     gmail_ready, gmail_detail = gmail_runtime_status()
+    firewall_mode = os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1").lower()
+    if firewall_mode not in {"v1", "v2_shadow", "v2"}:
+        firewall_mode = "v1"
+    loaded_policy = resolve_demo_policy()
     return {
         "agent_id": DEMO_AGENT_ID,
         "runtime_name": DEMO_ADK_RUNTIME_NAME,
@@ -145,7 +157,39 @@ def agent_definition() -> dict[str, Any]:
             "on_tool_error_callback: failed execution capture",
         ],
         "guardrails": {
-            "policy_id": "pol_strict_intent_v1",
+            "policy_id": loaded_policy.document.policy_id,
+            "policy_version": loaded_policy.document.version,
+            "policy_hash": loaded_policy.effective_hash,
+            "policy_status": (
+                "validated_active_policy"
+                if firewall_mode == "v2"
+                else "validated_shadow_policy"
+            ),
+            "firewall_mode": firewall_mode,
+            "enforced_by": (
+                "firewall_v2_deterministic"
+                if firewall_mode == "v2"
+                else "firewall_v1"
+            ),
+            "v2_status": (
+                "observe_only"
+                if firewall_mode == "v2_shadow"
+                else "not_enabled"
+                if firewall_mode == "v1"
+                else "deterministic_enforcement"
+            ),
+            "implementation": (
+                "FirewallV2 enforces the versioned deterministic policy and available "
+                "normalizers; intent, semantic analysis, LLM judging, and approval "
+                "resume are not implemented."
+                if firewall_mode == "v2"
+                else (
+                    "Functional V1 heuristic enforcement with FirewallV2 deterministic "
+                    "policy evidence in shadow mode."
+                    if firewall_mode == "v2_shadow"
+                    else "Functional V1 heuristic enforcement."
+                )
+            ),
             "approval_enforced": os.environ.get(
                 "AGENTGUARD_ADK_ENFORCE_APPROVAL", "true"
             ).lower()

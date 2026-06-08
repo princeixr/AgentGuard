@@ -21,7 +21,7 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from google.adk.agents import Agent
 
@@ -36,6 +36,7 @@ from agentguard.control_plane.demo_adk_definition import (
     gmail_tool_prefix,
 )
 from agentguard.control_plane.registry import DEMO_AGENT_ID, DemoAgentRegistry
+from agentguard.firewall_v2.models import FirewallMode
 from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession, adk_runtime_policy
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -53,7 +54,11 @@ COMMAND_TIMEOUT_SECONDS = int(os.environ.get("ADK_COMMAND_TIMEOUT_SECONDS", "60"
 # Cap returned output so a chatty command can't blow up the model context.
 MAX_OUTPUT_CHARS = int(os.environ.get("ADK_MAX_OUTPUT_CHARS", "20000"))
 TRACE_NAMESPACE = os.environ.get("AGENTGUARD_ADK_TRACE_NAMESPACE", "google_adk")
-TRACE_ROOT = os.environ.get("AGENTGUARD_TRACE_ROOT", str(_REPO_ROOT / "data" / "traces"))
+TRACE_ROOT = Path(
+    os.environ.get("AGENTGUARD_TRACE_ROOT", str(_REPO_ROOT / "data" / "traces"))
+)
+if not TRACE_ROOT.is_absolute():
+    TRACE_ROOT = _REPO_ROOT / TRACE_ROOT
 AGENT_ID = DEMO_AGENT_ID
 APP_NAME = DEMO_ADK_APP_NAME
 RUNTIME_IDENTITY = DemoAgentRegistry().runtime_identity(AGENT_ID)
@@ -72,6 +77,15 @@ ENFORCE_APPROVAL = os.environ.get("AGENTGUARD_ADK_ENFORCE_APPROVAL", "true").low
     "yes",
     "on",
 }
+FORCE_BLOCK = os.environ.get(
+    "AGENTGUARD_FORCE_BLOCK",
+    os.environ.get("FORCE_BLOCK", "false"),
+).lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 ENABLE_ELASTIC = os.environ.get("AGENTGUARD_ADK_ELASTIC_ENABLED")
 if ENABLE_ELASTIC is not None:
     ENABLE_ELASTIC = ENABLE_ELASTIC.strip().lower() in {"1", "true", "yes", "on"}
@@ -83,6 +97,12 @@ FAIL_ON_ELASTIC_ERROR = os.environ.get(
     "yes",
     "on",
 }
+_firewall_mode = os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1").lower()
+FIREWALL_MODE: FirewallMode = (
+    cast(FirewallMode, _firewall_mode)
+    if _firewall_mode in {"v1", "v2_shadow", "v2"}
+    else "v1"
+)
 
 _TRACE_SESSIONS: dict[str, GoogleADKTraceSession] = {}
 
@@ -188,13 +208,19 @@ def _before_tool_callback(tool, args: dict[str, Any], tool_context):
     )
     runtime_policy = adk_runtime_policy(result.decision.decision)
 
-    if runtime_policy == "require_approval" and ENFORCE_APPROVAL:
-        approval_response = {
+    should_stop = runtime_policy == "block" or (
+        runtime_policy == "require_approval" and ENFORCE_APPROVAL
+    )
+    if should_stop:
+        is_approval = runtime_policy == "require_approval"
+        blocked_response = {
             "error": (
                 "AgentGuard requires approval for this tool call. Approval UI is not "
                 "implemented yet, so the tool was not executed."
+                if is_approval
+                else "AgentGuard blocked this tool call. The tool was not executed."
             ),
-            "approval_required": True,
+            "approval_required": is_approval,
             "blocked_by_agentguard": True,
             "tool_name": tool_name,
             "runtime_policy": runtime_policy,
@@ -202,8 +228,8 @@ def _before_tool_callback(tool, args: dict[str, Any], tool_context):
             "guard_explanation": result.decision.explanation,
             "trace_id": result.trace.trace_id,
         }
-        tracer.record_tool_response(tool_name, approval_response, call_id=call_id)
-        return approval_response
+        tracer.record_tool_response(tool_name, blocked_response, call_id=call_id)
+        return blocked_response
 
     return None
 
@@ -240,6 +266,8 @@ def _get_trace_session(context) -> GoogleADKTraceSession:
             trace_root=TRACE_ROOT,
             enable_elastic=ENABLE_ELASTIC,
             fail_on_elastic_error=FAIL_ON_ELASTIC_ERROR,
+            force_block=FORCE_BLOCK,
+            firewall_mode=FIREWALL_MODE,
         )
     return _TRACE_SESSIONS[session_id]
 

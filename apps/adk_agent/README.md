@@ -6,7 +6,7 @@ optionally expose a Docker-backed Gmail MCP server.
 
 AgentGuard is wired through ADK tool callbacks. Every proposed tool call becomes an
 `AgentGuardTraceV1`, is evaluated by `AgentGuardFirewallV1` before execution, and is
-then mapped to one runtime policy: `allow` or `require_approval`.
+then mapped to `allow`, `require_approval`, or unconditional `block`.
 
 ## Files
 
@@ -54,6 +54,7 @@ agent: You're in the AgentGuard repo root ... and you're on Python 3.11.
 | `ADK_COMMAND_TIMEOUT_SECONDS` | `60` | Max seconds per command. |
 | `ADK_MAX_OUTPUT_CHARS` | `20000` | Output truncation cap per command. |
 | `AGENTGUARD_ADK_ENFORCE_APPROVAL` | `true` | When true, `require_approval` returns a synthetic response and the tool is not executed. |
+| `AGENTGUARD_FORCE_BLOCK` / `FORCE_BLOCK` | `false` | Demo/test override that records a `block` decision and prevents every ADK tool call from executing. |
 | `AGENTGUARD_ADK_TRACE_NAMESPACE` | `google_adk` | Namespace for local v1 trace artifacts. |
 | `AGENTGUARD_TRACE_ROOT` | `data/traces` | Root directory for local trace artifacts. |
 | `AGENTGUARD_ADK_ELASTIC_ENABLED` | unset | Optional ADK-only override for `AGENTGUARD_ELASTIC_ENABLED`. |

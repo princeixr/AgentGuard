@@ -13,6 +13,9 @@ export function useLiveEvents(agentId: string) {
       void queryClient.invalidateQueries({
         queryKey: ["interception", agentId],
       });
+      void queryClient.invalidateQueries({
+        queryKey: ["session", agentId],
+      });
     };
     source.onopen = () => setConnected(true);
     source.onerror = () => setConnected(false);

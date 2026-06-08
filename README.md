@@ -40,7 +40,7 @@ Runtime-specific proposed tool call
     -> GuardScoreV1
     -> GuardDecisionV1
     -> SessionRiskStateV1
-    -> runtime allow / require_approval
+    -> runtime allow / require_approval / block
 ```
 
 The canonical schema is documented in [schema_architecture.md](schema_architecture.md)
@@ -51,8 +51,8 @@ and implemented in [src/agentguard/tracing/schema_v1.py](src/agentguard/tracing/
 1. `apps/adk_agent/`
 
    The governed Google ADK runtime. ADK tool callbacks build `AgentGuardTraceV1`
-   records, call `AgentGuardFirewallV1` before execution, and expose only two runtime
-   policies for now: `allow` and `require_approval`.
+   records, call `AgentGuardFirewallV1` before execution, and expose `allow`,
+   `require_approval`, and unconditional `block` runtime policies.
 
 2. `apps/openclaw_trace_agents/`
 
