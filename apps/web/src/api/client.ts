@@ -1,12 +1,15 @@
 import type {
   Agent,
   AgentDefinition,
+  AgentPolicy,
   AgentTestRun,
   CurrentInterception,
   DemoSessionContext,
+  GuardAdminStatus,
   MemoryDetail,
   MemoryPage,
   OperationsSummary,
+  PolicyValidation,
   Scenario,
   SessionDetail,
   SessionSummary,
@@ -32,6 +35,34 @@ export const api = {
   agentDefinition: (agentId: string) =>
     request<AgentDefinition>(
       `/api/v1/agents/${encodeURIComponent(agentId)}/definition`,
+    ),
+  guardAdmin: (agentId: string) =>
+    request<GuardAdminStatus>(
+      `/api/v1/agents/${encodeURIComponent(agentId)}/guard`,
+    ),
+  agentPolicy: (agentId: string) =>
+    request<AgentPolicy>(
+      `/api/v1/agents/${encodeURIComponent(agentId)}/policy`,
+    ),
+  validateAgentPolicy: (agentId: string, document: Record<string, unknown>) =>
+    request<PolicyValidation>(
+      `/api/v1/agents/${encodeURIComponent(agentId)}/policy/validate`,
+      {
+        method: "POST",
+        body: JSON.stringify({ document }),
+      },
+    ),
+  updateAgentPolicy: (
+    agentId: string,
+    expectedHash: string,
+    document: Record<string, unknown>,
+  ) =>
+    request<AgentPolicy>(
+      `/api/v1/agents/${encodeURIComponent(agentId)}/policy`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ expected_hash: expectedHash, document }),
+      },
     ),
   runAgentTest: (agentId: string, message: string) =>
     request<AgentTestRun>(

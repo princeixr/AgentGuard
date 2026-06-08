@@ -8,6 +8,7 @@ import {
   ListTree,
   Settings,
   Shield,
+  ShieldCheck,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useLocation, useParams } from "react-router-dom";
@@ -45,6 +46,11 @@ export function AppShell() {
       label: "Risk & Operations",
       icon: Activity,
     },
+    {
+      to: `/agents/${selectedAgentId}/guard`,
+      label: "Guard Admin",
+      icon: ShieldCheck,
+    },
   ];
   const pageTitle = location.pathname === "/agents"
     ? "Agents"
@@ -58,6 +64,8 @@ export function AppShell() {
           ? "Decision Memory"
           : location.pathname.endsWith("/operations")
             ? "Risk & Operations"
+            : location.pathname.endsWith("/guard")
+              ? "Guard Admin"
             : "AgentGuard";
 
   return (
@@ -113,10 +121,6 @@ export function AppShell() {
               {label}
             </NavLink>
           ))}
-          <div className="flex items-center gap-3 rounded px-4 py-3 text-sm text-[var(--ink-muted)]">
-            <Bot size={18} />
-            Policies
-          </div>
         </nav>
 
         <div className="space-y-2 border-t border-[var(--border)] p-4">

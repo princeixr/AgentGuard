@@ -35,6 +35,11 @@ const OperationsPage = lazy(() =>
     default: module.OperationsPage,
   })),
 );
+const GuardAdminPage = lazy(() =>
+  import("../features/guard/GuardAdminPage").then((module) => ({
+    default: module.GuardAdminPage,
+  })),
+);
 
 export function App() {
   return (
@@ -83,6 +88,10 @@ export function App() {
           <Route
             path="/agents/:agentId/operations"
             element={<OperationsPage />}
+          />
+          <Route
+            path="/agents/:agentId/guard"
+            element={<GuardAdminPage />}
           />
         </Route>
       </Routes>

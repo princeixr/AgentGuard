@@ -14,13 +14,35 @@ from agentguard.tracing.trace_store import TraceStore
 
 
 class SessionRiskManagerV1:
-    def __init__(self, trace_store: TraceStore | None = None, window_size: int = 5):
+    def __init__(
+        self,
+        trace_store: TraceStore | None = None,
+        window_size: int = 5,
+        namespace: str = "default",
+    ):
         self.trace_store = trace_store
         self.window_size = window_size
+        self.namespace = namespace
         self._states: dict[str, SessionRiskStateV1] = {}
 
     def get(self, session_id: str) -> SessionRiskStateV1 | None:
-        return self._states.get(session_id)
+        state = self._states.get(session_id)
+        if state is not None:
+            return state
+        if self.trace_store is None:
+            return None
+        path = (
+            self.trace_store.root_dir
+            / "v1"
+            / self.namespace
+            / "session_risk"
+            / f"{session_id}.json"
+        )
+        if not path.exists():
+            return None
+        state = SessionRiskStateV1.model_validate_json(path.read_text(encoding="utf-8"))
+        self._states[session_id] = state
+        return state
 
     def update(
         self,

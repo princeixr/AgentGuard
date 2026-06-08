@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 from agentguard.api.models import CurrentInterception, EventEnvelope
 from agentguard.api.repositories.base import DashboardRepository
@@ -81,7 +82,11 @@ class AgentLiveRuntimeService:
     def _apply_event(self, event: LiveEventV1) -> None:
         detail = None
         total_steps = event.step_index or 0
-        if event.event_type in {"guard_decided", *TERMINAL_EVENTS} and event.trace_id:
+        if event.event_type in {
+            "guard_decided",
+            "firewall_v2_evaluated",
+            *TERMINAL_EVENTS,
+        } and event.trace_id:
             try:
                 detail = self.query_service.memory_detail(
                     event.trace_id,
@@ -94,9 +99,15 @@ class AgentLiveRuntimeService:
                 total_steps = len(session.steps) if session else total_steps
             except (KeyError, StopIteration):
                 detail = None
-        status = "running"
+        existing = self._states.get(event.agent_id)
+        status = (
+            existing.status
+            if existing is not None
+            and existing.current_trace_id == event.trace_id
+            else "running"
+        )
         if (
-            event.event_type == "guard_decided"
+            event.event_type in {"guard_decided", "firewall_v2_evaluated"}
             and detail is not None
             and detail.item.decision in INTERVENTION_DECISIONS
         ):
@@ -105,6 +116,9 @@ class AgentLiveRuntimeService:
             status = "completed"
         self._states[event.agent_id] = CurrentInterception(
             status=status,
+            event_source="google_adk_runtime",
+            firewall_mode=os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1"),
+            guard_version=_guard_version(),
             agent_id=event.agent_id,
             session_id=event.session_id,
             current_trace_id=event.trace_id,
@@ -120,7 +134,13 @@ class AgentLiveRuntimeService:
             if event.agent_id == agent_id
         ]
         if not events:
-            return CurrentInterception(status="idle", agent_id=agent_id)
+            return CurrentInterception(
+                status="idle",
+                event_source="google_adk_runtime",
+                firewall_mode=os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1"),
+                guard_version=_guard_version(),
+                agent_id=agent_id,
+            )
         latest_session = max(events, key=lambda item: item.timestamp).session_id
         for event in sorted(
             (item for item in events if item.session_id == latest_session),
@@ -128,3 +148,11 @@ class AgentLiveRuntimeService:
         ):
             self._apply_event(event)
         return self._states[agent_id]
+
+
+def _guard_version() -> str:
+    return (
+        "agentguard_firewall_v2_deterministic"
+        if os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1") == "v2"
+        else "agentguard_firewall_v1"
+    )

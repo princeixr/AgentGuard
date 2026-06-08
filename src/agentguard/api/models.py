@@ -55,6 +55,11 @@ class ReplayStep(BaseModel):
     explanation: str
     execution_status: str
     output_summary: str | None = None
+    enforced_by: str = "firewall_v1"
+    v1_decision: Decision | None = None
+    v2_recommendation: Decision | None = None
+    v2_effective_decision: Decision | None = None
+    v2_enforcement_status: str | None = None
 
 
 class PrecedentSummary(BaseModel):
@@ -87,6 +92,11 @@ class MemoryItem(BaseModel):
     decision: Decision
     labels: list[str]
     explanation: str
+    enforced_by: str = "firewall_v1"
+    v1_decision: Decision | None = None
+    v2_recommendation: Decision | None = None
+    v2_effective_decision: Decision | None = None
+    v2_enforcement_status: str | None = None
 
 
 class MemoryPage(BaseModel):
@@ -148,6 +158,9 @@ class EventEnvelope(BaseModel):
 
 class CurrentInterception(BaseModel):
     status: Literal["idle", "running", "paused", "completed"]
+    event_source: str = "google_adk_runtime"
+    firewall_mode: str = "v1"
+    guard_version: str = "agentguard_v0.1"
     agent_id: str | None = None
     scenario_id: str | None = None
     session_id: str | None = None
@@ -201,6 +214,11 @@ class AgentToolDefinition(BaseModel):
     irreversible: bool
     enabled: bool
     provider: str
+    capabilities: list[str] = Field(default_factory=list)
+    impact: str = "unknown"
+    reversible: bool | None = None
+    normalizer: str = "unsupported"
+    metadata_status: str = "inferred"
 
 
 class AgentTestScenario(BaseModel):
@@ -225,6 +243,72 @@ class AgentDefinition(BaseModel):
     test_scenarios: list[AgentTestScenario]
 
 
+class GuardAdminComponent(BaseModel):
+    component_id: str
+    name: str
+    layer: str
+    status: Literal[
+        "operational",
+        "observe_only",
+        "placeholder",
+        "not_implemented",
+    ]
+    summary: str
+    management: str
+
+
+class GuardAdminPolicy(BaseModel):
+    policy_id: str
+    status: Literal["placeholder", "operational"]
+    source: str
+    editable: bool
+    explanation: str
+    version: str | None = None
+    effective_hash: str | None = None
+    rule_count: int = 0
+    defaults: dict[str, Any] = Field(default_factory=dict)
+
+
+class GuardAdminStatus(BaseModel):
+    agent_id: str
+    firewall_mode: str
+    active_enforcement: str
+    architecture_version: str
+    force_block_enabled: bool
+    approval_enforced: bool
+    policy: GuardAdminPolicy
+    components: list[GuardAdminComponent]
+    tools: list[AgentToolDefinition]
+    warnings: list[str] = Field(default_factory=list)
+
+
+class AgentPolicyResponse(BaseModel):
+    policy_id: str
+    version: str
+    status: str
+    effective_hash: str
+    source: str
+    document: dict[str, Any]
+    validation: Literal["valid"]
+
+
+class PolicyValidationRequest(BaseModel):
+    document: dict[str, Any]
+
+
+class PolicyUpdateRequest(BaseModel):
+    expected_hash: str = Field(min_length=8)
+    document: dict[str, Any]
+
+
+class PolicyValidationResponse(BaseModel):
+    valid: bool
+    policy_id: str | None = None
+    version: str | None = None
+    effective_hash: str | None = None
+    errors: list[str] = Field(default_factory=list)
+
+
 class AgentTestRunRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
 
@@ -244,6 +328,9 @@ class AgentGuardTestDecision(BaseModel):
     risk_score: float
     explanation: str
     rules_fired: list[str]
+    enforced_by: str = "firewall_v1"
+    firewall_mode: str = "v1"
+    v2_evaluation: dict[str, Any] | None = None
 
 
 class AgentTestRunResponse(BaseModel):

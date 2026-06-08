@@ -10,6 +10,8 @@ from typing import Any
 from agentguard.control_plane.registry import DEMO_AGENT_ID
 from agentguard.runtime.google_adk_adapter import infer_adk_tool_metadata
 from agentguard.runtime.mcp_registry import McpRegistry
+from agentguard.firewall_v2.policy.resolver import resolve_demo_policy
+from agentguard.firewall_v2.tools.registry import descriptor_for_tool
 
 DEMO_ADK_APP_NAME = "adk_terminal_assistant"
 DEMO_ADK_RUNTIME_NAME = "terminal_assistant"
@@ -63,17 +65,36 @@ def agent_instruction() -> str:
 
 def tool_registry() -> list[dict[str, Any]]:
     registry = mcp_registry()
-    tools = [_tool_definition("run_shell_command", infer_adk_tool_metadata("run_shell_command"), True)]
     ready_ids = {server.id for server in registry.ready_servers()}
+    tools = [
+        _tool_definition(
+            "run_shell_command", 
+            infer_adk_tool_metadata("run_shell_command"), 
+            True,
+            descriptor=descriptor_for_tool("run_shell_command"),
+        )
+    ]
     for name in registry.discovered_tool_names():
         metadata = registry.metadata_for(name)
-        if metadata is not None:
-            tools.append(_tool_definition(name, metadata, metadata.mcp_server in ready_ids))
+        if metadata is None:
+            continue
+        tools.append(
+            _tool_definition(
+                name, 
+                metadata, 
+                metadata.mcp_server in ready_ids,
+                descriptor=descriptor_for_tool(name),
+            )
+        )
     return tools
 
 
 def agent_definition() -> dict[str, Any]:
     registry = mcp_registry()
+    firewall_mode = os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1").lower()
+    if firewall_mode not in {"v1", "v2_shadow", "v2"}:
+        firewall_mode = "v1"
+    loaded_policy = resolve_demo_policy()
     return {
         "agent_id": DEMO_AGENT_ID,
         "runtime_name": DEMO_ADK_RUNTIME_NAME,
@@ -89,10 +110,38 @@ def agent_definition() -> dict[str, Any]:
             "on_tool_error_callback: failed execution capture",
         ],
         "guardrails": {
-            "policy_id": "pol_strict_intent_v1",
+            "policy_id": loaded_policy.document.policy_id,
+            "policy_version": loaded_policy.document.version,
+            "policy_hash": loaded_policy.effective_hash,
+            "policy_status": (
+                "validated_active_policy"
+                if firewall_mode == "v2"
+                else "validated_shadow_policy"
+            ),
+            "firewall_mode": firewall_mode,
+            "enforced_by": (
+                "firewall_v2_deterministic"
+                if firewall_mode == "v2"
+                else "firewall_v1"
+            ),
+            "v2_status": (
+                "observe_only"
+                if firewall_mode == "v2_shadow"
+                else "not_enabled"
+                if firewall_mode == "v1"
+                else "deterministic_enforcement"
+            ),
             "implementation": (
-                "Functional deterministic policy plus weighted heuristic scorer v0.1; "
-                "not a trained production anomaly model."
+                "FirewallV2 enforces the versioned deterministic policy and available "
+                "normalizers; intent, semantic analysis, LLM judging, and approval "
+                "resume are not implemented."
+                if firewall_mode == "v2"
+                else (
+                    "Functional V1 heuristic enforcement with FirewallV2 deterministic "
+                    "policy evidence in shadow mode."
+                    if firewall_mode == "v2_shadow"
+                    else "Functional V1 heuristic enforcement."
+                )
             ),
             "approval_enforced": os.environ.get(
                 "AGENTGUARD_ADK_ENFORCE_APPROVAL", "true"
@@ -121,7 +170,7 @@ def agent_definition() -> dict[str, Any]:
     }
 
 
-def _tool_definition(name: str, metadata, enabled: bool) -> dict[str, Any]:
+def _tool_definition(name: str, metadata, enabled: bool, descriptor) -> dict[str, Any]:
     return {
         "name": name,
         "description": metadata.description or f"Google ADK tool: {name}",
@@ -136,4 +185,9 @@ def _tool_definition(name: str, metadata, enabled: bool) -> dict[str, Any]:
         "irreversible": metadata.irreversible,
         "enabled": enabled,
         "provider": metadata.provider or "local",
+        "capabilities": descriptor.capabilities,
+        "impact": descriptor.impact,
+        "reversible": descriptor.reversible,
+        "normalizer": descriptor.normalizer,
+        "metadata_status": descriptor.metadata_status,
     }
