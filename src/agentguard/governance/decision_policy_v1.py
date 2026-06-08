@@ -50,6 +50,10 @@ class DecisionPolicyV1:
                 decision = "block"
             else:
                 decision = "require_approval"
+        elif trace.proposed_tool_call.tool_name in trace.intent.confirmation_required_tools:
+            rules.append("tool_requires_confirmation")
+            decision = "require_approval"
+            tier = "static_policy"
         elif (
             feature.context_features.untrusted_instruction_present
             and feature.policy_features.side_effect_present

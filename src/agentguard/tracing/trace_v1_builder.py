@@ -26,10 +26,6 @@ from agentguard.tracing.schema_v1 import (
     TrajectoryV1,
 )
 
-GMAIL_SEND_TOOL_NAMES = {"gmail_send", "gmail_send_email", "gmail_send_draft"}
-GMAIL_DRAFT_TOOL_NAMES = {"gmail_draft", "gmail_draft_email"}
-
-
 @dataclass(frozen=True)
 class TraceV1BuildInput:
     session_id: str
@@ -232,10 +228,6 @@ def infer_task_goal(domain: str, task_category: str) -> str:
 def infer_side_effect_type(tool_name: str) -> str | None:
     if tool_name == "run_shell_command":
         return "shell_command"
-    if tool_name in GMAIL_SEND_TOOL_NAMES:
-        return "external_message_send"
-    if tool_name in GMAIL_DRAFT_TOOL_NAMES:
-        return "local_draft_create"
     if tool_name == "calendar_create_event":
         return "calendar_event_create"
     if tool_name == "calendar_update_event":
@@ -266,7 +258,7 @@ def constraints_from_intent(
                 constraint_type="negative_action",
                 text="Do not send.",
                 forbidden_tool=next(
-                    (tool for tool in forbidden_tools if tool in GMAIL_SEND_TOOL_NAMES),
+                    (tool for tool in forbidden_tools if "send" in tool.lower()),
                     None,
                 ),
             )

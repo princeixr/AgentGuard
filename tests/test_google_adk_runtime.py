@@ -13,6 +13,7 @@ from agentguard.control_plane.registry import (
     DemoAgentRegistry,
 )
 from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession, adk_runtime_policy
+from agentguard.runtime.mcp_registry import McpRegistry
 from agentguard.tracing.serializers import load_jsonl
 from agentguard.tracing.trace_store import TraceStore
 
@@ -26,6 +27,7 @@ def test_google_adk_trace_session_runs_firewall_before_execution(tmp_path):
         available_tools=["run_shell_command", "gmail_send_email"],
         trace_store=TraceStore(root_dir=tmp_path / "traces"),
         namespace="google_adk_test",
+        metadata_resolver=_mcp_registry().metadata_for,
     )
     session.start_turn("Draft a reply but do not send it.")
 
@@ -153,10 +155,12 @@ def test_before_tool_callback_force_blocks_every_tool_call(monkeypatch, tmp_path
 def test_google_adk_trace_session_records_tool_executed_event(tmp_path):
     session = _trace_session(tmp_path)
     session.start_turn("Search my inbox for the latest budget thread.")
-    result = session.record_tool_call("gmail_search", {"query": "budget"}, call_id="call_search")
+    result = session.record_tool_call(
+        "gmail_search_emails", {"query": "budget"}, call_id="call_search"
+    )
 
     session.record_tool_response(
-        "gmail_search",
+        "gmail_search_emails",
         {"results": ["thread_budget_q2"]},
         call_id="call_search",
     )
@@ -174,13 +178,15 @@ def test_google_adk_trace_uses_adk_tool_metadata(tmp_path):
     session = _trace_session(tmp_path)
     session.start_turn("Search my inbox for the latest budget thread.")
 
-    result = session.record_tool_call("gmail_search", {"query": "budget"}, call_id="call_search")
+    result = session.record_tool_call(
+        "gmail_search_emails", {"query": "budget"}, call_id="call_search"
+    )
 
     tool = result.trace.proposed_tool_call
     assert tool.tool_category == "email"
     assert tool.risk_level == "read_only"
     assert tool.side_effect_type is None
-    assert tool.mcp_server == "artymclabin_gmail_mcp"
+    assert tool.mcp_server == "gmail"
 
 
 def test_google_adk_shell_trace_uses_shell_metadata(tmp_path):
@@ -200,10 +206,10 @@ def test_google_adk_shell_trace_uses_shell_metadata(tmp_path):
 def test_runtime_event_references_persisted_decision(tmp_path):
     session = _trace_session(tmp_path)
     session.start_turn("Search my inbox for the latest budget thread.")
-    session.record_tool_call("gmail_search", {"query": "budget"}, call_id="call_search")
+    session.record_tool_call("gmail_search_emails", {"query": "budget"}, call_id="call_search")
 
     session.record_tool_response(
-        "gmail_search",
+        "gmail_search_emails",
         {"results": ["thread_budget_q2"]},
         call_id="call_search",
     )
@@ -217,10 +223,10 @@ def test_runtime_event_references_persisted_decision(tmp_path):
 def test_google_adk_trace_session_records_tool_failed_event(tmp_path):
     session = _trace_session(tmp_path)
     session.start_turn("Search my inbox for the latest budget thread.")
-    session.record_tool_call("gmail_search", {"query": "budget"}, call_id="call_search")
+    session.record_tool_call("gmail_search_emails", {"query": "budget"}, call_id="call_search")
 
     session.record_tool_response(
-        "gmail_search",
+        "gmail_search_emails",
         {"error": "MCP server unavailable"},
         call_id="call_search",
     )
@@ -236,10 +242,14 @@ def test_google_adk_trace_session_records_tool_failed_event(tmp_path):
 def test_record_tool_response_is_idempotent_for_same_call_id(tmp_path):
     session = _trace_session(tmp_path)
     session.start_turn("Search my inbox for the latest budget thread.")
-    session.record_tool_call("gmail_search", {"query": "budget"}, call_id="call_search")
+    session.record_tool_call("gmail_search_emails", {"query": "budget"}, call_id="call_search")
 
-    session.record_tool_response("gmail_search", {"results": ["thread_budget_q2"]}, call_id="call_search")
-    session.record_tool_response("gmail_search", {"results": ["thread_budget_q2"]}, call_id="call_search")
+    session.record_tool_response(
+        "gmail_search_emails", {"results": ["thread_budget_q2"]}, call_id="call_search"
+    )
+    session.record_tool_response(
+        "gmail_search_emails", {"results": ["thread_budget_q2"]}, call_id="call_search"
+    )
 
     executed_events = [event for event in _runtime_events(tmp_path) if event["event_type"] == "tool_executed"]
     assert len(executed_events) == 1
@@ -248,9 +258,9 @@ def test_record_tool_response_is_idempotent_for_same_call_id(tmp_path):
 def test_record_tool_response_matches_without_call_id(tmp_path):
     session = _trace_session(tmp_path)
     session.start_turn("Search my inbox for the latest budget thread.")
-    session.record_tool_call("gmail_search", {"query": "budget"}, call_id=None)
+    session.record_tool_call("gmail_search_emails", {"query": "budget"}, call_id=None)
 
-    session.record_tool_response("gmail_search", {"results": ["thread_budget_q2"]}, call_id=None)
+    session.record_tool_response("gmail_search_emails", {"results": ["thread_budget_q2"]}, call_id=None)
 
     executed_events = [event for event in _runtime_events(tmp_path) if event["event_type"] == "tool_executed"]
     assert len(executed_events) == 1
@@ -363,10 +373,15 @@ def _trace_session(tmp_path):
         agent_id="terminal_assistant",
         runtime_agent_id="terminal_assistant",
         agent_config_id="adk_terminal_assistant",
-        available_tools=["run_shell_command", "gmail_search", "gmail_send_email"],
+        available_tools=["run_shell_command", "gmail_search_emails", "gmail_send_email"],
         trace_store=TraceStore(root_dir=tmp_path / "traces"),
         namespace="google_adk_test",
+        metadata_resolver=_mcp_registry().metadata_for,
     )
+
+
+def _mcp_registry():
+    return McpRegistry.load("config/adk_mcp_servers.toml")
 
 
 def _runtime_events(tmp_path):

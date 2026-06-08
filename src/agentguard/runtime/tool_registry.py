@@ -18,7 +18,9 @@ class ToolMetadata:
     requires_confirmation_by_default: bool = False
     irreversible: bool = False
     mcp_server: str | None = None
+    provider: str | None = None
     description: str | None = None
+    action_tags: tuple[str, ...] = ()
 
 
 class ToolRegistry:
@@ -36,7 +38,9 @@ class ToolRegistry:
         requires_confirmation_by_default: bool = False,
         irreversible: bool = False,
         mcp_server: str | None = None,
+        provider: str | None = None,
         description: str | None = None,
+        action_tags: tuple[str, ...] = (),
     ) -> None:
         self._tools[tool_name] = fn
         self._metadata[tool_name] = ToolMetadata(
@@ -47,7 +51,9 @@ class ToolRegistry:
             requires_confirmation_by_default=requires_confirmation_by_default,
             irreversible=irreversible,
             mcp_server=mcp_server,
+            provider=provider,
             description=description,
+            action_tags=action_tags,
         )
 
     def register_metadata(self, metadata: ToolMetadata, fn: Callable | None = None) -> None:

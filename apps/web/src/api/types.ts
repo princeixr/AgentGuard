@@ -216,10 +216,15 @@ export interface AgentDefinition {
   };
   runtime: {
     model_credentials_configured: boolean;
-    gmail_mcp_enabled: boolean;
-    gmail_mcp_ready: boolean;
-    gmail_mcp_detail: string;
-    gmail_mcp_image: string;
+    mcp_config_path: string;
+    mcp_servers: Array<{
+      id: string;
+      prefix: string;
+      transport: string;
+      enabled: boolean;
+      ready: boolean;
+      detail: string;
+    }>;
   };
   test_scenarios: AgentTestScenario[];
 }

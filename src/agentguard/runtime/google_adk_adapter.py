@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
 from agentguard.control_plane.models import RuntimeIdentity
@@ -12,13 +13,10 @@ from agentguard.core.enums import ToolRiskLevel
 from agentguard.core.models import ExecutedToolCall
 from agentguard.governance.decision_policy_v1 import DecisionPolicyV1
 from agentguard.governance.firewall_v1 import AgentGuardFirewallV1, FirewallResultV1
-from agentguard.runtime.tool_registry import ToolMetadata, infer_tool_metadata
+from agentguard.runtime.tool_registry import ToolMetadata
 from agentguard.tracing.schema_v1 import AgentGuardTraceV1, LiveEventV1, TraceSourceV1
 from agentguard.tracing.trace_store import TraceStore
 from agentguard.tracing.trace_v1_builder import TraceV1BuildInput, TraceV1Builder
-
-GMAIL_SEND_TOOL_NAMES = {"gmail_send", "gmail_send_email", "gmail_send_draft"}
-
 
 class GoogleADKAdapter:
     def __init__(self, tool_registry=None, firewall=None, trace_builder=None, trace_store=None, max_steps=6):
@@ -57,6 +55,7 @@ class GoogleADKTraceSession:
         builder: TraceV1Builder | None = None,
         firewall: AgentGuardFirewallV1 | None = None,
         tool_metadata: dict[str, ToolMetadata] | None = None,
+        metadata_resolver: Callable[[str], ToolMetadata | None] | None = None,
         enable_elastic: bool | None = None,
         fail_on_elastic_error: bool = False,
         runtime_identity: RuntimeIdentity | None = None,
@@ -79,7 +78,8 @@ class GoogleADKTraceSession:
             fail_on_elastic_error=fail_on_elastic_error,
             decision_policy=DecisionPolicyV1(force_block=force_block),
         )
-        self.tool_metadata = tool_metadata or build_adk_tool_metadata(available_tools)
+        self.tool_metadata = dict(tool_metadata or {})
+        self.metadata_resolver = metadata_resolver
         self.raw_user_request = ""
         self.prior_tool_calls: list[ExecutedToolCall] = []
         self.previous_trace_id: str | None = None
@@ -102,6 +102,8 @@ class GoogleADKTraceSession:
         call_id = call_id or str(uuid4())
         args = dict(arguments or {})
         metadata = self._metadata(tool_name)
+        if tool_name not in self.available_tools:
+            self.available_tools.append(tool_name)
         domain = _infer_domain(metadata)
         trace = self.builder.build(
             TraceV1BuildInput(
@@ -146,9 +148,10 @@ class GoogleADKTraceSession:
                 available_tools=self.available_tools,
                 task_relevant_tools=_infer_task_relevant_tools(tool_name, self.available_tools),
                 intent_forbidden_tools=_infer_intent_forbidden_tools(
-                    tool_name,
                     self.available_tools,
                     self.raw_user_request,
+                    self.tool_metadata,
+                    self.metadata_resolver,
                 ),
                 confirmation_required_tools=_confirmation_required_tools(tool_name, metadata),
                 prior_tool_calls=list(self.prior_tool_calls),
@@ -242,7 +245,13 @@ class GoogleADKTraceSession:
         )
 
     def _metadata(self, tool_name: str) -> ToolMetadata:
-        return self.tool_metadata.get(tool_name, infer_adk_tool_metadata(tool_name))
+        metadata = self.tool_metadata.get(tool_name)
+        if metadata is None and self.metadata_resolver is not None:
+            metadata = self.metadata_resolver(tool_name)
+        if metadata is None:
+            metadata = infer_adk_tool_metadata(tool_name)
+        self.tool_metadata[tool_name] = metadata
+        return metadata
 
 
 def build_adk_tool_metadata(available_tools: list[str]) -> dict[str, ToolMetadata]:
@@ -258,41 +267,17 @@ def infer_adk_tool_metadata(tool_name: str) -> ToolMetadata:
             side_effect_type="shell_command",
             requires_confirmation_by_default=False,
             irreversible=False,
+            provider="local",
             description="Run a local non-interactive shell command.",
         )
-    if tool_name.startswith("gmail_"):
-        raw_gmail_tool = tool_name.removeprefix("gmail_")
-        if raw_gmail_tool in {"search", "search_emails", "read", "read_email"}:
-            risk_level = ToolRiskLevel.READ_ONLY
-            side_effect_type = None
-            requires_confirmation = False
-            irreversible = False
-        elif raw_gmail_tool in {"draft", "draft_email"}:
-            risk_level = ToolRiskLevel.LOW_SIDE_EFFECT
-            side_effect_type = "local_draft_create"
-            requires_confirmation = False
-            irreversible = False
-        elif raw_gmail_tool in {"send", "send_email", "send_draft"}:
-            risk_level = ToolRiskLevel.EXTERNAL_WRITE
-            side_effect_type = "external_message_send"
-            requires_confirmation = True
-            irreversible = True
-        else:
-            risk_level = ToolRiskLevel.LOW_SIDE_EFFECT
-            side_effect_type = None
-            requires_confirmation = False
-            irreversible = False
-        return ToolMetadata(
-            name=tool_name,
-            category="email",
-            risk_level=risk_level,
-            side_effect_type=side_effect_type,
-            requires_confirmation_by_default=requires_confirmation,
-            irreversible=irreversible,
-            mcp_server="artymclabin_gmail_mcp",
-            description=f"Gmail MCP tool {raw_gmail_tool}.",
-        )
-    return infer_tool_metadata(tool_name)
+    return ToolMetadata(
+        name=tool_name,
+        category="unknown",
+        risk_level=ToolRiskLevel.HIGH_RISK,
+        requires_confirmation_by_default=True,
+        irreversible=False,
+        description="Unclassified ADK tool. Explicit metadata is required for lower-risk use.",
+    )
 
 
 def _infer_domain(metadata: ToolMetadata) -> str:
@@ -313,25 +298,49 @@ def _infer_task_relevant_tools(tool_name: str, available_tools: list[str]) -> li
 
 
 def _infer_intent_forbidden_tools(
-    tool_name: str,
     available_tools: list[str],
     raw_user_request: str,
+    metadata_by_tool: dict[str, ToolMetadata],
+    metadata_resolver: Callable[[str], ToolMetadata | None] | None,
 ) -> list[str]:
-    if tool_name not in GMAIL_SEND_TOOL_NAMES:
-        return []
     request = raw_user_request.lower()
-    negative_phrases = [
-        "do not send",
-        "don't send",
-        "dont send",
-        "not send",
-        "without sending",
-        "draft only",
-        "only draft",
-    ]
-    if not any(phrase in request for phrase in negative_phrases):
-        return []
-    return [tool for tool in available_tools if tool in GMAIL_SEND_TOOL_NAMES] or [tool_name]
+    forbidden: list[str] = []
+    for available_tool in available_tools:
+        metadata = metadata_by_tool.get(available_tool)
+        if metadata is None and metadata_resolver is not None:
+            metadata = metadata_resolver(available_tool)
+        if metadata is None:
+            continue
+        explicitly_forbidden = any(
+            _request_forbids_action(request, tag) for tag in metadata.action_tags
+        )
+        missing_required_action = (
+            metadata.irreversible
+            and bool(metadata.action_tags)
+            and not any(_request_requests_action(request, tag) for tag in metadata.action_tags)
+        )
+        if explicitly_forbidden or missing_required_action:
+            forbidden.append(available_tool)
+    return forbidden
+
+
+def _request_forbids_action(request: str, action: str) -> bool:
+    action = action.lower().strip()
+    if not action:
+        return False
+    phrases = (
+        f"do not {action}",
+        f"don't {action}",
+        f"dont {action}",
+        f"not {action}",
+        f"without {action}",
+        f"without {action}ing",
+    )
+    return any(phrase in request for phrase in phrases)
+
+
+def _request_requests_action(request: str, action: str) -> bool:
+    return bool(re.search(rf"\b{re.escape(action.lower().strip())}\b", request))
 
 
 def _confirmation_required_tools(tool_name: str, metadata: ToolMetadata) -> list[str]:

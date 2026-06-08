@@ -1,7 +1,7 @@
 """A conversational Google ADK agent with a terminal-command tool.
 
 This is a self-contained demo agent you can chat with. It exposes a terminal
-tool and, optionally, a Docker-backed Gmail MCP toolset.
+tool and any MCP servers enabled in ``config/adk_mcp_servers.toml``.
 
 Run it with the ADK CLI from the repo root:
 
@@ -28,15 +28,13 @@ from google.adk.agents import Agent
 from agentguard.control_plane.demo_adk_definition import (
     DEMO_ADK_APP_NAME,
     DEMO_ADK_DESCRIPTION,
-    GMAIL_RAW_TOOLS,
     agent_instruction,
     enabled_tools,
-    gmail_enabled,
-    gmail_runtime_ready,
-    gmail_tool_prefix,
+    mcp_registry,
 )
 from agentguard.control_plane.registry import DEMO_AGENT_ID, DemoAgentRegistry
 from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession, adk_runtime_policy
+from agentguard.runtime.mcp_registry import McpRegistry
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -61,14 +59,8 @@ if not TRACE_ROOT.is_absolute():
 AGENT_ID = DEMO_AGENT_ID
 APP_NAME = DEMO_ADK_APP_NAME
 RUNTIME_IDENTITY = DemoAgentRegistry().runtime_identity(AGENT_ID)
-GMAIL_MCP_ENABLED = gmail_enabled()
-GMAIL_MCP_DOCKER_IMAGE = os.environ.get(
-    "GMAIL_MCP_DOCKER_IMAGE", "agentguard-gmail-mcp:artymclabin"
-)
-GMAIL_MCP_CREDENTIALS_VOLUME = os.environ.get("GMAIL_MCP_CREDENTIALS_VOLUME", "mcp-gmail")
-GMAIL_MCP_TOOL_PREFIX = gmail_tool_prefix()
-GMAIL_MCP_RAW_TOOLS = GMAIL_RAW_TOOLS
-GMAIL_MCP_TOOLS = [f"{GMAIL_MCP_TOOL_PREFIX}_{name}" for name in GMAIL_MCP_RAW_TOOLS]
+MCP_REGISTRY = mcp_registry()
+MCP_SERVER_STATUSES = MCP_REGISTRY.statuses()
 AVAILABLE_TOOLS = enabled_tools()
 ENFORCE_APPROVAL = os.environ.get("AGENTGUARD_ADK_ENFORCE_APPROVAL", "true").lower() in {
     "1",
@@ -149,43 +141,59 @@ def run_shell_command(command: str) -> dict:
         }
 
 
-def _build_gmail_mcp_toolset() -> list[Any]:
-    if not GMAIL_MCP_ENABLED or not gmail_runtime_ready():
-        return []
-
+def _build_mcp_toolsets(registry: McpRegistry) -> list[Any]:
     try:
-        from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
+        from google.adk.tools.mcp_tool.mcp_session_manager import (
+            StdioConnectionParams,
+            StreamableHTTPConnectionParams,
+        )
         from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
         from mcp import StdioServerParameters
     except ImportError as exc:  # pragma: no cover - startup guidance
         raise RuntimeError(
-            "Gmail MCP is enabled, but MCP dependencies are not installed. "
+            "An MCP server is enabled, but MCP dependencies are not installed. "
             "Run `uv sync` from the repo root and try again."
         ) from exc
 
-    return [
-        McpToolset(
-            connection_params=StdioConnectionParams(
+    class RegistryAwareMcpToolset(McpToolset):
+        def __init__(self, *, registry, server, **kwargs):
+            self._agentguard_registry = registry
+            self._agentguard_server = server
+            super().__init__(**kwargs)
+
+        async def get_tools(self, readonly_context=None):
+            tools = await super().get_tools(readonly_context)
+            for tool in tools:
+                self._agentguard_registry.register_discovered_tool(
+                    self._agentguard_server, tool
+                )
+            return tools
+
+    toolsets = []
+    for server in registry.ready_servers():
+        if server.transport == "stdio":
+            connection_params = StdioConnectionParams(
                 server_params=StdioServerParameters(
-                    command="docker",
-                    args=[
-                        "run",
-                        "-i",
-                        "--rm",
-                        "-v",
-                        f"{GMAIL_MCP_CREDENTIALS_VOLUME}:/gmail-server",
-                        "-e",
-                        "GMAIL_OAUTH_PATH=/gmail-server/gcp-oauth.keys.json",
-                        "-e",
-                        "GMAIL_CREDENTIALS_PATH=/gmail-server/credentials.json",
-                        GMAIL_MCP_DOCKER_IMAGE,
-                    ],
-                ),
-            ),
-            tool_filter=GMAIL_MCP_RAW_TOOLS,
-            tool_name_prefix=GMAIL_MCP_TOOL_PREFIX,
+                    command=server.stdio_command or "",
+                    args=list(server.stdio_args),
+                    env=server.stdio_env or None,
+                )
+            )
+        else:
+            connection_params = StreamableHTTPConnectionParams(
+                url=server.http_url or "",
+                headers=server.http_headers or None,
+            )
+        toolsets.append(
+            RegistryAwareMcpToolset(
+                registry=registry,
+                server=server,
+                connection_params=connection_params,
+                tool_filter=None,
+                tool_name_prefix=server.prefix,
+            )
         )
-    ]
+    return toolsets
 
 
 def _before_tool_callback(tool, args: dict[str, Any], tool_context):
@@ -239,7 +247,7 @@ def _after_tool_callback(tool, args: dict[str, Any], tool_context, tool_response
 def _on_tool_error_callback(tool, args: dict[str, Any], tool_context, error: Exception) -> None:
     _get_trace_session(tool_context).record_tool_response(
         _tool_name(tool),
-        {"error": str(error), "args": args},
+        {"error": MCP_REGISTRY.redact(str(error)), "args": args},
         call_id=getattr(tool_context, "function_call_id", None),
     )
     return None
@@ -260,6 +268,12 @@ def _get_trace_session(context) -> GoogleADKTraceSession:
             enable_elastic=ENABLE_ELASTIC,
             fail_on_elastic_error=FAIL_ON_ELASTIC_ERROR,
             force_block=FORCE_BLOCK,
+            tool_metadata={
+                name: metadata
+                for name in MCP_REGISTRY.discovered_tool_names()
+                if (metadata := MCP_REGISTRY.metadata_for(name)) is not None
+            },
+            metadata_resolver=MCP_REGISTRY.metadata_for,
         )
     return _TRACE_SESSIONS[session_id]
 
@@ -285,7 +299,7 @@ def _tool_name(tool) -> str:
     return getattr(tool, "name", None) or getattr(tool, "__name__", None) or str(tool)
 
 
-TOOLS = [run_shell_command] + _build_gmail_mcp_toolset()
+TOOLS = [run_shell_command] + _build_mcp_toolsets(MCP_REGISTRY)
 
 root_agent = Agent(
     name=AGENT_ID,

@@ -43,12 +43,7 @@ except ModuleNotFoundError:  # pragma: no cover - guidance for first-time setup
         "and set a Gemini API key, e.g. export GOOGLE_API_KEY=..."
     )
 
-from adk_agent.agent import (  # noqa: E402
-    GMAIL_MCP_CREDENTIALS_VOLUME,
-    GMAIL_MCP_DOCKER_IMAGE,
-    GMAIL_MCP_ENABLED,
-    root_agent,
-)
+from adk_agent.agent import MCP_SERVER_STATUSES, root_agent  # noqa: E402
 APP_NAME = "adk_terminal_assistant"
 USER_ID = "local_user"
 SESSION_ID = "local_session"
@@ -90,13 +85,12 @@ async def main() -> None:
     trace_path = os.path.join(TRACE_ROOT, "v1", TRACE_NAMESPACE, "traces.jsonl")
 
     print(f"Chatting with '{root_agent.name}' (model: {root_agent.model}).")
-    if GMAIL_MCP_ENABLED:
-        print(
-            "Gmail MCP enabled "
-            f"(Docker image: {GMAIL_MCP_DOCKER_IMAGE}, volume: {GMAIL_MCP_CREDENTIALS_VOLUME})."
-        )
+    if MCP_SERVER_STATUSES:
+        for status in MCP_SERVER_STATUSES:
+            state = "ready" if status.ready else status.detail
+            print(f"MCP server '{status.id}' ({status.transport}, prefix {status.prefix}_): {state}.")
     else:
-        print("Gmail MCP disabled (set ADK_GMAIL_MCP_ENABLED=true to enable it).")
+        print("No MCP servers configured.")
     print(f"Writing AgentGuard v1 traces to {trace_path}.")
     print("Type a message, or 'exit' to quit.\n")
 

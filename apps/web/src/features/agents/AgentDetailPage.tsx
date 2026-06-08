@@ -160,15 +160,14 @@ export function AgentDetailPage() {
                   : "Not configured"
                 }
               />
-              <IntegrationFact
-                icon={<Wrench size={16} />}
-                label="Gmail MCP"
-                value={
-                  config.runtime.gmail_mcp_ready
-                    ? "Ready"
-                    : config.runtime.gmail_mcp_detail
-                }
-              />
+              {config.runtime.mcp_servers.map((server) => (
+                <IntegrationFact
+                  icon={<Wrench size={16} />}
+                  key={server.id}
+                  label={`${server.id} MCP`}
+                  value={server.ready ? "Ready" : server.detail}
+                />
+              ))}
             </div>
             <div className="border-t border-[var(--border)] p-5">
               <div className="rounded border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
