@@ -576,6 +576,38 @@ def test_before_tool_callback_enforces_v2_destructive_shell_block(
     assert v2_payload["enforced_decision"] == "block"
 
 
+def test_before_tool_callback_enforces_v2_destructive_shell_block(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
+    monkeypatch.setenv("AGENTGUARD_FIREWALL_MODE", "v2")
+    monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
+    adk_agent = _load_adk_agent()
+    adk_agent._TRACE_SESSIONS.clear()
+
+    response = adk_agent._before_tool_callback(
+        SimpleNamespace(name="run_shell_command"),
+        {"command": "rm v2-callback-test.txt"},
+        _fake_tool_context("Delete v2-callback-test.txt."),
+    )
+
+    assert response is not None
+    assert response["blocked_by_agentguard"] is True
+    assert response["runtime_policy"] == "block"
+    assert response["firewall_decision"] == "block"
+    events = load_jsonl(
+        tmp_path / "traces" / "v1" / "google_adk" / "live_events.jsonl"
+    )
+    v2_payload = next(
+        event["payload"]
+        for event in events
+        if event["event_type"] == "firewall_v2_evaluated"
+    )
+    assert v2_payload["enforced_by"] == "firewall_v2"
+    assert v2_payload["enforced_decision"] == "block"
+
+
 def test_before_tool_callback_force_blocks_every_tool_call(monkeypatch, tmp_path):
     monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "false")
     monkeypatch.setenv("AGENTGUARD_FORCE_BLOCK", "true")

@@ -66,26 +66,30 @@ def agent_instruction() -> str:
 def tool_registry() -> list[dict[str, Any]]:
     registry = mcp_registry()
     ready_ids = {server.id for server in registry.ready_servers()}
+
     tools = [
         _tool_definition(
-            "run_shell_command", 
-            infer_adk_tool_metadata("run_shell_command"), 
-            True,
+            "run_shell_command",
+            infer_adk_tool_metadata("run_shell_command"),
+            enabled=True,
             descriptor=descriptor_for_tool("run_shell_command"),
         )
     ]
+
     for name in registry.discovered_tool_names():
         metadata = registry.metadata_for(name)
         if metadata is None:
             continue
+
         tools.append(
             _tool_definition(
-                name, 
-                metadata, 
-                metadata.mcp_server in ready_ids,
+                name,
+                metadata,
+                enabled=metadata.mcp_server in ready_ids,
                 descriptor=descriptor_for_tool(name),
             )
         )
+
     return tools
 
 
@@ -170,7 +174,12 @@ def agent_definition() -> dict[str, Any]:
     }
 
 
-def _tool_definition(name: str, metadata, enabled: bool, descriptor) -> dict[str, Any]:
+def _tool_definition(
+    name: str,
+    metadata,
+    enabled: bool,
+    descriptor,
+) -> dict[str, Any]:
     return {
         "name": name,
         "description": metadata.description or f"Google ADK tool: {name}",
@@ -184,7 +193,7 @@ def _tool_definition(name: str, metadata, enabled: bool, descriptor) -> dict[str
         "requires_confirmation": metadata.requires_confirmation_by_default,
         "irreversible": metadata.irreversible,
         "enabled": enabled,
-        "provider": metadata.provider or "local",
+        "provider": metadata.provider or descriptor.provider,
         "capabilities": descriptor.capabilities,
         "impact": descriptor.impact,
         "reversible": descriptor.reversible,
