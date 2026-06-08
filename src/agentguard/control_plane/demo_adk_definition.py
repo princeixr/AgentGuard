@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from agentguard.control_plane.registry import DEMO_AGENT_ID
-from agentguard.runtime.google_adk_adapter import infer_adk_tool_metadata
-from agentguard.runtime.mcp_registry import McpRegistry
 from agentguard.firewall_v2.policy.resolver import resolve_demo_policy
 from agentguard.firewall_v2.tools.registry import descriptor_for_tool
+from agentguard.runtime.google_adk_adapter import infer_adk_tool_metadata
+from agentguard.runtime.mcp_registry import McpRegistry
 
 DEMO_ADK_APP_NAME = "adk_terminal_assistant"
 DEMO_ADK_RUNTIME_NAME = "terminal_assistant"
@@ -55,11 +56,18 @@ def agent_instruction() -> str:
             "config/adk_mcp_servers.toml when external integrations are requested."
         )
     server_names = ", ".join(f"{server.id} ({server.prefix}_*)" for server in ready_servers)
+    local_time = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z (UTC%z)")
     return (
         f"{BASE_ADK_INSTRUCTION} The available MCP servers are: {server_names}. "
         "Use their prefixed tools for matching external integrations. Never invent a "
         "tool name, and never use run_shell_command as a fallback for an external "
-        "integration action."
+        "integration action. "
+        f"The local machine time is {local_time}. For calendar requests about relative "
+        "days such as today or tomorrow, use local-time boundaries rather than UTC "
+        "boundaries. First list the calendars visible to the account, then query every "
+        "visible calendar for the requested local midnight-to-next-midnight range. "
+        "Combine and chronologically sort the events before answering; do not assume "
+        "the primary calendar contains every event."
     )
 
 

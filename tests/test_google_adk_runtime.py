@@ -23,6 +23,7 @@ from agentguard.control_plane.registry import (
     DEMO_WORKSPACE_ID,
     DemoAgentRegistry,
 )
+from agentguard.control_plane.demo_adk_definition import agent_instruction
 from agentguard.api.services.guard_admin import guard_admin_status
 from agentguard.governance.session_risk_v1 import SessionRiskManagerV1
 from agentguard.firewall_v2.config import FirewallV2RuntimeConfig
@@ -33,7 +34,12 @@ from agentguard.firewall_v2.policy.models import PolicyDocumentV1
 from agentguard.firewall_v2.policy.resolver import resolve_demo_policy
 from agentguard.firewall_v2.policy.store import PolicyStore
 from agentguard.firewall_v2.policy.validator import PolicyValidationError
-from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession, adk_runtime_policy
+from agentguard.runtime.google_adk_adapter import (
+    GoogleADKTraceSession,
+    _execution_status,
+    _summarize_tool_response,
+    adk_runtime_policy,
+)
 from agentguard.runtime.mcp_registry import McpRegistry
 from agentguard.firewall_v2.tools.models import ToolDescriptorV1
 from agentguard.firewall_v2.tools.normalizers.shell import ShellNormalizerV1
@@ -110,6 +116,42 @@ def test_google_adk_trace_session_propagates_runtime_identity(tmp_path):
     assert result.feature.agent_id == DEMO_AGENT_ID
     assert result.score.agent_id == DEMO_AGENT_ID
     assert result.decision.agent_id == DEMO_AGENT_ID
+
+
+def test_agent_instruction_queries_all_calendars_using_local_day_boundaries():
+    instruction = agent_instruction()
+
+    assert "use local-time boundaries rather than UTC boundaries" in instruction
+    assert "query every visible calendar" in instruction
+    assert "do not assume the primary calendar contains every event" in instruction
+
+
+def test_mcp_response_summary_includes_nested_text_content():
+    response = {
+        "content": [
+            {
+                "type": "text",
+                "text": '[{"summary":"Sprint-Hack","start":"2026-06-08T22:30:00-04:00"}]',
+            }
+        ],
+        "isError": False,
+    }
+
+    summary = _summarize_tool_response(response)
+
+    assert "Sprint-Hack" in summary
+    assert "tool returned an empty response" not in summary
+    assert _execution_status(response) == "executed"
+
+
+def test_mcp_error_response_is_recorded_as_failed():
+    response = {
+        "content": [{"type": "text", "text": '{"error":"calendar unavailable"}'}],
+        "isError": True,
+    }
+
+    assert _execution_status(response) == "failed"
+    assert "calendar unavailable" in _summarize_tool_response(response)
 
 
 def test_session_risk_state_restores_from_persisted_namespace(tmp_path):
@@ -551,38 +593,6 @@ def test_before_tool_callback_allows_approval_when_enforcement_disabled(
     )
 
     assert response is None
-
-
-def test_before_tool_callback_enforces_v2_destructive_shell_block(
-    monkeypatch,
-    tmp_path,
-):
-    monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
-    monkeypatch.setenv("AGENTGUARD_FIREWALL_MODE", "v2")
-    monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
-    adk_agent = _load_adk_agent()
-    adk_agent._TRACE_SESSIONS.clear()
-
-    response = adk_agent._before_tool_callback(
-        SimpleNamespace(name="run_shell_command"),
-        {"command": "rm v2-callback-test.txt"},
-        _fake_tool_context("Delete v2-callback-test.txt."),
-    )
-
-    assert response is not None
-    assert response["blocked_by_agentguard"] is True
-    assert response["runtime_policy"] == "block"
-    assert response["firewall_decision"] == "block"
-    events = load_jsonl(
-        tmp_path / "traces" / "v1" / "google_adk" / "live_events.jsonl"
-    )
-    v2_payload = next(
-        event["payload"]
-        for event in events
-        if event["event_type"] == "firewall_v2_evaluated"
-    )
-    assert v2_payload["enforced_by"] == "firewall_v2"
-    assert v2_payload["enforced_decision"] == "block"
 
 
 def test_before_tool_callback_enforces_v2_destructive_shell_block(

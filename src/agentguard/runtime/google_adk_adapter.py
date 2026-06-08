@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Mapping
 from pathlib import Path
@@ -415,7 +416,7 @@ def _execution_status(response: Any) -> str:
     if isinstance(response, Mapping):
         if response.get("blocked_by_agentguard"):
             return "blocked"
-        if response.get("error"):
+        if response.get("error") or response.get("isError"):
             return "failed"
         if response.get("timed_out"):
             return "failed"
@@ -442,9 +443,43 @@ def _summarize_tool_response(response: Any, max_chars: int = 500) -> str:
             pieces.append(f"stderr={stderr[:max_chars]}")
         if response.get("timed_out"):
             pieces.append("timed_out=true")
+        mcp_content = _summarize_mcp_content(response.get("content"), max_chars)
+        if mcp_content:
+            pieces.append(f"content={mcp_content}")
+        structured_content = response.get("structuredContent")
+        if structured_content is not None:
+            pieces.append(
+                f"structured_content={_compact_value(structured_content, max_chars)}"
+            )
         return "; ".join(pieces) or "tool returned an empty response"
     text = str(response).strip()
     return text[:max_chars] if text else "tool returned an empty response"
+
+
+def _summarize_mcp_content(content: Any, max_chars: int) -> str:
+    if not isinstance(content, list):
+        return ""
+    values = []
+    for item in content:
+        if isinstance(item, Mapping):
+            value = item.get("text")
+            if value is None:
+                value = item.get("data")
+            if value is None:
+                continue
+            values.append(_compact_value(value, max_chars))
+        elif item is not None:
+            values.append(_compact_value(item, max_chars))
+    return " | ".join(values)[:max_chars]
+
+
+def _compact_value(value: Any, max_chars: int) -> str:
+    if isinstance(value, str):
+        return value.strip()[:max_chars]
+    try:
+        return json.dumps(value, separators=(",", ":"), ensure_ascii=True)[:max_chars]
+    except (TypeError, ValueError):
+        return str(value).strip()[:max_chars]
 
 
 def adk_runtime_policy(guard_decision: str) -> str:

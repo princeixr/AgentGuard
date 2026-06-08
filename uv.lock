@@ -9,6 +9,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "google-adk" },
+    { name = "google-genai" },
     { name = "mcp" },
     { name = "pydantic" },
     { name = "uvicorn" },
@@ -28,6 +29,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "google-adk", specifier = ">=2.1.0" },
     { name = "google-adk", marker = "extra == 'adk'", specifier = ">=1.0" },
+    { name = "google-genai", specifier = ">=1.75.0" },
     { name = "mcp", specifier = ">=1.27.1" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
