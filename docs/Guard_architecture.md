@@ -907,6 +907,13 @@ into one unexplained number.
 
 ## 12. Tier 3: LLM Judge
 
+Implementation status as of 2026-06-08: a first production-oriented Tier 3 boundary is
+implemented under `src/agentguard/firewall_v2/tiers/tier_3/`. It uses Gemini through
+`google-genai`, validates structured JSON with Pydantic, records model/prompt metadata,
+and fails closed to `require_approval` when the model call, timeout, or schema parse
+fails. It can run in shadow mode or feed the V2 combiner when
+`AGENTGUARD_TIER3_ENFORCEMENT_ENABLED=true`.
+
 ### 12.1 Responsibility
 
 Tier 3 handles ambiguous, consequential calls where deterministic and semantic evidence
@@ -963,19 +970,43 @@ It should not receive:
 {
   "verdict": "require_approval",
   "confidence": 0.82,
-  "applicable_rule_ids": [
-    "approve_email_send"
+  "intent_alignment_score": 0.62,
+  "tool_criticality_score": 0.86,
+  "necessity_score": 0.55,
+  "argument_scope_score": 0.48,
+  "policy_compliance_score": 0.70,
+  "context_risk_score": 0.40,
+  "discovered_criteria": [
+    {
+      "name": "recipient_social_engineering_risk",
+      "score": 0.66,
+      "weight": 0.10,
+      "rationale": "External recipient and financially sensitive content.",
+      "escalates_risk": true
+    }
   ],
-  "intent_alignment": "partial",
-  "argument_scope": "broader_than_requested",
   "rationale": "The user authorized drafting but did not clearly authorize sending.",
   "uncertainties": [
     "No explicit confirmation to send"
-  ]
+  ],
+  "model": "gemini-2.5-flash",
+  "prompt_version": "tier3_judge_v1.0.0"
 }
 ```
 
 Validate this output against a strict schema.
+
+Current rubric:
+
+```text
+intent alignment                  25%
+tool criticality                  20%
+necessity                         15%
+argument scope                    15%
+policy compliance                 15%
+context risk                      10%
+discovered criteria               audit/escalation only, capped at 20% per item
+```
 
 ### 12.5 Benefits
 
@@ -1006,6 +1037,11 @@ Validate this output against a strict schema.
 - Model failure uses the policy's `llm_failure` effect.
 
 ## 13. Final Decision Combiner
+
+Implementation status as of 2026-06-08: `DecisionCombinerV1` exists under
+`src/agentguard/firewall_v2/enforcement/combiner.py`. It is deterministic Python code;
+it does not call an LLM. Its current conservative configuration caps model-based hard
+blocks to `require_approval` unless explicitly enabled later.
 
 ### 13.1 Inputs
 

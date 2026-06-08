@@ -12,6 +12,7 @@ license = { text = "MIT" }
 dependencies = [
     "fastapi>=0.115",
     "google-adk>=2.1.0",
+    "google-genai>=1.75.0",
     "mcp>=1.27.1",
     "pydantic>=2.7",
     "uvicorn>=0.30",

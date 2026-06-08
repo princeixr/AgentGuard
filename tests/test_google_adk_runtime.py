@@ -25,6 +25,8 @@ from agentguard.control_plane.registry import (
 )
 from agentguard.api.services.guard_admin import guard_admin_status
 from agentguard.governance.session_risk_v1 import SessionRiskManagerV1
+from agentguard.firewall_v2.config import FirewallV2RuntimeConfig
+from agentguard.firewall_v2.enforcement import DecisionCombinerV1
 from agentguard.firewall_v2.policy.evaluator import PolicyEvaluatorV1
 from agentguard.firewall_v2.policy.loader import PolicyLoader
 from agentguard.firewall_v2.policy.models import PolicyDocumentV1
@@ -35,6 +37,8 @@ from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession, adk_run
 from agentguard.firewall_v2.tools.models import ToolDescriptorV1
 from agentguard.firewall_v2.tools.normalizers.shell import ShellNormalizerV1
 from agentguard.firewall_v2.tools.registry import descriptor_for_tool
+from agentguard.firewall_v2.tiers.models import TierResultV1
+from agentguard.firewall_v2.tiers.tier_3.models import LlmJudgeInputV1, LlmJudgeResultV1
 from agentguard.tracing.serializers import load_jsonl
 from agentguard.tracing.trace_store import TraceStore
 
@@ -44,6 +48,11 @@ def _stable_guard_environment(monkeypatch):
     monkeypatch.setenv("AGENTGUARD_FORCE_BLOCK", "false")
     monkeypatch.setenv("FORCE_BLOCK", "false")
     monkeypatch.setenv("AGENTGUARD_FIREWALL_MODE", "v1")
+    monkeypatch.setenv("AGENTGUARD_TIER_1_ENABLED", "true")
+    monkeypatch.setenv("AGENTGUARD_TIER_2_ENABLED", "false")
+    monkeypatch.setenv("AGENTGUARD_TIER_3_ENABLED", "false")
+    monkeypatch.setenv("AGENTGUARD_TIER3_ENFORCEMENT_ENABLED", "false")
+    monkeypatch.setenv("AGENTGUARD_MOCK_PIPELINE_ONLY", "false")
 
 
 def test_google_adk_trace_session_runs_firewall_before_execution(tmp_path):
@@ -616,6 +625,36 @@ def test_before_tool_callback_force_blocks_every_tool_call(monkeypatch, tmp_path
     assert blocked_events[0]["payload"]["approval_required"] is False
 
 
+def test_before_tool_callback_mock_pipeline_never_executes(monkeypatch, tmp_path):
+    monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
+    monkeypatch.setenv("AGENTGUARD_MOCK_PIPELINE_ONLY", "true")
+    monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "false")
+    monkeypatch.setenv("AGENTGUARD_FIREWALL_MODE", "v2")
+    monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
+    adk_agent = _load_adk_agent()
+    adk_agent._TRACE_SESSIONS.clear()
+
+    response = adk_agent._before_tool_callback(
+        SimpleNamespace(name="run_shell_command"),
+        {"command": "pwd"},
+        _fake_tool_context("Show me the current directory."),
+    )
+
+    assert response is not None
+    assert response["blocked_by_agentguard"] is True
+    assert response["mock_pipeline_only"] is True
+    assert response["firewall_decision"] == "allow"
+    blocked_events = [
+        event
+        for event in load_jsonl(
+            tmp_path / "traces" / "v1" / "google_adk" / "live_events.jsonl"
+        )
+        if event["event_type"] == "tool_blocked"
+    ]
+    assert len(blocked_events) == 1
+    assert blocked_events[0]["payload"]["execution_status"] == "blocked"
+
+
 def test_google_adk_trace_session_records_v2_shadow_evidence(tmp_path):
     session = _trace_session(tmp_path, firewall_mode="v2_shadow")
     session.start_turn("Show me the current directory.")
@@ -749,6 +788,100 @@ def test_google_adk_trace_session_v2_mode_enforces_policy_recommendation(
         "allow" if expected_decision == "allow" else expected_decision
     )
     assert result.decision.explanation.startswith("FirewallV2 enforced")
+
+
+def test_v2_shadow_records_tier3_judge_without_enforcement(tmp_path):
+    session = GoogleADKTraceSession(
+        session_id="tier3_shadow_session",
+        agent_id="terminal_assistant",
+        runtime_agent_id="terminal_assistant",
+        agent_config_id="adk_terminal_assistant",
+        available_tools=["run_shell_command"],
+        trace_store=TraceStore(root_dir=tmp_path / "traces"),
+        namespace="google_adk_test",
+        firewall_mode="v2_shadow",
+        runtime_config=FirewallV2RuntimeConfig(
+            tier_1_enabled=True,
+            tier_2_enabled=True,
+            tier_3_enabled=True,
+            tier_3_enforcement_enabled=False,
+            tier_confidence_threshold=1.01,
+        ),
+        tier_3_provider=_MockJudgeProvider(verdict="require_approval", confidence=0.91),
+    )
+    session.start_turn("Show me the current directory.")
+    result = session.record_tool_call(
+        "run_shell_command",
+        {"command": "pwd"},
+        call_id="call_tier3_shadow",
+    )
+
+    payload = _latest_v2_payload(tmp_path)
+
+    assert result.decision.decision == "allow"
+    assert payload["enforced_by"] == "firewall_v1"
+    assert payload["evaluation"]["tier_results"][-1]["tier"] == "tier_3"
+    assert payload["evaluation"]["tier_results"][-1]["recommendation"] == "require_approval"
+    assert payload["evaluation"]["combined_decision"]["final_decision"] == "allow"
+
+
+def test_v2_tier3_enforcement_can_escalate_allow_to_approval(tmp_path):
+    session = GoogleADKTraceSession(
+        session_id="tier3_enforced_session",
+        agent_id="terminal_assistant",
+        runtime_agent_id="terminal_assistant",
+        agent_config_id="adk_terminal_assistant",
+        available_tools=["run_shell_command"],
+        trace_store=TraceStore(root_dir=tmp_path / "traces"),
+        namespace="google_adk_test",
+        firewall_mode="v2",
+        runtime_config=FirewallV2RuntimeConfig(
+            tier_1_enabled=True,
+            tier_2_enabled=True,
+            tier_3_enabled=True,
+            tier_3_enforcement_enabled=True,
+            tier_confidence_threshold=1.01,
+        ),
+        tier_3_provider=_MockJudgeProvider(verdict="require_approval", confidence=0.93),
+    )
+    session.start_turn("Show me the current directory.")
+    result = session.record_tool_call(
+        "run_shell_command",
+        {"command": "pwd"},
+        call_id="call_tier3_enforced",
+    )
+
+    assert result.decision.decision == "require_approval"
+    assert result.decision.explanation.startswith("FirewallV2 enforced require_approval")
+
+
+def test_combiner_does_not_allow_tier3_to_override_deterministic_block(tmp_path):
+    session = _trace_session(tmp_path, firewall_mode="v2")
+    session.start_turn("Delete a file.")
+    result = session.record_tool_call(
+        "run_shell_command",
+        {"command": "rm important.txt"},
+        call_id="call_block_combiner",
+    )
+    policy = PolicyEvaluatorV1(resolve_demo_policy()).evaluate(
+        descriptor_for_tool("run_shell_command"),
+        action=ShellNormalizerV1().normalize(result.trace),
+    )
+    tier3_allow = TierResultV1(
+        tier="tier_3",
+        status="completed",
+        recommendation="allow",
+        confidence=0.99,
+        explanation="Mock judge would allow.",
+    )
+
+    combined = DecisionCombinerV1(
+        tier_3_enforcement_enabled=True,
+    ).combine(policy, [tier3_allow])
+
+    assert policy.recommendation == "block"
+    assert combined.final_decision == "block"
+    assert combined.enforced_by == "tier_1_deterministic_policy"
 
 
 def test_v2_mode_keeps_force_block_as_emergency_override(tmp_path):
@@ -1040,3 +1173,38 @@ def _runtime_events(tmp_path):
         )
         if event["payload"].get("runtime_event_source") == "google_adk_adapter"
     ]
+
+
+def _latest_v2_payload(tmp_path):
+    events = load_jsonl(
+        tmp_path / "traces" / "v1" / "google_adk_test" / "live_events.jsonl"
+    )
+    return next(
+        event["payload"]
+        for event in reversed(events)
+        if event["event_type"] == "firewall_v2_evaluated"
+    )
+
+
+class _MockJudgeProvider:
+    def __init__(self, verdict="allow", confidence=0.9):
+        self.verdict = verdict
+        self.confidence = confidence
+
+    def judge(self, packet: LlmJudgeInputV1) -> LlmJudgeResultV1:
+        return LlmJudgeResultV1(
+            trace_id=packet.trace_id,
+            verdict=self.verdict,
+            confidence=self.confidence,
+            intent_alignment_score=0.8,
+            tool_criticality_score=0.4,
+            necessity_score=0.7,
+            argument_scope_score=0.7,
+            policy_compliance_score=0.8,
+            context_risk_score=0.2,
+            discovered_criteria=[],
+            rationale=f"Mock Tier 3 recommends {self.verdict}.",
+            uncertainties=[],
+            model="mock-gemini",
+            prompt_version="test",
+        )

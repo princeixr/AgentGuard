@@ -46,4 +46,6 @@ class FirewallV2Evaluation(BaseModel):
     tool_descriptor: dict[str, Any] | None = None
     normalized_action: dict[str, Any] | None = None
     policy_evaluation: dict[str, Any] | None = None
+    tier_results: list[dict[str, Any]] = Field(default_factory=list)
+    combined_decision: dict[str, Any] | None = None
     explanation: str

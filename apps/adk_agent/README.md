@@ -55,6 +55,14 @@ agent: You're in the AgentGuard repo root ... and you're on Python 3.11.
 | `ADK_MAX_OUTPUT_CHARS` | `20000` | Output truncation cap per command. |
 | `AGENTGUARD_ADK_ENFORCE_APPROVAL` | `true` | When true, `require_approval` returns a synthetic response and the tool is not executed. |
 | `AGENTGUARD_FORCE_BLOCK` / `FORCE_BLOCK` | `false` | Demo/test override that records a `block` decision and prevents every ADK tool call from executing. |
+| `AGENTGUARD_FIREWALL_MODE` | `v1` | `v1`, `v2_shadow`, or `v2`; controls whether V2 records evidence or owns enforcement. |
+| `AGENTGUARD_TIER_1_ENABLED` | `true` | Enables the V2 deterministic tier. |
+| `AGENTGUARD_TIER_2_ENABLED` | `false` | Enables the V2 Tier 2 semantic boundary. Current implementation records a conservative placeholder. |
+| `AGENTGUARD_TIER_3_ENABLED` | `false` | Enables the Gemini-backed V2 Tier 3 LLM judge when escalation is needed. |
+| `AGENTGUARD_TIER3_ENFORCEMENT_ENABLED` | `false` | Allows Tier 3 output to affect the V2 combiner. Keep false for shadow testing. |
+| `AGENTGUARD_TIER_CONFIDENCE_THRESHOLD` | `0.75` | Confidence threshold used to escalate between enabled tiers. |
+| `AGENTGUARD_TIER3_MODEL` | `gemini-2.5-flash` | Gemini model used by the Tier 3 judge. |
+| `AGENTGUARD_MOCK_PIPELINE_ONLY` | `false` | Evaluates and logs the full guard pipeline but never executes the proposed tool. Recommended for cloud/team tests. |
 | `AGENTGUARD_ADK_TRACE_NAMESPACE` | `google_adk` | Namespace for local v1 trace artifacts. |
 | `AGENTGUARD_TRACE_ROOT` | `data/traces` | Root directory for local trace artifacts. |
 | `AGENTGUARD_ADK_ELASTIC_ENABLED` | unset | Optional ADK-only override for `AGENTGUARD_ELASTIC_ENABLED`. |
@@ -106,6 +114,28 @@ their labels/decisions into retrieval features before scoring the current tool c
 
 Use `AGENTGUARD_ADK_ELASTIC_ENABLED=false` to keep the ADK agent local-only even when
 global Elastic is enabled for other scripts.
+
+## V2 Tiered Runtime
+
+For Tier 3 shadow evaluation:
+
+```bash
+export GOOGLE_API_KEY="..."
+export AGENTGUARD_FIREWALL_MODE=v2
+export AGENTGUARD_TIER_1_ENABLED=true
+export AGENTGUARD_TIER_2_ENABLED=false
+export AGENTGUARD_TIER_3_ENABLED=true
+export AGENTGUARD_TIER3_ENFORCEMENT_ENABLED=false
+```
+
+For safe shared testing, add:
+
+```bash
+export AGENTGUARD_MOCK_PIPELINE_ONLY=true
+```
+
+Mock-pipeline mode still writes trace, V1, V2, tier, combiner, and runtime events, but
+the ADK tool is not executed.
 
 The runtime Docker command expects both OAuth files in the `mcp-gmail` volume:
 `/gmail-server/gcp-oauth.keys.json` and `/gmail-server/credentials.json`.

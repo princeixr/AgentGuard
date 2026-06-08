@@ -927,6 +927,11 @@ Tier 2 must demonstrate measurable scenario value over Tier 1 alone.
 
 ## 14. Phase 10: Tier 3 Structured LLM Judge
 
+Status as of 2026-06-08: partially implemented. The backend Tier 3 judge, shared
+tier-result contract, Gemini provider, timeout/failure fallback, and deterministic
+combiner are implemented. UI presentation, durable TierResult storage, broader
+sanitization/redaction, and calibrated routing remain.
+
 ### Goal
 
 Use an LLM only for configured ambiguous, consequential actions.
@@ -935,13 +940,13 @@ Use an LLM only for configured ambiguous, consequential actions.
 
 Implement:
 
-- sanitized judge packet,
-- trusted prompt template,
-- structured response schema,
-- timeout,
-- confidence threshold,
-- malformed-output handling,
-- model and prompt version recording.
+- sanitized judge packet, partly implemented with bounded trace/action/policy context,
+- trusted prompt template, implemented,
+- structured response schema, implemented,
+- timeout, implemented,
+- confidence threshold, implemented,
+- malformed-output handling, implemented as fail-closed Tier 3 failure,
+- model and prompt version recording, implemented.
 
 Initial routes:
 
@@ -949,6 +954,15 @@ Initial routes:
 - selected ambiguous shell actions not already blocked.
 
 Tier 3 cannot weaken Tier 1.
+
+Current runtime flags:
+
+```text
+AGENTGUARD_TIER_3_ENABLED=false
+AGENTGUARD_TIER3_ENFORCEMENT_ENABLED=false
+AGENTGUARD_TIER3_MODEL=gemini-2.5-flash
+AGENTGUARD_MOCK_PIPELINE_ONLY=false
+```
 
 ### UI work
 
@@ -993,7 +1007,9 @@ Expected:
 
 ### Exit gate
 
-Tier 3 adds understandable evidence without becoming the policy authority.
+Tier 3 adds understandable evidence without becoming the policy authority. Backend
+tests now cover shadow evidence, enforcement escalation, deterministic-block precedence,
+and mock-pipeline non-execution.
 
 ## 15. Phase 11: Decision V2 and Complete Replay
 
