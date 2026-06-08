@@ -42,6 +42,11 @@ export interface ReplayStep {
   explanation: string;
   execution_status: string;
   output_summary: string | null;
+  enforced_by: string;
+  v1_decision: Decision | null;
+  v2_recommendation: Decision | null;
+  v2_effective_decision: Decision | null;
+  v2_enforcement_status: string | null;
 }
 
 export interface PrecedentSummary {
@@ -74,6 +79,11 @@ export interface MemoryItem {
   decision: Decision;
   labels: string[];
   explanation: string;
+  enforced_by: string;
+  v1_decision: Decision | null;
+  v2_recommendation: Decision | null;
+  v2_effective_decision: Decision | null;
+  v2_enforcement_status: string | null;
 }
 
 export interface MemoryPage {
@@ -96,6 +106,9 @@ export interface MemoryDetail {
 
 export interface CurrentInterception {
   status: "idle" | "running" | "paused" | "completed";
+  event_source: string;
+  firewall_mode: string;
+  guard_version: string;
   agent_id: string | null;
   scenario_id: string | null;
   session_id: string | null;
@@ -189,6 +202,11 @@ export interface AgentToolDefinition {
   irreversible: boolean;
   enabled: boolean;
   provider: string;
+  capabilities: string[];
+  impact: string;
+  reversible: boolean | null;
+  normalizer: string;
+  metadata_status: string;
 }
 
 export interface AgentTestScenario {
@@ -210,6 +228,12 @@ export interface AgentDefinition {
   callbacks: string[];
   guardrails: {
     policy_id: string;
+    policy_version: string;
+    policy_hash: string;
+    policy_status: string;
+    firewall_mode: string;
+    enforced_by: string;
+    v2_status: string;
     implementation: string;
     approval_enforced: boolean;
     trace_namespace: string;
@@ -222,6 +246,87 @@ export interface AgentDefinition {
     gmail_mcp_image: string;
   };
   test_scenarios: AgentTestScenario[];
+}
+
+export interface GuardAdminComponent {
+  component_id: string;
+  name: string;
+  layer: string;
+  status:
+    | "operational"
+    | "observe_only"
+    | "placeholder"
+    | "not_implemented";
+  summary: string;
+  management: string;
+}
+
+export interface GuardAdminStatus {
+  agent_id: string;
+  firewall_mode: string;
+  active_enforcement: string;
+  architecture_version: string;
+  force_block_enabled: boolean;
+  approval_enforced: boolean;
+  policy: {
+    policy_id: string;
+    status: "placeholder" | "operational";
+    source: string;
+    editable: boolean;
+    explanation: string;
+    version: string | null;
+    effective_hash: string | null;
+    rule_count: number;
+    defaults: Record<string, string>;
+  };
+  components: GuardAdminComponent[];
+  tools: AgentToolDefinition[];
+  warnings: string[];
+}
+
+export interface AgentPolicy {
+  policy_id: string;
+  version: string;
+  status: string;
+  effective_hash: string;
+  source: string;
+  validation: "valid";
+  document: {
+    schema_version: string;
+    policy_id: string;
+    version: string;
+    name: string;
+    description: string;
+    status: "draft" | "published";
+    scope: {
+      workspace_id: string;
+      agent_id: string;
+      deployment_id: string | null;
+    };
+    defaults: Record<string, string>;
+    routing: Record<string, string[]>;
+    rules: Array<{
+      rule_id: string;
+      description: string;
+      effect: "allow" | "require_approval" | "block";
+      severity: string;
+      non_overridable: boolean;
+      match: {
+        capabilities_any: string[];
+        tools_any: string[];
+        resource_constraints: Record<string, unknown>;
+      };
+    }>;
+    notes: string[];
+  };
+}
+
+export interface PolicyValidation {
+  valid: boolean;
+  policy_id: string | null;
+  version: string | null;
+  effective_hash: string | null;
+  errors: string[];
 }
 
 export interface AgentTestRun {
@@ -245,6 +350,9 @@ export interface AgentTestRun {
     risk_score: number;
     explanation: string;
     rules_fired: string[];
+    enforced_by: string;
+    firewall_mode: string;
+    v2_evaluation: Record<string, any> | null;
   }>;
   duration_ms: number;
 }

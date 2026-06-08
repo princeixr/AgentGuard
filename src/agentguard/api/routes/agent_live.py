@@ -43,7 +43,7 @@ def current(
 @router.get("/events/stream")
 async def events(
     agent_id: str,
-    runtime: DemoRuntimeService = Depends(get_demo_runtime),
+    runtime: AgentLiveRuntimeService = Depends(get_agent_live_runtime),
     registry: DemoAgentRegistry = Depends(get_agent_registry),
 ):
     _require_agent(agent_id, registry)

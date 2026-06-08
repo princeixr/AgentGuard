@@ -10,6 +10,8 @@ from uuid import uuid4
 from agentguard.control_plane.models import RuntimeIdentity
 from agentguard.core.enums import ToolRiskLevel
 from agentguard.core.models import ExecutedToolCall
+from agentguard.firewall_v2.engine import AgentGuardFirewallV2
+from agentguard.firewall_v2.models import FirewallMode, FirewallV2Evaluation
 from agentguard.governance.decision_policy_v1 import DecisionPolicyV1
 from agentguard.governance.firewall_v1 import AgentGuardFirewallV1, FirewallResultV1
 from agentguard.runtime.tool_registry import ToolMetadata, infer_tool_metadata
@@ -61,6 +63,7 @@ class GoogleADKTraceSession:
         fail_on_elastic_error: bool = False,
         runtime_identity: RuntimeIdentity | None = None,
         force_block: bool = False,
+        firewall_mode: FirewallMode = "v1",
     ):
         self.session_id = session_id
         self.agent_id = agent_id
@@ -85,6 +88,13 @@ class GoogleADKTraceSession:
         self.previous_trace_id: str | None = None
         self.previous_output_summary: str | None = None
         self.pending_results: dict[str, FirewallResultV1] = {}
+        self.firewall_mode = firewall_mode
+        self.force_block = force_block
+        self.firewall_v2 = (
+            AgentGuardFirewallV2(mode=firewall_mode)
+            if firewall_mode in {"v2_shadow", "v2"}
+            else None
+        )
 
     @property
     def trace_path(self) -> Path:
@@ -163,6 +173,49 @@ class GoogleADKTraceSession:
             )
         )
         result = self.firewall.intercept(trace)
+        if self.firewall_v2 is not None:
+            evaluation = self.firewall_v2.evaluate(trace)
+            v1_decision = result.decision
+            effective_decision = (
+                result.decision
+                if self.force_block
+                else _decision_from_v2(result, evaluation)
+                if self.firewall_mode == "v2"
+                else result.decision
+            )
+            enforced_by = (
+                "emergency_force_block"
+                if self.force_block
+                else "firewall_v2"
+                if self.firewall_mode == "v2"
+                else "firewall_v1"
+            )
+            result = FirewallResultV1(
+                trace=result.trace,
+                feature=result.feature,
+                score=result.score,
+                decision=effective_decision,
+                session_state_id=result.session_state_id,
+            )
+            self._append_event(
+                "firewall_v2_evaluated",
+                trace,
+                {
+                    "runtime_event_source": "google_adk_adapter",
+                    "enforced_by": enforced_by,
+                    "enforced_decision": effective_decision.decision,
+                    "v1_decision": v1_decision.model_dump(
+                        mode="json",
+                        by_alias=True,
+                    ),
+                    "effective_decision": effective_decision.model_dump(
+                        mode="json",
+                        by_alias=True,
+                    ),
+                    "firewall_mode": self.firewall_mode,
+                    "evaluation": evaluation.model_dump(mode="json", by_alias=True),
+                },
+            )
         self.pending_results[call_id] = result
         return result
 
@@ -382,6 +435,43 @@ def adk_runtime_policy(guard_decision: str) -> str:
     if guard_decision == "block":
         return "block"
     return "require_approval"
+
+
+def _decision_from_v2(
+    result: FirewallResultV1,
+    evaluation: FirewallV2Evaluation,
+):
+    recommendation = evaluation.recommendation
+    if recommendation not in {"allow", "require_approval", "block"}:
+        recommendation = "block"
+    policy = evaluation.policy_evaluation or {}
+    matched_rules = policy.get("matched_rules") or []
+    rule_ids = [
+        str(rule.get("rule_id"))
+        for rule in matched_rules
+        if isinstance(rule, dict) and rule.get("rule_id")
+    ]
+    if not rule_ids:
+        rule_ids = [
+            f"firewall_v2_default:{recommendation}",
+        ]
+    score_by_decision = {
+        "allow": 0.05,
+        "require_approval": 0.72,
+        "block": 0.95,
+    }
+    return result.decision.model_copy(
+        update={
+            "decision": recommendation,
+            "tier_used": "static_policy",
+            "final_risk_score": score_by_decision[recommendation],
+            "decision_rules_fired": rule_ids,
+            "explanation": (
+                f"FirewallV2 enforced {recommendation}. "
+                f"{policy.get('explanation') or evaluation.explanation}"
+            ),
+        }
+    )
 
 
 def _runtime_event_payload(

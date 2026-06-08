@@ -18,7 +18,7 @@ DEMO_USER_ID = "usr_demo_owner"
 DEMO_AGENT_ID = "agt_google_adk_assistant"
 DEMO_DEPLOYMENT_ID = "dep_google_adk_development"
 DEMO_INTEGRATION_ID = "int_google_adk_local"
-DEMO_POLICY_ID = "pol_strict_intent_v1"
+DEMO_POLICY_ID = "pol_personal_assistant"
 DEMO_TIMESTAMP = datetime(2026, 6, 6, 14, 30, tzinfo=timezone.utc)
 
 
@@ -59,8 +59,8 @@ class DemoAgentRegistry:
                 workspace_id=DEMO_WORKSPACE_ID,
                 name="Google ADK Assistant",
                 description=(
-                    "Guarded terminal and Gmail assistant integrated through Google ADK "
-                    "tool callbacks."
+                    "Personal productivity assistant with guarded terminal, communication, "
+                    "workspace, scheduling, and future MCP capabilities."
                 ),
                 framework="google_adk",
                 status="live" if model_configured else "setup_required",

@@ -141,18 +141,39 @@ class GoogleADKTestService:
             for item in load_jsonl(namespace_root / "traces.jsonl")
             if item.get("session_id") == session_id
         }
-        return [
-            AgentGuardTestDecision(
-                trace_id=decision["trace_id"],
-                tool_name=traces[decision["trace_id"]]["proposed_tool_call"]["tool_name"],
-                decision=decision["decision"],
-                risk_score=decision["final_risk_score"],
-                explanation=decision["explanation"],
-                rules_fired=decision.get("decision_rules_fired", []),
+        v2_by_trace = {
+            event["trace_id"]: event["payload"]
+            for event in load_jsonl(namespace_root / "live_events.jsonl")
+            if event.get("event_type") == "firewall_v2_evaluated"
+            and event.get("trace_id") in traces
+        }
+        items = []
+        for decision in load_jsonl(namespace_root / "decisions.jsonl"):
+            if decision.get("trace_id") not in traces:
+                continue
+            trace_id = decision["trace_id"]
+            v2_payload = v2_by_trace.get(trace_id, {})
+            effective_decision = v2_payload.get("effective_decision") or decision
+            items.append(
+                AgentGuardTestDecision(
+                    trace_id=trace_id,
+                    tool_name=traces[trace_id]["proposed_tool_call"]["tool_name"],
+                    decision=effective_decision["decision"],
+                    risk_score=effective_decision["final_risk_score"],
+                    explanation=effective_decision["explanation"],
+                    rules_fired=effective_decision.get("decision_rules_fired", []),
+                    enforced_by=v2_payload.get(
+                        "enforced_by",
+                        "firewall_v1",
+                    ),
+                    firewall_mode=v2_payload.get(
+                        "firewall_mode",
+                        "v1",
+                    ),
+                    v2_evaluation=v2_payload.get("evaluation"),
+                )
             )
-            for decision in load_jsonl(namespace_root / "decisions.jsonl")
-            if decision.get("trace_id") in traces
-        ]
+        return items
 
 
 def _json_value(value: Any) -> Any:

@@ -21,7 +21,7 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from google.adk.agents import Agent
 
@@ -36,6 +36,7 @@ from agentguard.control_plane.demo_adk_definition import (
     gmail_tool_prefix,
 )
 from agentguard.control_plane.registry import DEMO_AGENT_ID, DemoAgentRegistry
+from agentguard.firewall_v2.models import FirewallMode
 from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession, adk_runtime_policy
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -96,6 +97,12 @@ FAIL_ON_ELASTIC_ERROR = os.environ.get(
     "yes",
     "on",
 }
+_firewall_mode = os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1").lower()
+FIREWALL_MODE: FirewallMode = (
+    cast(FirewallMode, _firewall_mode)
+    if _firewall_mode in {"v1", "v2_shadow", "v2"}
+    else "v1"
+)
 
 _TRACE_SESSIONS: dict[str, GoogleADKTraceSession] = {}
 
@@ -260,6 +267,7 @@ def _get_trace_session(context) -> GoogleADKTraceSession:
             enable_elastic=ENABLE_ELASTIC,
             fail_on_elastic_error=FAIL_ON_ELASTIC_ERROR,
             force_block=FORCE_BLOCK,
+            firewall_mode=FIREWALL_MODE,
         )
     return _TRACE_SESSIONS[session_id]
 

@@ -128,6 +128,21 @@ export function AgentDetailPage() {
                       Confirmation: {tool.requires_confirmation ? "required" : "no"}
                     </span>
                   </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {tool.capabilities.map((capability) => (
+                      <span
+                        className="rounded border border-[var(--border)] bg-[var(--surface-low)] px-2 py-1 font-mono text-[10px]"
+                        key={capability}
+                      >
+                        {capability}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-3 text-[11px] text-[var(--ink-muted)]">
+                    <span>Impact: {tool.impact}</span>
+                    <span>Normalizer: {tool.normalizer}</span>
+                    <span>Metadata: {tool.metadata_status}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -139,7 +154,22 @@ export function AgentDetailPage() {
               <IntegrationFact
                 icon={<ShieldCheck size={16} />}
                 label="Policy"
-                value={config.guardrails.policy_id}
+                value={`${config.guardrails.policy_id} (${config.guardrails.policy_status})`}
+              />
+              <IntegrationFact
+                icon={<ShieldCheck size={16} />}
+                label="Firewall mode"
+                value={config.guardrails.firewall_mode}
+              />
+              <IntegrationFact
+                icon={<ShieldCheck size={16} />}
+                label="Enforced by"
+                value={config.guardrails.enforced_by}
+              />
+              <IntegrationFact
+                icon={<RadioTower size={16} />}
+                label="V2 status"
+                value={config.guardrails.v2_status}
               />
               <IntegrationFact
                 icon={<RadioTower size={16} />}
@@ -258,6 +288,18 @@ export function AgentDetailPage() {
                             Risk {Math.round(decision.risk_score * 100)} ·{" "}
                             {decision.explanation}
                           </div>
+                          <div className="mt-2 text-[11px] text-[var(--ink-muted)]">
+                            Enforced by <code>{decision.enforced_by}</code> · Mode{" "}
+                            <code>{decision.firewall_mode}</code>
+                          </div>
+                          {decision.v2_evaluation && (
+                            <div className="mt-3 rounded bg-[var(--surface-low)] p-3 text-xs">
+                              <div className="font-semibold">V2 shadow evaluation</div>
+                              <div className="mt-1 text-[var(--ink-muted)]">
+                                {decision.v2_evaluation.explanation}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))
                     ) : (

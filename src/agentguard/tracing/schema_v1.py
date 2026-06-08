@@ -127,6 +127,7 @@ class LiveEventV1(AgentGuardSchemaV1Model):
         "tool_executed",
         "tool_blocked",
         "tool_failed",
+        "firewall_v2_evaluated",
     ]
     trace_id: str | None = None
     session_id: str
