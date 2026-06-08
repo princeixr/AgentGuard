@@ -1,8 +1,8 @@
 # AgentGuard Developer Runtime Guide
 
-Status: current implemented v1 guide.
+Status: current implemented guide with V1 compatibility and V2 tiered evaluation.
 
-Last updated: 2026-05-30
+Last updated: 2026-06-08
 
 ## Project Goal
 
@@ -45,7 +45,9 @@ Core records:
 Host agent proposes tool call
     -> runtime adapter builds AgentGuardTraceV1
     -> AgentGuardFirewallV1.intercept(trace)
+    -> optional AgentGuardFirewallV2 tiered evaluation
     -> TraceFeatureV1, GuardScoreV1, GuardDecisionV1 are persisted
+    -> optional V2 tier evidence and combined decision are recorded
     -> SessionRiskStateV1 is updated
     -> runtime maps the decision to allow, require_approval, or block
     -> runtime executes or returns an approval-required/blocked response
@@ -62,6 +64,21 @@ block             never execute the tool
 ```
 
 `AGENTGUARD_ADK_ENFORCE_APPROVAL=true` is the default.
+
+V2 rollout is controlled with:
+
+```text
+AGENTGUARD_FIREWALL_MODE=v1 | v2_shadow | v2
+AGENTGUARD_TIER_1_ENABLED=true
+AGENTGUARD_TIER_2_ENABLED=false
+AGENTGUARD_TIER_3_ENABLED=false
+AGENTGUARD_TIER3_ENFORCEMENT_ENABLED=false
+AGENTGUARD_MOCK_PIPELINE_ONLY=false
+```
+
+Tier 3 uses Gemini via `google-genai` and requires `GOOGLE_API_KEY` when enabled.
+`AGENTGUARD_MOCK_PIPELINE_ONLY=true` is the safest mode for shared/cloud testing because
+it evaluates and logs the full pipeline without executing the proposed tool.
 
 ## OpenClaw Dataset Flow
 
@@ -117,9 +134,25 @@ mock_tools/              local email, file, and calendar tools
 
 `GoogleADKTraceSession` is the active callback bridge used by `apps/adk_agent`. It
 builds `AgentGuardTraceV1` records with ADK/MCP tool metadata, calls
-`AgentGuardFirewallV1` before execution, stores firewall artifacts, and records
-post-decision runtime events such as `tool_executed`, `tool_failed`, and
-approval-stopped `tool_blocked`.
+`AgentGuardFirewallV1` before execution, optionally evaluates `AgentGuardFirewallV2`,
+stores firewall artifacts, and records post-decision runtime events such as
+`tool_executed`, `tool_failed`, and approval-stopped `tool_blocked`.
+
+### `src/agentguard/firewall_v2/`
+
+```text
+engine.py                  V2 orchestration and tier escalation
+config/runtime.py          environment-backed tier flags
+policy/                    published policy models, loader, evaluator, store
+tools/normalizers/         canonical action normalization
+tiers/tier_1/              deterministic policy tier
+tiers/tier_2/              semantic/retrieval boundary placeholder
+tiers/tier_3/              Gemini structured LLM judge
+enforcement/combiner.py    deterministic final combiner
+```
+
+Tier 3 produces structured evidence and recommendations. The combiner owns enforcement
+and prevents Tier 3 from weakening deterministic block or approval outcomes.
 
 ### `apps/openclaw_trace_agents/`
 

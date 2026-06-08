@@ -36,6 +36,7 @@ Runtime-specific proposed tool call
     -> runtime adapter or trace adapter
     -> AgentGuardTraceV1
     -> AgentGuardFirewallV1
+    -> optional AgentGuardFirewallV2 tiered evaluation
     -> TraceFeatureV1
     -> GuardScoreV1
     -> GuardDecisionV1
@@ -75,6 +76,8 @@ and implemented in [src/agentguard/tracing/schema_v1.py](src/agentguard/tracing/
 | Trace store | `src/agentguard/tracing/trace_store.py` | Persists v1 traces, features, scores, decisions, live events, labels, and session state to local JSONL/JSON. |
 | Tool registry | `src/agentguard/runtime/tool_registry.py` | Stores tool domain, side-effect, confirmation, and risk metadata. |
 | Google ADK adapter | `src/agentguard/runtime/google_adk_adapter.py` | Live ADK trace session, tool metadata mapping, firewall call, runtime policy mapping, and lifecycle events. |
+| FirewallV2 tiers | `src/agentguard/firewall_v2/tiers/` | Tier 1 deterministic policy, Tier 2 boundary, and Gemini-backed Tier 3 judge evidence. |
+| V2 combiner | `src/agentguard/firewall_v2/enforcement/combiner.py` | Deterministically combines tier recommendations without allowing Tier 3 to weaken hard policy. |
 | V1 feature builder | `src/agentguard/governance/feature_builder_v1.py` | Derives policy/context/retrieval/statistical feature records from traces. |
 | V1 scoring | `src/agentguard/governance/scoring_v1.py` | Computes step and cumulative risk scores with placeholder formulas. |
 | V1 decision policy | `src/agentguard/governance/decision_policy_v1.py` | Maps scores and hard policy signals to verdicts. |
@@ -117,6 +120,19 @@ make demo
 
 Open `http://127.0.0.1:5173`. The deterministic local dataset is initialized
 automatically and does not require Gemini, Gmail, Docker, or Elastic credentials.
+
+For the live ADK/V2 Tier 3 path, configure:
+
+```bash
+GOOGLE_API_KEY=...
+AGENTGUARD_FIREWALL_MODE=v2
+AGENTGUARD_TIER_1_ENABLED=true
+AGENTGUARD_TIER_3_ENABLED=true
+AGENTGUARD_TIER3_ENFORCEMENT_ENABLED=false
+```
+
+For central team testing, set `AGENTGUARD_MOCK_PIPELINE_ONLY=true` so the guard
+pipeline logs decisions without executing tools.
 
 Reset the demo dataset:
 
@@ -177,6 +193,33 @@ AGENTGUARD_ENV_FILE=.env.elastic python3 scripts/query_elastic_traces.py --size 
 ```
 
 See [docs/elastic_storage.md](docs/elastic_storage.md).
+
+## Central Team Deployment
+
+The simplest hosted setup is two Render services:
+
+```text
+agentguard-api  FastAPI web service
+agentguard-web  React/Vite static site
+```
+
+Backend start command:
+
+```bash
+python -m uvicorn agentguard.api.app:app --host 0.0.0.0 --port $PORT
+```
+
+Frontend settings:
+
+```text
+Root directory: apps/web
+Build command: npm install && npm run build
+Publish directory: dist
+```
+
+Add a static-site rewrite from `/api/*` to the backend `/api/*`, then add the SPA
+fallback from `/*` to `/index.html`. Keep `AGENTGUARD_MOCK_PIPELINE_ONLY=true` for
+shared testing unless the deployment is intentionally allowed to execute tools.
 
 The database workspace lives under [data/elastic](data/elastic). It contains checked-in
 mapping snapshots, reusable query bodies, database inspection notebooks, and ignored

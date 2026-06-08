@@ -11,8 +11,10 @@ from uuid import uuid4
 from agentguard.control_plane.models import RuntimeIdentity
 from agentguard.core.enums import ToolRiskLevel
 from agentguard.core.models import ExecutedToolCall
+from agentguard.firewall_v2.config import FirewallV2RuntimeConfig
 from agentguard.firewall_v2.engine import AgentGuardFirewallV2
 from agentguard.firewall_v2.models import FirewallMode, FirewallV2Evaluation
+from agentguard.firewall_v2.tiers.tier_3.judge import LlmJudgeProvider
 from agentguard.governance.decision_policy_v1 import DecisionPolicyV1
 from agentguard.governance.firewall_v1 import AgentGuardFirewallV1, FirewallResultV1
 from agentguard.runtime.tool_registry import ToolMetadata
@@ -63,6 +65,8 @@ class GoogleADKTraceSession:
         runtime_identity: RuntimeIdentity | None = None,
         force_block: bool = False,
         firewall_mode: FirewallMode = "v1",
+        runtime_config: FirewallV2RuntimeConfig | None = None,
+        tier_3_provider: LlmJudgeProvider | None = None,
     ):
         self.session_id = session_id
         self.agent_id = agent_id
@@ -90,9 +94,14 @@ class GoogleADKTraceSession:
         self.pending_results: dict[str, FirewallResultV1] = {}
         self.firewall_mode = firewall_mode
         self.force_block = force_block
+        self.runtime_config = runtime_config or FirewallV2RuntimeConfig.from_env()
         self.firewall_v2 = (
-            AgentGuardFirewallV2(mode=firewall_mode)
-            if firewall_mode in {"v2_shadow", "v2"}
+            AgentGuardFirewallV2(
+                mode=firewall_mode,
+                runtime_config=self.runtime_config,
+                tier_3_provider=tier_3_provider,
+            )
+            if firewall_mode in {"v2_shadow", "v2"} or self.runtime_config.tier_3_enabled
             else None
         )
 
@@ -454,6 +463,7 @@ def _decision_from_v2(
     if recommendation not in {"allow", "require_approval", "block"}:
         recommendation = "block"
     policy = evaluation.policy_evaluation or {}
+    combined = evaluation.combined_decision or {}
     matched_rules = policy.get("matched_rules") or []
     rule_ids = [
         str(rule.get("rule_id"))
@@ -477,7 +487,7 @@ def _decision_from_v2(
             "decision_rules_fired": rule_ids,
             "explanation": (
                 f"FirewallV2 enforced {recommendation}. "
-                f"{policy.get('explanation') or evaluation.explanation}"
+                f"{'; '.join(combined.get('reasons') or []) or policy.get('explanation') or evaluation.explanation}"
             ),
         }
     )

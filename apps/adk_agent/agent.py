@@ -89,6 +89,15 @@ FAIL_ON_ELASTIC_ERROR = os.environ.get(
     "yes",
     "on",
 }
+MOCK_PIPELINE_ONLY = os.environ.get(
+    "AGENTGUARD_MOCK_PIPELINE_ONLY",
+    os.environ.get("AGENTGUARD_MOCK_RUN", "false"),
+).lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 _firewall_mode = os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1").lower()
 FIREWALL_MODE: FirewallMode = (
     cast(FirewallMode, _firewall_mode)
@@ -216,13 +225,17 @@ def _before_tool_callback(tool, args: dict[str, Any], tool_context):
     )
     runtime_policy = adk_runtime_policy(result.decision.decision)
 
-    should_stop = runtime_policy == "block" or (
+    should_stop = MOCK_PIPELINE_ONLY or runtime_policy == "block" or (
         runtime_policy == "require_approval" and ENFORCE_APPROVAL
     )
     if should_stop:
         is_approval = runtime_policy == "require_approval"
         blocked_response = {
             "error": (
+                "AgentGuard mock pipeline mode is enabled. The full guard pipeline "
+                "was evaluated and logged, but the tool was not executed."
+                if MOCK_PIPELINE_ONLY
+                else
                 "AgentGuard requires approval for this tool call. Approval UI is not "
                 "implemented yet, so the tool was not executed."
                 if is_approval
@@ -230,6 +243,7 @@ def _before_tool_callback(tool, args: dict[str, Any], tool_context):
             ),
             "approval_required": is_approval,
             "blocked_by_agentguard": True,
+            "mock_pipeline_only": MOCK_PIPELINE_ONLY,
             "tool_name": tool_name,
             "runtime_policy": runtime_policy,
             "firewall_decision": result.decision.decision,
