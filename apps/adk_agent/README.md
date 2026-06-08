@@ -161,6 +161,44 @@ headers = { Authorization = "Bearer ${PROJECT_MCP_TOKEN}" }
 HTTP server readiness currently verifies that the configuration is valid; the
 actual network connection is established by ADK when the toolset is used.
 
+### Open-source Google Workspace MCP Server
+
+The checked-in registry runs Google's open-source
+[`gemini-cli-extensions/workspace`](https://github.com/gemini-cli-extensions/workspace)
+server through `npx`. It works with normal Google accounts and does not depend
+on the Developer Preview-only `*mcp.googleapis.com` endpoints.
+
+One MCP process exposes Gmail, Calendar, Drive, and Chat. Tools are
+self-discovered under names such as:
+
+```text
+workspace_calendar_listEvents
+workspace_drive_search
+workspace_gmail_search
+workspace_chat_listSpaces
+```
+
+The existing Docker Gmail server remains available under `gmail_local_*`.
+
+The first Workspace tool call opens Google's authorization page in your
+browser. Complete sign-in there; the server stores and refreshes credentials
+through macOS Keychain under `gemini-cli-workspace-oauth`. Later agent runs
+reuse that credential without ADK-specific OAuth configuration.
+
+The package is pinned to `v0.0.8` in `config/adk_mcp_servers.toml`. Its first
+startup can take longer while `npx` downloads and builds the package.
+
+The checked-in `WORKSPACE_FEATURE_OVERRIDES` disables Docs, People, Slides,
+Sheets, Time, and Tasks so only the requested Gmail, Calendar, Drive, and Chat
+services are exposed. Their read and write feature groups remain enabled, so
+Google may request broad write scopes. AgentGuard still requires approval for
+discovered write and destructive tools; the terminal demo blocks those actions
+because it does not yet have an approval UI.
+
+To sign in with another account, stop the agent, open **Keychain Access**, find
+the `gemini-cli-workspace-oauth` item, delete it, and invoke a Workspace tool
+again.
+
 ### Secrets and Environment Variables
 
 Use `${VARIABLE_NAME}` anywhere inside stdio commands, arguments, environment
@@ -236,13 +274,13 @@ Common failures:
 | Unknown tool requires approval | Its behavior was ambiguous, so AgentGuard conservatively requires approval. |
 | Server marked ready but HTTP call fails | Check endpoint reachability, authentication headers, and remote server logs. |
 
-### Gmail Example
+### Local Gmail Example
 
-The checked-in registry includes an enabled Gmail Docker configuration. Gmail
+The checked-in registry includes an enabled local Gmail Docker configuration. Gmail
 read, draft, update, delete, reply, and other tools are discovered
 automatically. Build and authenticate its Docker image, ensure the `mcp-gmail`
 Docker volume contains the OAuth files, and start Docker before running the
-agent.
+agent. Its tools use the `gmail_local_*` prefix.
 
 Gmail send and reply tools are naturally inferred as external writes and require
 approval. Because this terminal demo has no approval UI, those actions are

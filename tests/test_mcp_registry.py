@@ -87,6 +87,17 @@ def test_adk_builds_one_unfiltered_toolset_per_ready_server(tmp_path):
     assert all(toolset.tool_filter is None for toolset in toolsets)
 
 
+def test_checked_in_workspace_server_uses_pinned_open_source_stdio_package():
+    registry = McpRegistry.load("config/adk_mcp_servers.toml")
+    workspace = next(server for server in registry.servers if server.id == "workspace")
+
+    assert workspace.transport == "stdio"
+    assert workspace.prefix == "workspace"
+    assert workspace.stdio_command == "npx"
+    assert "--package=github:gemini-cli-extensions/workspace#v0.0.8" in workspace.stdio_args
+    assert "WORKSPACE_FEATURE_OVERRIDES" in workspace.stdio_env
+
+
 def test_discovered_tools_infer_metadata_from_annotations_and_names(tmp_path):
     registry = _load_registry(
         tmp_path,

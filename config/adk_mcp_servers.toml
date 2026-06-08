@@ -2,8 +2,8 @@
 # Environment references such as "${TOKEN}" are resolved at startup.
 
 [[servers]]
-id = "gmail"
-prefix = "gmail"
+id = "gmail_local"
+prefix = "gmail_local"
 enabled = true
 transport = "stdio"
 
@@ -19,3 +19,19 @@ args = [
   "agentguard-gmail-mcp:artymclabin",
 ]
 
+[[servers]]
+id = "workspace"
+prefix = "workspace"
+enabled = true
+transport = "stdio"
+
+[servers.stdio]
+command = "npx"
+args = [
+  "-y",
+  "--package=github:gemini-cli-extensions/workspace#v0.0.8",
+  "gemini-workspace-server",
+]
+
+[servers.stdio.env]
+WORKSPACE_FEATURE_OVERRIDES = "docs.read:off,docs.write:off,people.read:off,slides.read:off,slides.write:off,sheets.read:off,sheets.write:off,time.read:off,tasks.read:off,tasks.write:off"
