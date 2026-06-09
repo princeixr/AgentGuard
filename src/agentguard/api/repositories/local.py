@@ -35,6 +35,10 @@ class LocalDashboardRepository:
         self.root = Path(root)
         self.namespace = namespace
         self.fallback_reason = fallback_reason
+        self._model_cache: dict[
+            tuple[str, type[BaseModel]],
+            tuple[tuple[int, int] | None, list[BaseModel]],
+        ] = {}
 
     @property
     def namespace_root(self) -> Path:
@@ -90,7 +94,23 @@ class LocalDashboardRepository:
         return json.loads(path.read_text(encoding="utf-8"))
 
     def _load_models(self, name: str, model_type: type[ModelT]) -> list[ModelT]:
-        return [
+        path = self.namespace_root / name
+        signature = _file_signature(path)
+        cache_key = (name, model_type)
+        cached = self._model_cache.get(cache_key)
+        if cached is not None and cached[0] == signature:
+            return list(cached[1])
+        models = [
             model_type.model_validate(record)
-            for record in load_jsonl(self.namespace_root / name)
+            for record in load_jsonl(path)
         ]
+        self._model_cache[cache_key] = (signature, models)
+        return list(models)
+
+
+def _file_signature(path: Path) -> tuple[int, int] | None:
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return None
+    return stat.st_mtime_ns, stat.st_size

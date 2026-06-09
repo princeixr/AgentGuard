@@ -57,6 +57,9 @@ SENSITIVE_PREFIXES = (
     "~/.aws",
     "~/.config/gcloud",
     "~/Library/Keychains",
+    "~/Library/LaunchAgents",
+    "/Library/LaunchAgents",
+    "/Library/LaunchDaemons",
     "/etc",
 )
 CONTROL_PATTERNS = (
@@ -196,18 +199,6 @@ class ShellNormalizerV1:
                 reversible=True,
                 impact="low",
             )
-        if command_name in READ_COMMANDS:
-            return self._action(
-                trace,
-                command,
-                operation="read",
-                capabilities=["filesystem.read"],
-                arguments=arguments,
-                flags=flags,
-                side_effect=False,
-                reversible=True,
-                impact="low",
-            )
         if command_name in WRITE_COMMANDS or has_redirection:
             resources = _path_resources(
                 _redirection_targets(tokens) if has_redirection else arguments,
@@ -225,6 +216,18 @@ class ShellNormalizerV1:
                 reversible=True,
                 impact="medium",
                 confidence=0.9 if has_redirection else 1.0,
+            )
+        if command_name in READ_COMMANDS:
+            return self._action(
+                trace,
+                command,
+                operation="read",
+                capabilities=["filesystem.read"],
+                arguments=arguments,
+                flags=flags,
+                side_effect=False,
+                reversible=True,
+                impact="low",
             )
         if command_name in EXECUTE_COMMANDS or command.startswith("./"):
             return self._action(

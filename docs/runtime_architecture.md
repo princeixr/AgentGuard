@@ -76,12 +76,18 @@ Tier execution is controlled independently:
 
 ```text
 AGENTGUARD_TIER_1_ENABLED=true
+AGENTGUARD_AGENTTRUST_SHELL_ENABLED=true
 AGENTGUARD_TIER_2_ENABLED=false
 AGENTGUARD_TIER_3_ENABLED=false
 AGENTGUARD_TIER3_ENFORCEMENT_ENABLED=false
 AGENTGUARD_TIER_CONFIDENCE_THRESHOLD=0.75
 AGENTGUARD_TIER3_MODEL=gemini-2.5-flash
 ```
+
+Tier 1 combines the versioned AgentGuard policy with stateless AgentTrust v0.5.0
+analysis for shell tools. `allow` cannot override a stricter result; AgentTrust
+`warn` and `review` map to `require_approval`, and provider failures fail closed to
+approval.
 
 Tier 3 uses Gemini through `google-genai` and requires `GOOGLE_API_KEY` when enabled.
 It returns structured evidence, not direct execution authority. The deterministic

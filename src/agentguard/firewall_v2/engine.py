@@ -10,7 +10,10 @@ from agentguard.firewall_v2.models import FirewallMode, FirewallV2Evaluation, V2
 from agentguard.firewall_v2.policy.loader import LoadedPolicy, PolicyLoader
 from agentguard.firewall_v2.policy.resolver import resolve_demo_policy
 from agentguard.firewall_v2.tiers.models import TierResultV1
-from agentguard.firewall_v2.tiers.tier_1 import Tier1DeterministicEvaluator
+from agentguard.firewall_v2.tiers.tier_1 import (
+    AgentTrustShellProvider,
+    Tier1DeterministicEvaluator,
+)
 from agentguard.firewall_v2.tiers.tier_2 import Tier2SemanticEvaluator
 from agentguard.firewall_v2.tiers.tier_3 import Tier3LlmJudge
 from agentguard.firewall_v2.tiers.tier_3.judge import LlmJudgeProvider, build_judge_input
@@ -27,6 +30,7 @@ class AgentGuardFirewallV2:
         loaded_policy: LoadedPolicy | None = None,
         runtime_config: FirewallV2RuntimeConfig | None = None,
         tier_3_provider: LlmJudgeProvider | None = None,
+        agenttrust_provider: AgentTrustShellProvider | None = None,
         descriptor_resolver: Callable[[str], ToolDescriptorV1] | None = None,
     ):
         self.mode = mode
@@ -34,6 +38,7 @@ class AgentGuardFirewallV2:
         self._policy_loader = PolicyLoader()
         self.runtime_config = runtime_config or FirewallV2RuntimeConfig.from_env()
         self._tier_3_provider = tier_3_provider
+        self._agenttrust_provider = agenttrust_provider or AgentTrustShellProvider()
         self._descriptor_resolver = descriptor_resolver
 
     def evaluate(self, trace: AgentGuardTraceV1) -> FirewallV2Evaluation:
@@ -68,8 +73,11 @@ class AgentGuardFirewallV2:
         )
         normalized_action = normalize_tool_call(trace, descriptor)
         policy_evaluation, tier_1_result = Tier1DeterministicEvaluator(
-            loaded_policy
+            loaded_policy,
+            agenttrust_shell_enabled=self.runtime_config.agenttrust_shell_enabled,
+            agenttrust_provider=self._agenttrust_provider,
         ).evaluate(
+            trace,
             descriptor,
             normalized_action,
         )
@@ -140,8 +148,8 @@ class AgentGuardFirewallV2:
                     name="tier_1",
                     status="completed" if self.runtime_config.tier_1_enabled else "skipped",
                     detail=(
-                        "Deterministic policy precedence produced the current "
-                        f"recommendation: {policy_evaluation.recommendation}."
+                        "Deterministic policy and shell-security precedence produced "
+                        f"the current recommendation: {tier_1_result.recommendation}."
                     ),
                 ),
                 *_tier_stage_results(tier_results),

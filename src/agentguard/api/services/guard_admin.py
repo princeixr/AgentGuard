@@ -75,6 +75,28 @@ def guard_admin_status(agent_id: str) -> GuardAdminStatus:
             ),
         ),
         GuardAdminComponent(
+            component_id="agenttrust_shell",
+            name="AgentTrust shell security",
+            layer="Tier 1 provider",
+            status=(
+                "operational"
+                if runtime_config.agenttrust_shell_enabled
+                else "observe_only"
+            ),
+            summary=(
+                "The real AgentTrust v0.5.0 deterministic interceptor evaluates every "
+                "shell proposal using stateless command-risk and policy checks."
+                if runtime_config.agenttrust_shell_enabled
+                else "AgentTrust shell analysis is implemented but disabled for this process."
+            ),
+            management=(
+                "ALLOW maps to allow; BLOCK remains a strict block; WARN, REVIEW, "
+                "unknown results, and provider failures require approval. The pinned "
+                "254-case shell benchmark records 92.1% AgentTrust verdict agreement "
+                "and zero dangerous false allows after AgentGuard policy combination."
+            ),
+        ),
+        GuardAdminComponent(
             component_id="intent_contract",
             name="Intent contract",
             layer="V2 authorization",
@@ -88,11 +110,12 @@ def guard_admin_status(agent_id: str) -> GuardAdminStatus:
             layer="Evaluation",
             status="operational",
             summary=(
-                "Tool descriptors, normalized shell actions, policy defaults, matched "
-                "rules, and restrictive precedence produce the V2 decision."
+                "Central policy and deterministic security-provider results are combined "
+                "using most-restrictive precedence."
             ),
             management=(
-                "Enforced in v2 mode and recorded without enforcement in v2_shadow."
+                "A policy or AgentTrust block cannot be downgraded. Approval requirements "
+                "cannot be downgraded to allow."
             ),
         ),
         GuardAdminComponent(
@@ -122,6 +145,20 @@ def guard_admin_status(agent_id: str) -> GuardAdminStatus:
                 "Controlled by AGENTGUARD_TIER_3_ENABLED and "
                 "AGENTGUARD_TIER3_ENFORCEMENT_ENABLED. Deterministic policy remains "
                 "non-overridable."
+            ),
+        ),
+        GuardAdminComponent(
+            component_id="decision_combiner",
+            name="Deterministic decision combiner",
+            layer="Enforcement",
+            status="operational",
+            summary=(
+                "Tier results are reduced to allow, require approval, or block with "
+                "deterministic precedence and recorded decision ownership."
+            ),
+            management=(
+                "In v2 mode the combined decision controls execution. Model-based tiers "
+                "cannot override deterministic policy or shell-security blocks."
             ),
         ),
         GuardAdminComponent(
@@ -162,8 +199,9 @@ def guard_admin_status(agent_id: str) -> GuardAdminStatus:
             "V1 risk and threshold logic can determine the outcome."
         )
     warnings.append(
-        "Metadata-driven normalization is active. Intent contracts, Tier 2 semantic "
-        "analysis, approval resume, and declarative descriptor overrides remain incomplete."
+        "Metadata-driven normalization and AgentTrust shell security are active. Intent "
+        "contracts, Tier 2 semantic analysis, approval resume, and declarative descriptor "
+        "overrides remain incomplete."
     )
     return GuardAdminStatus(
         agent_id=agent_id,

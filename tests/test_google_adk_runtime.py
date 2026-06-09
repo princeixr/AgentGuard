@@ -360,7 +360,12 @@ def test_guard_admin_status_does_not_claim_unimplemented_v2_controls(monkeypatch
     assert components["normalization"].status == "operational"
     assert "metadata-driven normalizer" in components["normalization"].summary
     assert components["intent_contract"].status == "not_implemented"
+    assert components["agenttrust_shell"].status == "operational"
+    assert "AgentTrust v0.5.0" in components["agenttrust_shell"].summary
+    assert "92.1%" in components["agenttrust_shell"].management
     assert components["tier_1"].status == "operational"
+    assert components["decision_combiner"].status == "operational"
+    assert components["approval_resume"].status == "not_implemented"
 
 
 def test_personal_assistant_policy_loads_with_expected_scope():

@@ -25,12 +25,15 @@ import { DEMO_AGENT_ID } from "../../config/demo";
 const FLOW_IDS = [
   "interception",
   "tool_descriptors",
-  "policy_engine",
   "normalization",
+  "policy_engine",
   "intent_contract",
+  "agenttrust_shell",
   "tier_1",
   "tier_2",
   "tier_3",
+  "decision_combiner",
+  "approval_resume",
   "v2_shadow",
 ];
 

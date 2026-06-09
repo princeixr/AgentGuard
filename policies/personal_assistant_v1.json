@@ -1,7 +1,7 @@
 {
   "schema_version": "agentguard.policy.v1",
   "policy_id": "pol_personal_assistant",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "name": "Personal Assistant Safety Policy",
   "description": "Capability guardrails for a laptop-resident personal assistant with terminal, communication, scheduling, workspace, search, and future payment access.",
   "status": "published",
@@ -184,6 +184,9 @@
             "~/.aws",
             "~/.config/gcloud",
             "~/Library/Keychains",
+            "~/Library/LaunchAgents",
+            "/Library/LaunchAgents",
+            "/Library/LaunchDaemons",
             "/etc"
           ]
         }

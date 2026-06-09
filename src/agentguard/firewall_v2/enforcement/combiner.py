@@ -38,6 +38,10 @@ class DecisionCombinerV1:
         tier_results: list[TierResultV1],
     ) -> CombinedDecisionV1:
         tier_ids = [result.tier_result_id for result in tier_results]
+        tier_1 = next(
+            (result for result in tier_results if result.tier == "tier_1"),
+            None,
+        )
         if policy_evaluation.recommendation == "block":
             return CombinedDecisionV1(
                 final_decision="block",
@@ -46,6 +50,17 @@ class DecisionCombinerV1:
                 reasons=[
                     "Deterministic policy recommended block and is non-overridable.",
                     policy_evaluation.explanation,
+                ],
+                tier_result_ids=tier_ids,
+            )
+        if tier_1 is not None and tier_1.recommendation == "block":
+            return CombinedDecisionV1(
+                final_decision="block",
+                enforced_by="tier_1_deterministic_security",
+                confidence=tier_1.confidence,
+                reasons=[
+                    "A deterministic Tier 1 security provider recommended block.",
+                    tier_1.explanation,
                 ],
                 tier_result_ids=tier_ids,
             )
@@ -60,11 +75,26 @@ class DecisionCombinerV1:
                 ],
                 tier_result_ids=tier_ids,
             )
+        if tier_1 is not None and tier_1.recommendation == "require_approval":
+            return CombinedDecisionV1(
+                final_decision="require_approval",
+                enforced_by="tier_1_deterministic_security",
+                confidence=tier_1.confidence,
+                reasons=[
+                    "A deterministic Tier 1 security provider requires approval.",
+                    tier_1.explanation,
+                ],
+                tier_result_ids=tier_ids,
+            )
         if not self.tier_3_enforcement_enabled:
             return CombinedDecisionV1(
-                final_decision=policy_evaluation.recommendation,
-                enforced_by="tier_1_deterministic_policy",
-                confidence=0.85,
+                final_decision=(
+                    tier_1.recommendation
+                    if tier_1 is not None and tier_1.recommendation != "not_available"
+                    else policy_evaluation.recommendation
+                ),
+                enforced_by="tier_1_deterministic_security",
+                confidence=tier_1.confidence if tier_1 is not None else 0.85,
                 reasons=[
                     "Tier 3 enforcement is disabled; using deterministic recommendation."
                 ],

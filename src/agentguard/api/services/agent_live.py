@@ -32,13 +32,15 @@ class AgentLiveRuntimeService:
         self._states: dict[str, CurrentInterception] = {}
         self._seen_event_ids: set[str] = set()
         self._monitor_task: asyncio.Task | None = None
+        self._initialized = False
 
     def current(self, agent_id: str) -> CurrentInterception:
+        self._initialize_from_history()
         self._consume_new_events()
         state = self._states.get(agent_id)
         if state is not None:
             return state
-        return self._state_from_history(agent_id)
+        return self._idle_state(agent_id)
 
     async def subscribe(self, agent_id: str):
         subscription = self.broker.subscribe()
@@ -68,6 +70,7 @@ class AgentLiveRuntimeService:
             self._monitor_task = asyncio.create_task(self._monitor())
 
     async def _monitor(self) -> None:
+        self._initialize_from_history()
         while True:
             try:
                 for event in self._new_events():
@@ -94,6 +97,7 @@ class AgentLiveRuntimeService:
             await asyncio.sleep(self.poll_interval_seconds)
 
     def _consume_new_events(self) -> list[LiveEventV1]:
+        self._initialize_from_history()
         new_events = self._new_events()
         for event in new_events:
             self._seen_event_ids.add(event.event_id)
@@ -105,6 +109,18 @@ class AgentLiveRuntimeService:
         return [
             event for event in events if event.event_id not in self._seen_event_ids
         ]
+
+    def _initialize_from_history(self) -> None:
+        if self._initialized:
+            return
+        events = sorted(self.repository.live_events(), key=lambda item: item.timestamp)
+        self._seen_event_ids.update(event.event_id for event in events)
+        latest_by_agent: dict[str, LiveEventV1] = {}
+        for event in events:
+            latest_by_agent[event.agent_id] = event
+        for event in latest_by_agent.values():
+            self._apply_event(event)
+        self._initialized = True
 
     def _apply_event(self, event: LiveEventV1) -> None:
         detail = None
@@ -154,27 +170,14 @@ class AgentLiveRuntimeService:
             detail=detail,
         )
 
-    def _state_from_history(self, agent_id: str) -> CurrentInterception:
-        events = [
-            event
-            for event in self.repository.live_events()
-            if event.agent_id == agent_id
-        ]
-        if not events:
-            return CurrentInterception(
-                status="idle",
-                event_source="google_adk_runtime",
-                firewall_mode=os.environ.get("AGENTGUARD_FIREWALL_MODE", "v2"),
-                guard_version=_guard_version(),
-                agent_id=agent_id,
-            )
-        latest_session = max(events, key=lambda item: item.timestamp).session_id
-        for event in sorted(
-            (item for item in events if item.session_id == latest_session),
-            key=lambda item: item.timestamp,
-        ):
-            self._apply_event(event)
-        return self._states[agent_id]
+    def _idle_state(self, agent_id: str) -> CurrentInterception:
+        return CurrentInterception(
+            status="idle",
+            event_source="google_adk_runtime",
+            firewall_mode=os.environ.get("AGENTGUARD_FIREWALL_MODE", "v2"),
+            guard_version=_guard_version(),
+            agent_id=agent_id,
+        )
 
 
 def _guard_version() -> str:
