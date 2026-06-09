@@ -31,7 +31,7 @@ const FLOW_IDS = [
   "tier_1",
   "tier_2",
   "tier_3",
-  "firewall_v1",
+  "v2_shadow",
 ];
 
 export function GuardAdminPage() {
@@ -161,7 +161,7 @@ export function GuardAdminPage() {
             <h2 className="mt-2 text-2xl font-bold">Firewall architecture</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
               This page reports the actual implementation state for the selected
-              agent. Policy edits are validated and published to the V2 backend;
+              agent. Policy edits are validated and published to FirewallV2;
               unfinished controls remain read-only.
             </p>
           </div>
@@ -274,10 +274,27 @@ export function GuardAdminPage() {
                   <StatusBadge value={tool.metadata_status} />
                 </div>
                 <div className="mt-3 grid grid-cols-3 text-xs text-[var(--ink-muted)]">
-                  <span>Impact: {tool.impact}</span>
+                  <span>Action: {tool.domain}.{tool.operation}</span>
                   <span>Normalizer: {tool.normalizer}</span>
-                  <span>Provider: {tool.provider}</span>
+                  <span>
+                    Confidence: {Math.round(tool.metadata_confidence * 100)}%
+                  </span>
                 </div>
+                {Object.keys(tool.argument_roles).length > 0 && (
+                  <div className="mt-3 border-t border-[var(--border)] pt-3">
+                    <div className="eyebrow">Argument roles</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {Object.entries(tool.argument_roles).map(([role, fields]) => (
+                        <code
+                          className="rounded bg-blue-50 px-2 py-1 text-[10px] text-blue-800"
+                          key={role}
+                        >
+                          {role}: {fields.join(", ")}
+                        </code>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -326,7 +343,7 @@ export function GuardAdminPage() {
             </div>
             <div className="mt-3 rounded border border-amber-300 bg-[var(--amber-bg)] px-4 py-3 text-xs leading-5">
               Changes affect FirewallV2 recommendations on the next interception.
-              FirewallV1 still controls execution in <code>v2_shadow</code>.
+              In <code>v2</code> mode, the published policy controls execution.
             </div>
             <textarea
               aria-label="Policy JSON"

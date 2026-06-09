@@ -199,6 +199,148 @@ def test_tool_descriptors_mark_known_and_unknown_tools_truthfully():
     assert unknown.metadata_status == "unsupported"
 
 
+def test_metadata_driven_structured_tool_flows_through_v2_policy(tmp_path):
+    from agentguard.runtime.mcp_registry import (
+        McpServerConfig,
+        infer_discovered_mcp_metadata,
+    )
+
+    server = McpServerConfig(
+        id="mail",
+        prefix="mail",
+        enabled=True,
+        transport="stdio",
+        stdio_command="python",
+    )
+    metadata = infer_discovered_mcp_metadata(
+        tool_name="mail_send_email",
+        server=server,
+        raw_tool_name="send_email",
+        description="Send an email message to recipients.",
+        input_schema={
+            "type": "object",
+            "required": ["to", "body"],
+            "properties": {
+                "to": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Recipient email addresses.",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "Message body content.",
+                },
+            },
+        },
+    )
+    session = GoogleADKTraceSession(
+        session_id="structured_v2",
+        agent_id=DEMO_AGENT_ID,
+        available_tools=["mail_send_email"],
+        trace_store=TraceStore(root_dir=tmp_path / "traces"),
+        namespace="google_adk_test",
+        tool_metadata={"mail_send_email": metadata},
+        firewall_mode="v2",
+    )
+    session.start_turn("Send the payroll summary to finance@example.com.")
+
+    result = session.record_tool_call(
+        "mail_send_email",
+        {
+            "to": ["finance@example.com"],
+            "body": "Payroll account information is attached.",
+        },
+        call_id="call_send",
+    )
+
+    assert result.decision.decision == "require_approval"
+    events = load_jsonl(
+        tmp_path / "traces" / "v1" / "google_adk_test" / "live_events.jsonl"
+    )
+    evaluation = next(
+        event["payload"]["evaluation"]
+        for event in events
+        if event["event_type"] == "firewall_v2_evaluated"
+    )
+    descriptor = evaluation["tool_descriptor"]
+    action = evaluation["normalized_action"]
+    assert descriptor["normalizer"] == "structured_v1"
+    assert descriptor["capabilities"] == ["email.send", "communication.send"]
+    assert action["operation"] == "send"
+    assert action["destinations"][0]["value"] == "finance@example.com"
+    assert "financial" in action["data_classes"]
+    assert {
+        rule["rule_id"]
+        for rule in evaluation["policy_evaluation"]["matched_rules"]
+    } == {
+        "approve_external_communication",
+        "approve_untrusted_email_destinations",
+    }
+
+
+def test_metadata_driven_payment_extracts_resource_and_estimated_value(tmp_path):
+    from agentguard.runtime.mcp_registry import (
+        McpServerConfig,
+        infer_discovered_mcp_metadata,
+    )
+
+    server = McpServerConfig(
+        id="wallet",
+        prefix="wallet",
+        enabled=True,
+        transport="stdio",
+        stdio_command="python",
+    )
+    metadata = infer_discovered_mcp_metadata(
+        tool_name="wallet_transfer_funds",
+        server=server,
+        raw_tool_name="transfer_funds",
+        description="Transfer a payment to a wallet account.",
+        input_schema={
+            "type": "object",
+            "required": ["account_id", "amount", "currency"],
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "description": "Destination account ID.",
+                },
+                "amount": {"type": "number", "description": "Payment amount."},
+                "currency": {"type": "string"},
+            },
+        },
+    )
+    session = GoogleADKTraceSession(
+        session_id="payment_v2",
+        agent_id=DEMO_AGENT_ID,
+        available_tools=["wallet_transfer_funds"],
+        trace_store=TraceStore(root_dir=tmp_path / "traces"),
+        namespace="google_adk_test",
+        tool_metadata={"wallet_transfer_funds": metadata},
+        firewall_mode="v2",
+    )
+    session.start_turn("Transfer 250 USD to account acct_42.")
+
+    result = session.record_tool_call(
+        "wallet_transfer_funds",
+        {"account_id": "acct_42", "amount": 250, "currency": "USD"},
+        call_id="call_payment",
+    )
+
+    assert result.decision.decision == "block"
+    events = load_jsonl(
+        tmp_path / "traces" / "v1" / "google_adk_test" / "live_events.jsonl"
+    )
+    action = next(
+        event["payload"]["evaluation"]["normalized_action"]
+        for event in events
+        if event["event_type"] == "firewall_v2_evaluated"
+    )
+    assert action["capabilities"] == ["payment.execute"]
+    assert action["resources"][0]["value"] == "acct_42"
+    assert action["estimated_value"] == 250.0
+    assert action["estimated_value_currency"] == "USD"
+
+
 def test_guard_admin_status_does_not_claim_unimplemented_v2_controls(monkeypatch):
     monkeypatch.setenv("AGENTGUARD_FIREWALL_MODE", "v2_shadow")
     status = guard_admin_status(DEMO_AGENT_ID)
@@ -216,9 +358,7 @@ def test_guard_admin_status_does_not_claim_unimplemented_v2_controls(monkeypatch
     assert components["v2_shadow"].status == "observe_only"
     assert components["policy_engine"].status == "operational"
     assert components["normalization"].status == "operational"
-    assert "Gmail and future MCP normalizers are not implemented yet" in (
-        components["normalization"].summary
-    )
+    assert "metadata-driven normalizer" in components["normalization"].summary
     assert components["intent_contract"].status == "not_implemented"
     assert components["tier_1"].status == "operational"
 
@@ -984,6 +1124,61 @@ def test_dashboard_query_uses_v2_effective_decision_for_replay(tmp_path):
     assert replay.steps[0].decision == "block"
     assert replay.steps[0].rules_fired == ["block_destructive_actions"]
     assert replay.steps[0].explanation.startswith("FirewallV2 enforced block")
+    guard = replay.steps[0].guard_evaluation
+    assert guard is not None
+    assert guard.firewall_mode == "v2"
+    assert guard.enforcement_status == "enforced"
+    assert guard.recommendation == "block"
+    assert guard.enforced_by == "tier_1_deterministic_policy"
+    assert guard.policy_id == "pol_personal_assistant"
+    assert [rule["rule_id"] for rule in guard.matched_rules] == [
+        "block_destructive_actions"
+    ]
+    assert guard.normalized_action["operation"] == "delete"
+    assert guard.tier_results[0]["tier"] == "tier_1"
+
+    memory = service.memory_detail(
+        result.trace.trace_id,
+        agent_id=result.trace.source.agent_id,
+    )
+    assert memory is not None
+    assert memory.item.guard_evaluation == guard
+
+
+def test_v2_blocks_recursive_folder_deletion(tmp_path):
+    session = _trace_session(tmp_path, firewall_mode="v2")
+    session.start_turn('Delete folder "abc" from the desktop.')
+
+    result = session.record_tool_call(
+        "run_shell_command",
+        {"command": "rm -rf ~/Desktop/abc"},
+        call_id="call_recursive_delete",
+    )
+
+    assert result.decision.decision == "block"
+    events = [
+        json.loads(line)
+        for line in (
+            tmp_path
+            / "traces"
+            / "v1"
+            / "google_adk_test"
+            / "live_events.jsonl"
+        )
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    evaluation = next(
+        event["payload"]["evaluation"]
+        for event in events
+        if event["event_type"] == "firewall_v2_evaluated"
+    )
+    assert evaluation["normalized_action"]["operation"] == "delete"
+    assert evaluation["normalized_action"]["capabilities"] == ["filesystem.delete"]
+    assert evaluation["policy_evaluation"]["recommendation"] == "block"
+    assert evaluation["policy_evaluation"]["matched_rules"][0]["rule_id"] == (
+        "block_destructive_actions"
+    )
 
 
 def test_google_adk_trace_session_records_tool_executed_event(tmp_path):

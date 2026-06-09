@@ -16,6 +16,7 @@ from agentguard.firewall_v2.config import FirewallV2RuntimeConfig
 from agentguard.firewall_v2.engine import AgentGuardFirewallV2
 from agentguard.firewall_v2.models import FirewallMode, FirewallV2Evaluation
 from agentguard.firewall_v2.tiers.tier_3.judge import LlmJudgeProvider
+from agentguard.firewall_v2.tools.registry import descriptor_for_tool
 from agentguard.governance.decision_policy_v1 import DecisionPolicyV1
 from agentguard.governance.firewall_v1 import AgentGuardFirewallV1, FirewallResultV1
 from agentguard.runtime.tool_registry import ToolMetadata
@@ -101,6 +102,10 @@ class GoogleADKTraceSession:
                 mode=firewall_mode,
                 runtime_config=self.runtime_config,
                 tier_3_provider=tier_3_provider,
+                descriptor_resolver=lambda tool_name: descriptor_for_tool(
+                    tool_name,
+                    self._metadata(tool_name),
+                ),
             )
             if firewall_mode in {"v2_shadow", "v2"} or self.runtime_config.tier_3_enabled
             else None
@@ -290,7 +295,7 @@ class GoogleADKTraceSession:
         trace: AgentGuardTraceV1,
         payload: dict[str, Any] | None = None,
     ) -> None:
-        self.trace_store.append_live_event_v1(
+        self.firewall.record_live_event(
             LiveEventV1(
                 event_id=str(uuid4()),
                 event_type=event_type,
@@ -303,8 +308,7 @@ class GoogleADKTraceSession:
                 deployment_id=trace.source.deployment_id,
                 integration_id=trace.source.integration_id,
                 payload=payload or {},
-            ),
-            namespace=self.namespace,
+            )
         )
 
     def _metadata(self, tool_name: str) -> ToolMetadata:

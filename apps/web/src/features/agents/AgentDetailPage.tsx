@@ -139,9 +139,12 @@ export function AgentDetailPage() {
                     ))}
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-3 text-[11px] text-[var(--ink-muted)]">
-                    <span>Impact: {tool.impact}</span>
+                    <span>Action: {tool.domain}.{tool.operation}</span>
                     <span>Normalizer: {tool.normalizer}</span>
-                    <span>Metadata: {tool.metadata_status}</span>
+                    <span>
+                      Metadata: {tool.metadata_status} ·{" "}
+                      {Math.round(tool.metadata_confidence * 100)}%
+                    </span>
                   </div>
                 </div>
               ))}
@@ -284,18 +287,30 @@ export function AgentDetailPage() {
                             <StatusBadge value={decision.decision} />
                           </div>
                           <div className="mt-2 text-xs text-[var(--ink-muted)]">
-                            Risk {Math.round(decision.risk_score * 100)} ·{" "}
+                            Decision score {Math.round(decision.risk_score * 100)} ·{" "}
                             {decision.explanation}
                           </div>
-                          <div className="mt-2 text-[11px] text-[var(--ink-muted)]">
-                            Enforced by <code>{decision.enforced_by}</code> · Mode{" "}
-                            <code>{decision.firewall_mode}</code>
-                          </div>
-                          {decision.v2_evaluation && (
+                          {decision.guard_evaluation && (
                             <div className="mt-3 rounded bg-[var(--surface-low)] p-3 text-xs">
-                              <div className="font-semibold">V2 shadow evaluation</div>
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="font-semibold">
+                                  FirewallV2 evaluation
+                                </div>
+                                <StatusBadge
+                                  value={decision.guard_evaluation.enforcement_status}
+                                />
+                              </div>
                               <div className="mt-1 text-[var(--ink-muted)]">
-                                {decision.v2_evaluation.explanation}
+                                {decision.guard_evaluation.explanation}
+                              </div>
+                              <div className="mt-2 text-[11px] text-[var(--ink-muted)]">
+                                Enforced by{" "}
+                                <code>{decision.guard_evaluation.enforced_by}</code>{" "}
+                                · Policy{" "}
+                                <code>
+                                  {decision.guard_evaluation.policy_id}@
+                                  {decision.guard_evaluation.policy_version}
+                                </code>
                               </div>
                             </div>
                           )}

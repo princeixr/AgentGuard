@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import sys
 import textwrap
 from types import SimpleNamespace
 
@@ -62,14 +64,14 @@ def test_adk_builds_one_unfiltered_toolset_per_ready_server(tmp_path):
 
     registry = _load_registry(
         tmp_path,
-        """
+        f"""
         [[servers]]
         id = "local"
         prefix = "local"
         enabled = true
         transport = "stdio"
         [servers.stdio]
-        command = "python"
+        command = {json.dumps(sys.executable)}
 
         [[servers]]
         id = "remote"
@@ -146,6 +148,52 @@ def test_discovered_tools_infer_metadata_from_annotations_and_names(tmp_path):
         "project_delete_item",
         "project_process_item",
     ]
+
+
+def test_discovered_tool_schema_generates_security_descriptor_metadata(tmp_path):
+    registry = _load_registry(
+        tmp_path,
+        """
+        [[servers]]
+        id = "mail"
+        prefix = "mail"
+        enabled = true
+        transport = "stdio"
+        [servers.stdio]
+        command = "python"
+        """,
+    )
+    metadata = registry.register_discovered_tool(
+        registry.servers[0],
+        _discovered_tool(
+            "send_email",
+            "Send an email message to recipients.",
+            input_schema={
+                "type": "object",
+                "required": ["to", "body"],
+                "properties": {
+                    "to": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Recipient email addresses.",
+                    },
+                    "subject": {"type": "string"},
+                    "body": {
+                        "type": "string",
+                        "description": "Message body content.",
+                    },
+                },
+            },
+        ),
+    )
+
+    assert metadata.operation == "send"
+    assert metadata.capabilities == ("email.send", "communication.send")
+    assert metadata.argument_roles["destinations"] == ("to",)
+    assert metadata.argument_roles["data"] == ("subject", "body")
+    assert metadata.required_arguments == ("to", "body")
+    assert metadata.metadata_confidence >= 0.7
+    assert "input_schema" in metadata.metadata_provenance
 
 
 @pytest.mark.parametrize(
@@ -316,6 +364,7 @@ def _discovered_tool(
     *,
     read_only: bool | None = None,
     destructive: bool | None = None,
+    input_schema: dict | None = None,
 ):
     annotations = SimpleNamespace(
         readOnlyHint=read_only,
@@ -325,4 +374,5 @@ def _discovered_tool(
         name=name,
         description=description,
         annotations=annotations,
+        inputSchema=input_schema or {},
     )

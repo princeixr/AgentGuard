@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from agentguard.firewall_v2.config import FirewallV2RuntimeConfig
 from agentguard.firewall_v2.enforcement import DecisionCombinerV1
 from agentguard.firewall_v2.models import FirewallMode, FirewallV2Evaluation, V2StageResult
@@ -13,6 +15,7 @@ from agentguard.firewall_v2.tiers.tier_2 import Tier2SemanticEvaluator
 from agentguard.firewall_v2.tiers.tier_3 import Tier3LlmJudge
 from agentguard.firewall_v2.tiers.tier_3.judge import LlmJudgeProvider, build_judge_input
 from agentguard.firewall_v2.tools.normalizers.registry import normalize_tool_call
+from agentguard.firewall_v2.tools.models import ToolDescriptorV1
 from agentguard.firewall_v2.tools.registry import descriptor_for_tool
 from agentguard.tracing.schema_v1 import AgentGuardTraceV1
 
@@ -24,12 +27,14 @@ class AgentGuardFirewallV2:
         loaded_policy: LoadedPolicy | None = None,
         runtime_config: FirewallV2RuntimeConfig | None = None,
         tier_3_provider: LlmJudgeProvider | None = None,
+        descriptor_resolver: Callable[[str], ToolDescriptorV1] | None = None,
     ):
         self.mode = mode
         self._fixed_policy = loaded_policy
         self._policy_loader = PolicyLoader()
         self.runtime_config = runtime_config or FirewallV2RuntimeConfig.from_env()
         self._tier_3_provider = tier_3_provider
+        self._descriptor_resolver = descriptor_resolver
 
     def evaluate(self, trace: AgentGuardTraceV1) -> FirewallV2Evaluation:
         try:
@@ -56,7 +61,11 @@ class AgentGuardFirewallV2:
 
     def _evaluate(self, trace: AgentGuardTraceV1) -> FirewallV2Evaluation:
         loaded_policy = self._fixed_policy or resolve_demo_policy(self._policy_loader)
-        descriptor = descriptor_for_tool(trace.proposed_tool_call.tool_name)
+        descriptor = (
+            self._descriptor_resolver(trace.proposed_tool_call.tool_name)
+            if self._descriptor_resolver is not None
+            else descriptor_for_tool(trace.proposed_tool_call.tool_name)
+        )
         normalized_action = normalize_tool_call(trace, descriptor)
         policy_evaluation, tier_1_result = Tier1DeterministicEvaluator(
             loaded_policy

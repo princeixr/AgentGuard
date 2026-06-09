@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
+from contextlib import suppress
 
 from agentguard.api.models import CurrentInterception, EventEnvelope
 from agentguard.api.repositories.base import DashboardRepository
@@ -13,6 +15,7 @@ from agentguard.tracing.schema_v1 import LiveEventV1
 
 INTERVENTION_DECISIONS = {"review", "require_approval", "block"}
 TERMINAL_EVENTS = {"tool_executed", "tool_blocked", "tool_failed"}
+logger = logging.getLogger(__name__)
 
 
 class AgentLiveRuntimeService:
@@ -38,10 +41,27 @@ class AgentLiveRuntimeService:
         return self._state_from_history(agent_id)
 
     async def subscribe(self, agent_id: str):
+        subscription = self.broker.subscribe()
+        pending_event = asyncio.create_task(anext(subscription))
+        # Async-generator setup is deferred until its first iteration. Let the
+        # broker register this subscriber before the monitor can publish.
+        await asyncio.sleep(0)
         self._ensure_monitor()
-        async for envelope in self.broker.subscribe():
-            if envelope.data.get("agent_id") == agent_id:
-                yield envelope
+        try:
+            yield EventEnvelope(
+                event="state",
+                data=self.current(agent_id).model_dump(mode="json"),
+            )
+            while True:
+                envelope = await pending_event
+                pending_event = asyncio.create_task(anext(subscription))
+                if envelope.data.get("agent_id") == agent_id:
+                    yield envelope
+        finally:
+            pending_event.cancel()
+            with suppress(asyncio.CancelledError):
+                await pending_event
+            await subscription.aclose()
 
     def _ensure_monitor(self) -> None:
         if self._monitor_task is None or self._monitor_task.done():
@@ -49,20 +69,27 @@ class AgentLiveRuntimeService:
 
     async def _monitor(self) -> None:
         while True:
-            for event in self._new_events():
-                self._seen_event_ids.add(event.event_id)
-                self._apply_event(event)
-                await self.broker.publish(
-                    EventEnvelope(
-                        event="live_event",
-                        data=event.model_dump(mode="json", by_alias=True),
+            try:
+                for event in self._new_events():
+                    self._seen_event_ids.add(event.event_id)
+                    self._apply_event(event)
+                    await self.broker.publish(
+                        EventEnvelope(
+                            event="live_event",
+                            data=event.model_dump(mode="json", by_alias=True),
+                        )
                     )
-                )
-                await self.broker.publish(
-                    EventEnvelope(
-                        event="state",
-                        data=self.current(event.agent_id).model_dump(mode="json"),
+                    await self.broker.publish(
+                        EventEnvelope(
+                            event="state",
+                            data=self.current(event.agent_id).model_dump(mode="json"),
+                        )
                     )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(
+                    "Live-event polling failed; retrying on the next interval."
                 )
             await asyncio.sleep(self.poll_interval_seconds)
 
@@ -117,7 +144,7 @@ class AgentLiveRuntimeService:
         self._states[event.agent_id] = CurrentInterception(
             status=status,
             event_source="google_adk_runtime",
-            firewall_mode=os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1"),
+            firewall_mode=os.environ.get("AGENTGUARD_FIREWALL_MODE", "v2"),
             guard_version=_guard_version(),
             agent_id=event.agent_id,
             session_id=event.session_id,
@@ -137,7 +164,7 @@ class AgentLiveRuntimeService:
             return CurrentInterception(
                 status="idle",
                 event_source="google_adk_runtime",
-                firewall_mode=os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1"),
+                firewall_mode=os.environ.get("AGENTGUARD_FIREWALL_MODE", "v2"),
                 guard_version=_guard_version(),
                 agent_id=agent_id,
             )
@@ -151,8 +178,4 @@ class AgentLiveRuntimeService:
 
 
 def _guard_version() -> str:
-    return (
-        "agentguard_firewall_v2_deterministic"
-        if os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1") == "v2"
-        else "agentguard_firewall_v1"
-    )
+    return "agentguard_firewall_v2"

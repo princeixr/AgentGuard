@@ -1,7 +1,7 @@
-"""Registry for runtime tools and metadata."""
+"""Registry for runtime tools and security metadata."""
 
-from dataclasses import dataclass
-from typing import Callable
+from dataclasses import dataclass, field
+from typing import Any, Callable
 
 from agentguard.core.enums import ToolRiskLevel
 
@@ -21,6 +21,16 @@ class ToolMetadata:
     provider: str | None = None
     description: str | None = None
     action_tags: tuple[str, ...] = ()
+    operation: str = "unknown"
+    capabilities: tuple[str, ...] = ()
+    input_schema: dict[str, Any] = field(default_factory=dict)
+    argument_roles: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    required_arguments: tuple[str, ...] = ()
+    external_impact: bool | None = None
+    privilege_level: str = "standard"
+    data_classes: tuple[str, ...] = ()
+    metadata_confidence: float = 0.0
+    metadata_provenance: tuple[str, ...] = ()
 
 
 class ToolRegistry:
@@ -41,6 +51,16 @@ class ToolRegistry:
         provider: str | None = None,
         description: str | None = None,
         action_tags: tuple[str, ...] = (),
+        operation: str = "unknown",
+        capabilities: tuple[str, ...] = (),
+        input_schema: dict[str, Any] | None = None,
+        argument_roles: dict[str, tuple[str, ...]] | None = None,
+        required_arguments: tuple[str, ...] = (),
+        external_impact: bool | None = None,
+        privilege_level: str = "standard",
+        data_classes: tuple[str, ...] = (),
+        metadata_confidence: float = 0.0,
+        metadata_provenance: tuple[str, ...] = (),
     ) -> None:
         self._tools[tool_name] = fn
         self._metadata[tool_name] = ToolMetadata(
@@ -54,6 +74,16 @@ class ToolRegistry:
             provider=provider,
             description=description,
             action_tags=action_tags,
+            operation=operation,
+            capabilities=capabilities,
+            input_schema=input_schema or {},
+            argument_roles=argument_roles or {},
+            required_arguments=required_arguments,
+            external_impact=external_impact,
+            privilege_level=privilege_level,
+            data_classes=data_classes,
+            metadata_confidence=metadata_confidence,
+            metadata_provenance=metadata_provenance,
         )
 
     def register_metadata(self, metadata: ToolMetadata, fn: Callable | None = None) -> None:
@@ -118,6 +148,9 @@ def infer_tool_metadata(tool_name: str) -> ToolMetadata:
         requires_confirmation_by_default=risk_level
         in {ToolRiskLevel.EXTERNAL_WRITE, ToolRiskLevel.IRREVERSIBLE, ToolRiskLevel.HIGH_RISK},
         irreversible=risk_level == ToolRiskLevel.IRREVERSIBLE or tool_name in GMAIL_SEND_TOOL_NAMES,
+        operation="unknown",
+        metadata_confidence=0.4,
+        metadata_provenance=("tool_name",),
     )
 
 

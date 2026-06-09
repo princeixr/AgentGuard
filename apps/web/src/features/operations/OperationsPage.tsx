@@ -78,7 +78,7 @@ export function OperationsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 text-sm text-[var(--ink-muted)]">
           <Clock3 size={16} />
-          Deterministic demo dataset
+          FirewallV2 trace telemetry
         </div>
         <a
           className="flex items-center gap-2 rounded border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold"
@@ -118,7 +118,7 @@ export function OperationsPage() {
 
       <section className="grid grid-cols-2 gap-4">
         <div className="panel p-5">
-          <h2 className="text-sm font-bold">Riskiest Tools</h2>
+          <h2 className="text-sm font-bold">Most Intervened Tools</h2>
           <div className="mt-3 border-t border-[var(--border)] pt-3">
             <Chart option={toolChart} style={{ height: 220 }} />
           </div>

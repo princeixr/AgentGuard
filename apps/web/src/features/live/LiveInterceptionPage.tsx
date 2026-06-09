@@ -5,6 +5,7 @@ import {
   Search,
   ShieldAlert,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../../api/client";
@@ -15,6 +16,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 
 export function LiveInterceptionPage() {
   const { agentId = "" } = useParams();
+  const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
   const connected = useLiveEvents(agentId);
   const interception = useQuery({
     queryKey: ["interception", agentId],
@@ -27,6 +29,14 @@ export function LiveInterceptionPage() {
     queryFn: () => api.session(agentId, sessionId!),
     enabled: Boolean(sessionId),
   });
+  const selectedDetail = useQuery({
+    queryKey: ["memory-detail", agentId, selectedTraceId],
+    queryFn: () => api.memoryDetail(agentId, selectedTraceId!),
+    enabled: Boolean(selectedTraceId),
+  });
+  useEffect(() => {
+    setSelectedTraceId(null);
+  }, [sessionId]);
   if (interception.isLoading) {
     return <LoadingState label="Loading interception console" />;
   }
@@ -35,26 +45,19 @@ export function LiveInterceptionPage() {
   }
 
   const state = interception.data!;
-  const detail = state.detail;
-  const v2Event = detail?.events.find(
-    (event) => event.event_type === "firewall_v2_evaluated",
-  );
-  const v2Evaluation = v2Event?.payload?.evaluation;
-  const v2Enforced = v2Event?.payload?.enforced_by === "firewall_v2";
-  const normalizedAction = v2Evaluation?.normalized_action;
-  const policyEvaluation = v2Evaluation?.policy_evaluation;
-  const currentV2Decision =
-    detail?.item.v2_effective_decision ??
-    detail?.item.v2_recommendation ??
-    policyEvaluation?.recommendation;
-  const displayedDecision = currentV2Decision ?? detail?.item.decision;
-  const decisionOwner = v2Evaluation
-    ? v2Enforced
-      ? "FirewallV2 enforced decision"
-      : "FirewallV2 shadow recommendation"
-    : "FirewallV1 decision";
+  const detail = selectedDetail.data ?? state.detail;
+  const guardEvaluation = detail?.item.guard_evaluation;
+  const normalizedAction = guardEvaluation?.normalized_action;
+  const displayedDecision =
+    guardEvaluation?.recommendation ?? detail?.item.decision;
+  const observeOnly = guardEvaluation?.enforcement_status === "observe_only";
+  const decisionOwner = guardEvaluation
+    ? observeOnly
+      ? "AgentGuard FirewallV2 recommendation"
+      : "AgentGuard FirewallV2 enforced decision"
+    : "Historical trace without V2 evidence";
   const displayedExplanation =
-    policyEvaluation?.explanation ?? detail?.item.explanation;
+    guardEvaluation?.explanation || detail?.item.explanation;
   const visibleSteps =
     session.data?.steps.filter((step) => step.step_index <= state.current_step) ?? [];
   const idle = state.status === "idle";
@@ -129,14 +132,23 @@ export function LiveInterceptionPage() {
                     {detail?.trace.intent.raw_user_request}
                   </p>
                 </div>
-                {visibleSteps.map((step) => (
-                  <div
+                {visibleSteps.map((step) => {
+                  const stepDecision =
+                    step.guard_evaluation?.recommendation ?? step.decision;
+                  const selected =
+                    step.trace_id ===
+                    (selectedTraceId ?? state.current_trace_id);
+                  return (
+                  <button
+                    aria-pressed={selected}
                     className={`relative rounded border p-4 ${
-                      step.trace_id === state.current_trace_id
+                      selected
                         ? "border-amber-400 bg-amber-50/60"
                         : "border-[var(--border)]"
-                    }`}
+                    } block w-full text-left`}
                     key={step.trace_id}
+                    onClick={() => setSelectedTraceId(step.trace_id)}
+                    type="button"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -144,35 +156,25 @@ export function LiveInterceptionPage() {
                           {step.tool_name}
                         </code>
                         <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
-                          {step.v2_enforcement_status
-                            ? step.enforced_by === "firewall_v2"
-                              ? "V2 enforced"
-                              : "V2 recommendation"
-                            : "V1 enforced"}
+                          {step.guard_evaluation
+                            ? `${step.guard_evaluation.firewall_mode} · ${step.guard_evaluation.enforced_by}`
+                            : "Historical trace"}
                         </div>
                       </div>
-                      <StatusBadge
-                        value={
-                          step.v2_effective_decision ??
-                          step.v2_recommendation ??
-                          step.decision
-                        }
-                      />
+                      <StatusBadge value={stepDecision} />
                     </div>
                     <div className="mt-2 truncate mono text-[11px] text-[var(--ink-muted)]">
                       {step.argument_summary}
                     </div>
-                    {step.v2_recommendation &&
-                      step.enforced_by !== "firewall_v2" && (
-                        <div className="mt-3 flex items-center justify-between border-t border-[var(--border)] pt-2 text-[10px]">
-                          <span className="text-[var(--ink-muted)]">
-                            V1 enforced
-                          </span>
-                          <StatusBadge value={step.v1_decision ?? step.decision} />
-                        </div>
-                      )}
-                  </div>
-                ))}
+                    {step.guard_evaluation?.enforcement_status ===
+                      "observe_only" && (
+                      <div className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-blue-700">
+                        Observe only · tool execution used the legacy decision
+                      </div>
+                    )}
+                  </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -202,7 +204,7 @@ export function LiveInterceptionPage() {
                   <code className="text-2xl font-bold">
                     {detail.item.tool_name}
                   </code>
-                  <StatusBadge value={displayedDecision} />
+                  <StatusBadge value={displayedDecision ?? "unknown"} />
                 </div>
               </div>
 
@@ -219,6 +221,12 @@ export function LiveInterceptionPage() {
                     <p className="mt-2 text-sm leading-6">
                       {displayedExplanation}
                     </p>
+                    {observeOnly && (
+                      <p className="mt-2 rounded bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+                        This result was recorded in shadow mode and did not
+                        control tool execution.
+                      </p>
+                    )}
                     <div className="mt-3 flex flex-wrap gap-2">
                       {detail.item.labels.map((label) => (
                         <span
@@ -257,16 +265,14 @@ export function LiveInterceptionPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="eyebrow">Decision basis</div>
                     <code className="text-[11px] font-semibold">
-                      {v2Evaluation
-                        ? v2Enforced
-                          ? "firewall_v2 · deterministic policy"
-                          : "firewall_v2 · shadow"
+                      {guardEvaluation
+                        ? `${guardEvaluation.firewall_version} · ${guardEvaluation.enforced_by}`
                         : String(detail.decision.tier_used ?? "decision_policy")}
                     </code>
                   </div>
-                  {policyEvaluation?.matched_rules?.length > 0 ? (
+                  {guardEvaluation?.matched_rules.length ? (
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {policyEvaluation.matched_rules.map(
+                      {guardEvaluation.matched_rules.map(
                         (rule: { rule_id: string; effect: string }) => (
                           <code
                             className="rounded bg-[var(--red-bg)] px-2 py-1 text-[11px] font-semibold text-[var(--red)]"
@@ -300,20 +306,20 @@ export function LiveInterceptionPage() {
                 <div className="mt-6 rounded border border-blue-200 bg-blue-50/60 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="eyebrow text-blue-700">
-                      Current FirewallV2 interception
+                      FirewallV2 evaluation
                     </div>
                     <StatusBadge
                       value={
-                        v2Evaluation
-                          ? v2Evaluation.enforcement_status.replace("_", " ")
+                        guardEvaluation
+                          ? guardEvaluation.enforcement_status.replace("_", " ")
                           : "not run"
                       }
                     />
                   </div>
-                  {v2Evaluation ? (
+                  {guardEvaluation ? (
                     <>
                       <p className="mt-2 text-sm leading-5">
-                        {v2Evaluation.explanation}
+                        {guardEvaluation.explanation}
                       </p>
                       {normalizedAction && (
                         <div className="mt-3 rounded border border-blue-200 bg-white p-3">
@@ -400,45 +406,58 @@ export function LiveInterceptionPage() {
                           </p>
                         </div>
                       )}
-                      {policyEvaluation && (
-                        <div className="mt-3 rounded border border-blue-200 bg-white p-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="eyebrow">Policy recommendation</div>
-                              <code className="mt-1 block text-xs">
-                                {policyEvaluation.policy_id}@
-                                {policyEvaluation.policy_version}
-                              </code>
-                            </div>
-                            <StatusBadge value={policyEvaluation.recommendation} />
+                      <div className="mt-3 rounded border border-blue-200 bg-white p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="eyebrow">Policy decision</div>
+                            <code className="mt-1 block text-xs">
+                              {guardEvaluation.policy_id ?? "unknown"}@
+                              {guardEvaluation.policy_version ?? "unknown"}
+                            </code>
                           </div>
-                          <p className="mt-3 text-xs leading-5 text-[var(--ink-muted)]">
-                            {policyEvaluation.explanation}
-                          </p>
-                          {policyEvaluation.matched_rules.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {policyEvaluation.matched_rules.map(
-                                (rule: { rule_id: string; effect: string }) => (
-                                  <code
-                                    className="rounded bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-800"
-                                    key={rule.rule_id}
-                                  >
-                                    {rule.rule_id}: {rule.effect}
-                                  </code>
-                                ),
-                              )}
+                          <StatusBadge value={guardEvaluation.recommendation} />
+                        </div>
+                        {guardEvaluation.matched_rules.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {guardEvaluation.matched_rules.map((rule) => (
+                              <code
+                                className="rounded bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-800"
+                                key={rule.rule_id}
+                              >
+                                {rule.rule_id}: {rule.effect}
+                              </code>
+                            ))}
+                          </div>
+                        )}
+                        {guardEvaluation.deferred_rule_ids.length > 0 && (
+                          <div className="mt-3 text-[11px] text-[var(--ink-muted)]">
+                            Deferred rules:{" "}
+                            {guardEvaluation.deferred_rule_ids.join(", ")}
+                          </div>
+                        )}
+                      </div>
+                      {guardEvaluation.tier_results.length > 0 && (
+                        <div className="mt-3 grid gap-2">
+                          {guardEvaluation.tier_results.map((tier) => (
+                            <div
+                              className="rounded border border-blue-200 bg-white p-3 text-xs"
+                              key={String(tier.tier_result_id ?? tier.tier)}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <code className="font-semibold">
+                                  {String(tier.tier)}
+                                </code>
+                                <StatusBadge value={String(tier.recommendation)} />
+                              </div>
+                              <p className="mt-2 text-[var(--ink-muted)]">
+                                {String(tier.explanation)}
+                              </p>
                             </div>
-                          )}
-                          {policyEvaluation.deferred_rule_ids.length > 0 && (
-                            <div className="mt-3 text-[11px] text-[var(--ink-muted)]">
-                              Deferred until normalization:{" "}
-                              {policyEvaluation.deferred_rule_ids.join(", ")}
-                            </div>
-                          )}
+                          ))}
                         </div>
                       )}
                       <div className="mt-3 grid gap-2">
-                        {v2Evaluation.stages.map(
+                        {guardEvaluation.stages.map(
                           (stage: {
                             name: string;
                             status: string;
@@ -471,11 +490,12 @@ export function LiveInterceptionPage() {
               </div>
 
               <div className="border-t border-[var(--border)] bg-[var(--surface-low)] p-4 text-xs leading-5 text-[var(--ink-muted)]">
-                Event source: {state.event_source}. Enforcement is currently owned by
-                {v2Enforced ? " FirewallV2 deterministic policy." : " FirewallV1."}{" "}
-                {v2Enforced
-                  ? "Intent, Tier 2, Tier 3, and approval resume are not active."
-                  : "FirewallV2 evidence is observe-only in the current mode."}
+                Event source: {state.event_source}.{" "}
+                {guardEvaluation
+                  ? observeOnly
+                    ? `V2 recommendation owner: ${guardEvaluation.enforced_by}; execution was not controlled by V2.`
+                    : `Decision owner: ${guardEvaluation.enforced_by}.`
+                  : "This historical trace predates the V2 evaluation event."}
               </div>
             </div>
           ) : (
@@ -512,7 +532,7 @@ export function LiveInterceptionPage() {
                       {precedent.intent}
                     </p>
                     <div className="mt-3 text-xs font-semibold text-blue-700">
-                      {Math.round(precedent.risk_score * 100)} risk score
+                      {Math.round(precedent.risk_score * 100)} decision score
                     </div>
                   </div>
                 ))}

@@ -15,7 +15,20 @@ from agentguard.runtime.tool_registry import ToolMetadata
 
 _ENV_REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 _SERVER_KEYS = {"id", "prefix", "enabled", "transport", "stdio", "streamable_http"}
-_READ_ACTIONS = {"get", "list", "lookup", "read", "search", "view", "inspect", "fetch", "download"}
+_READ_ACTIONS = {
+    "download",
+    "fetch",
+    "find",
+    "get",
+    "inspect",
+    "list",
+    "lookup",
+    "query",
+    "read",
+    "retrieve",
+    "search",
+    "view",
+}
 _LOW_SIDE_EFFECT_ACTIONS = {"draft", "preview", "stage"}
 _WRITE_ACTIONS = {
     "approve",
@@ -23,11 +36,13 @@ _WRITE_ACTIONS = {
     "dispatch",
     "edit",
     "execute",
+    "pay",
     "publish",
     "reply",
     "run",
     "send",
     "trigger",
+    "transfer",
     "update",
     "upload",
     "write",
@@ -143,6 +158,16 @@ class McpRegistry:
     def register_discovered_tool(self, server: McpServerConfig, tool: Any) -> ToolMetadata:
         raw_tool = getattr(tool, "_mcp_tool", tool)
         raw_name = str(getattr(raw_tool, "name", None) or getattr(tool, "name", "unknown_tool"))
+        input_schema = (
+            getattr(raw_tool, "inputSchema", None)
+            or getattr(raw_tool, "input_schema", None)
+            or getattr(tool, "input_schema", None)
+            or {}
+        )
+        if hasattr(input_schema, "model_dump"):
+            input_schema = input_schema.model_dump(mode="json")
+        if not isinstance(input_schema, dict):
+            input_schema = {}
         tool_name = server.prefixed_tool_name(raw_name)
         metadata = infer_discovered_mcp_metadata(
             tool_name=tool_name,
@@ -150,6 +175,7 @@ class McpRegistry:
             raw_tool_name=raw_name,
             description=getattr(raw_tool, "description", None) or getattr(tool, "description", None),
             annotations=getattr(raw_tool, "annotations", None),
+            input_schema=input_schema,
         )
         self._discovered_tools[tool_name] = metadata
         return metadata
@@ -312,15 +338,21 @@ def infer_discovered_mcp_metadata(
     raw_tool_name: str,
     description: str | None = None,
     annotations: Any = None,
+    input_schema: dict[str, Any] | None = None,
 ) -> ToolMetadata:
+    input_schema = input_schema or {}
     text = re.sub(r"[_-]+", " ", f"{raw_tool_name} {description or ''}".lower())
     action_tags = tuple(
         action
         for action in sorted(_READ_ACTIONS | _LOW_SIDE_EFFECT_ACTIONS | _WRITE_ACTIONS | _IRREVERSIBLE_ACTIONS)
         if re.search(rf"\b{re.escape(action)}(?:s|ed|ing)?\b", text)
     )
-    read_only_hint = getattr(annotations, "readOnlyHint", None)
-    destructive_hint = getattr(annotations, "destructiveHint", None)
+    read_only_hint = _annotation_value(annotations, "readOnlyHint", "read_only_hint")
+    destructive_hint = _annotation_value(
+        annotations,
+        "destructiveHint",
+        "destructive_hint",
+    )
 
     if read_only_hint is True:
         risk_level = ToolRiskLevel.READ_ONLY
@@ -353,9 +385,24 @@ def infer_discovered_mcp_metadata(
         irreversible = False
         side_effect_type = None
 
+    category = _infer_category(server, text)
+    operation = _infer_operation(action_tags, read_only_hint)
+    capabilities = _infer_capabilities(category, operation, server)
+    argument_roles = _infer_argument_roles(input_schema)
+    provenance = ["tool_name", "description"]
+    confidence = 0.55
+    if input_schema:
+        provenance.append("input_schema")
+        confidence += 0.15
+    if read_only_hint is not None or destructive_hint is not None:
+        provenance.append("mcp_annotations")
+        confidence += 0.2
+    if operation == "unknown" or not capabilities:
+        confidence = min(confidence, 0.45)
+
     return ToolMetadata(
         name=tool_name,
-        category=_infer_category(server, text),
+        category=category,
         risk_level=risk_level,
         side_effect_type=side_effect_type,
         requires_confirmation_by_default=requires_confirmation,
@@ -364,17 +411,182 @@ def infer_discovered_mcp_metadata(
         provider=f"mcp:{server.id}",
         description=description or f"Tool provided by MCP server {server.id}.",
         action_tags=action_tags,
+        operation=operation,
+        capabilities=capabilities,
+        input_schema=input_schema,
+        argument_roles=argument_roles,
+        required_arguments=tuple(
+            value
+            for value in input_schema.get("required", [])
+            if isinstance(value, str)
+        ),
+        external_impact=_external_impact(category, operation),
+        privilege_level="standard",
+        metadata_confidence=min(confidence, 1.0),
+        metadata_provenance=tuple(provenance),
     )
+
+
+def _annotation_value(annotations: Any, *names: str) -> Any:
+    if annotations is None:
+        return None
+    for name in names:
+        if isinstance(annotations, dict) and name in annotations:
+            return annotations[name]
+        value = getattr(annotations, name, None)
+        if value is not None:
+            return value
+    return None
+
+
+def _infer_operation(
+    action_tags: tuple[str, ...],
+    read_only_hint: bool | None,
+) -> str:
+    priority = (
+        ("delete", {"delete", "destroy", "purge", "remove", "revoke"}),
+        ("send", {"dispatch", "publish", "reply", "send"}),
+        ("execute", {"execute", "pay", "run", "transfer", "trigger"}),
+        ("update", {"edit", "update", "write", "upload"}),
+        ("create", {"create"}),
+        ("draft", {"draft", "preview", "stage"}),
+        ("search", {"find", "lookup", "query", "search"}),
+        (
+            "read",
+            {"download", "fetch", "get", "inspect", "list", "read", "retrieve", "view"},
+        ),
+    )
+    tags = set(action_tags)
+    for operation, candidates in priority:
+        if tags.intersection(candidates):
+            return operation
+    return "read" if read_only_hint is True else "unknown"
+
+
+def _infer_capabilities(
+    category: str,
+    operation: str,
+    server: McpServerConfig,
+) -> tuple[str, ...]:
+    if operation == "unknown":
+        return ()
+    namespace = {
+        "email": "email",
+        "calendar": "calendar",
+        "file": "drive" if server.id == "workspace" else "filesystem",
+        "web": "web",
+        "code": "code",
+        "database": "database",
+        "payment": "payment",
+    }.get(category, category if category != "unknown" else "tool")
+    capability_operation = operation
+    if namespace == "email" and operation == "create":
+        capability_operation = "draft"
+    if namespace in {"calendar", "drive", "filesystem"} and operation == "search":
+        capability_operation = "read"
+    capabilities = [f"{namespace}.{capability_operation}"]
+    if namespace == "email" and operation == "send":
+        capabilities.append("communication.send")
+    return tuple(capabilities)
+
+
+def _infer_argument_roles(input_schema: dict[str, Any]) -> dict[str, tuple[str, ...]]:
+    properties = input_schema.get("properties")
+    if not isinstance(properties, dict):
+        return {}
+    roles: dict[str, list[str]] = {
+        "resources": [],
+        "destinations": [],
+        "data": [],
+        "estimated_value": [],
+        "currency": [],
+    }
+    for name, schema in properties.items():
+        if not isinstance(name, str):
+            continue
+        description = ""
+        if isinstance(schema, dict):
+            description = str(schema.get("description") or "")
+        text = re.sub(r"[_-]+", " ", f"{name} {description}".lower())
+        if any(
+            token in text
+            for token in (
+                "recipient",
+                "email address",
+                "destination",
+                "domain",
+                "host",
+                "url",
+                "webhook",
+                "channel",
+            )
+        ) or name.lower() in {"to", "cc", "bcc"}:
+            roles["destinations"].append(name)
+        if any(
+            token in text
+            for token in (
+                "file id",
+                "folder id",
+                "event id",
+                "calendar id",
+                "document id",
+                "resource id",
+                "path",
+                "filename",
+                "file name",
+                "attachment",
+            )
+        ) or name.lower().endswith("_id"):
+            roles["resources"].append(name)
+        if any(
+            token in text
+            for token in (
+                "body",
+                "content",
+                "message",
+                "subject",
+                "text",
+                "query",
+                "description",
+            )
+        ):
+            roles["data"].append(name)
+        if any(token in text for token in ("amount", "price", "total", "value")):
+            roles["estimated_value"].append(name)
+        if "currency" in text:
+            roles["currency"].append(name)
+    return {
+        role: tuple(names)
+        for role, names in roles.items()
+        if names
+    }
+
+
+def _external_impact(category: str, operation: str) -> bool | None:
+    if operation in {"read", "search", "draft"}:
+        return False
+    if operation == "unknown":
+        return None
+    return category in {
+        "email",
+        "calendar",
+        "file",
+        "web",
+        "code",
+        "database",
+        "payment",
+    }
 
 
 def _infer_category(server: McpServerConfig, text: str) -> str:
     category_terms = {
         "email": ("email", "gmail", "inbox", "message"),
         "code": ("code", "github", "gitlab", "repository", "pull request"),
-        "file": ("file", "filesystem", "directory", "attachment"),
+        "file": ("drive", "file", "filesystem", "directory", "attachment"),
         "calendar": ("calendar", "event", "meeting"),
         "database": ("database", "sql", "query", "table"),
         "web": ("browser", "web", "url", "http"),
+        "payment": ("payment", "wallet", "invoice", "transaction", "transfer"),
     }
     server_text = f"{server.id} {server.prefix} {text}".lower()
     return next(

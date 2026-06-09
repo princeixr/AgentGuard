@@ -98,7 +98,7 @@ MOCK_PIPELINE_ONLY = os.environ.get(
     "yes",
     "on",
 }
-_firewall_mode = os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1").lower()
+_firewall_mode = os.environ.get("AGENTGUARD_FIREWALL_MODE", "v2").lower()
 FIREWALL_MODE: FirewallMode = (
     cast(FirewallMode, _firewall_mode)
     if _firewall_mode in {"v1", "v2_shadow", "v2"}

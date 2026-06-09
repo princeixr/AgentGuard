@@ -94,7 +94,7 @@ def tool_registry() -> list[dict[str, Any]]:
                 name,
                 metadata,
                 enabled=metadata.mcp_server in ready_ids,
-                descriptor=descriptor_for_tool(name),
+                descriptor=descriptor_for_tool(name, metadata),
             )
         )
 
@@ -103,9 +103,9 @@ def tool_registry() -> list[dict[str, Any]]:
 
 def agent_definition() -> dict[str, Any]:
     registry = mcp_registry()
-    firewall_mode = os.environ.get("AGENTGUARD_FIREWALL_MODE", "v1").lower()
+    firewall_mode = os.environ.get("AGENTGUARD_FIREWALL_MODE", "v2").lower()
     if firewall_mode not in {"v1", "v2_shadow", "v2"}:
-        firewall_mode = "v1"
+        firewall_mode = "v2"
     loaded_policy = resolve_demo_policy()
     return {
         "agent_id": DEMO_AGENT_ID,
@@ -132,8 +132,10 @@ def agent_definition() -> dict[str, Any]:
             ),
             "firewall_mode": firewall_mode,
             "enforced_by": (
-                "firewall_v2_deterministic"
+                "firewall_v2"
                 if firewall_mode == "v2"
+                else "firewall_v1"
+                if firewall_mode == "v2_shadow"
                 else "firewall_v1"
             ),
             "v2_status": (
@@ -144,16 +146,9 @@ def agent_definition() -> dict[str, Any]:
                 else "deterministic_enforcement"
             ),
             "implementation": (
-                "FirewallV2 enforces the versioned deterministic policy and available "
-                "normalizers; intent, semantic analysis, LLM judging, and approval "
-                "resume are not implemented."
-                if firewall_mode == "v2"
-                else (
-                    "Functional V1 heuristic enforcement with FirewallV2 deterministic "
-                    "policy evidence in shadow mode."
-                    if firewall_mode == "v2_shadow"
-                    else "Functional V1 heuristic enforcement."
-                )
+                "FirewallV2 is integrated into the ADK interception path. Tier 1 "
+                "deterministic policy is active; Tier 2 is not implemented; Tier 3 "
+                "is available when enabled; approval resume is not implemented."
             ),
             "approval_enforced": os.environ.get(
                 "AGENTGUARD_ADK_ENFORCE_APPROVAL", "true"
@@ -202,9 +197,14 @@ def _tool_definition(
         "irreversible": metadata.irreversible,
         "enabled": enabled,
         "provider": metadata.provider or descriptor.provider,
+        "domain": descriptor.domain,
+        "operation": descriptor.operation,
         "capabilities": descriptor.capabilities,
         "impact": descriptor.impact,
         "reversible": descriptor.reversible,
         "normalizer": descriptor.normalizer,
         "metadata_status": descriptor.metadata_status,
+        "metadata_confidence": descriptor.metadata_confidence,
+        "metadata_provenance": descriptor.metadata_provenance,
+        "argument_roles": descriptor.argument_roles,
     }

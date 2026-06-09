@@ -5,6 +5,34 @@ export type Decision =
   | "require_approval"
   | "block";
 
+export interface GuardEvaluation {
+  firewall_mode: string;
+  firewall_version: string;
+  enforcement_status: string;
+  recommendation: Decision;
+  enforced_by: string;
+  explanation: string;
+  policy_id: string | null;
+  policy_version: string | null;
+  policy_hash: string | null;
+  matched_rules: Array<{
+    rule_id: string;
+    effect: string;
+    description?: string;
+    matched_capabilities?: string[];
+    matched_resources?: string[];
+  }>;
+  deferred_rule_ids: string[];
+  normalized_action: Record<string, any> | null;
+  tier_results: Array<Record<string, any>>;
+  combined_decision: Record<string, any> | null;
+  stages: Array<{
+    name: string;
+    status: string;
+    detail: string;
+  }>;
+}
+
 export interface ComponentHealth {
   name: string;
   status: "operational" | "degraded" | "unavailable";
@@ -42,11 +70,7 @@ export interface ReplayStep {
   explanation: string;
   execution_status: string;
   output_summary: string | null;
-  enforced_by: string;
-  v1_decision: Decision | null;
-  v2_recommendation: Decision | null;
-  v2_effective_decision: Decision | null;
-  v2_enforcement_status: string | null;
+  guard_evaluation: GuardEvaluation | null;
 }
 
 export interface PrecedentSummary {
@@ -79,11 +103,7 @@ export interface MemoryItem {
   decision: Decision;
   labels: string[];
   explanation: string;
-  enforced_by: string;
-  v1_decision: Decision | null;
-  v2_recommendation: Decision | null;
-  v2_effective_decision: Decision | null;
-  v2_enforcement_status: string | null;
+  guard_evaluation: GuardEvaluation | null;
 }
 
 export interface MemoryPage {
@@ -202,11 +222,16 @@ export interface AgentToolDefinition {
   irreversible: boolean;
   enabled: boolean;
   provider: string;
+  domain: string;
+  operation: string;
   capabilities: string[];
   impact: string;
   reversible: boolean | null;
   normalizer: string;
   metadata_status: string;
+  metadata_confidence: number;
+  metadata_provenance: string[];
+  argument_roles: Record<string, string[]>;
 }
 
 export interface AgentTestScenario {
@@ -355,9 +380,7 @@ export interface AgentTestRun {
     risk_score: number;
     explanation: string;
     rules_fired: string[];
-    enforced_by: string;
-    firewall_mode: string;
-    v2_evaluation: Record<string, any> | null;
+    guard_evaluation: GuardEvaluation | null;
   }>;
   duration_ms: number;
 }

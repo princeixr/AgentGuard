@@ -8,6 +8,7 @@ from statistics import median
 
 from agentguard.api.models import (
     ComponentHealth,
+    GuardEvaluationView,
     HealthResponse,
     MemoryDetail,
     MemoryItem,
@@ -89,8 +90,8 @@ class DashboardQueryService:
                     name="Guard engine",
                     status="operational",
                     detail=(
-                        "Functional deterministic policy and weighted heuristic scorer "
-                        "(v0.1); not a trained production anomaly model."
+                        "FirewallV2 deterministic policy is integrated with the "
+                        "Google ADK interception path."
                     ),
                 ),
             ],
@@ -135,7 +136,9 @@ class DashboardQueryService:
         for trace in traces:
             score = scores[trace.trace_id]
             decision = decisions[trace.trace_id]
-            v2_summary = _v2_summary(events_by_trace.get(trace.trace_id, []))
+            guard_evaluation = guard_evaluation_from_events(
+                events_by_trace.get(trace.trace_id, [])
+            )
             runtime_event = next(
                 (
                     event
@@ -168,11 +171,7 @@ class DashboardQueryService:
                     output_summary=(
                         runtime_event.payload.get("output_summary") if runtime_event else None
                     ),
-                    enforced_by=v2_summary["enforced_by"],
-                    v1_decision=v2_summary["v1_decision"],
-                    v2_recommendation=v2_summary["v2_recommendation"],
-                    v2_effective_decision=v2_summary["v2_effective_decision"],
-                    v2_enforcement_status=v2_summary["v2_enforcement_status"],
+                    guard_evaluation=guard_evaluation,
                 )
             )
         summary = self._session_summary(session_id, traces, decisions)
@@ -317,7 +316,9 @@ class DashboardQueryService:
         for trace_id, trace in traces.items():
             decision = decisions[trace_id]
             score = scores[trace_id]
-            v2_summary = _v2_summary(events_by_trace.get(trace_id, []))
+            guard_evaluation = guard_evaluation_from_events(
+                events_by_trace.get(trace_id, [])
+            )
             label_values = list(score.dominant_signals)
             if trace_id in labels and labels[trace_id].failure_type != "none":
                 label_values.append(labels[trace_id].failure_type)
@@ -336,11 +337,7 @@ class DashboardQueryService:
                     decision=decision.decision,
                     labels=sorted(set(label_values)),
                     explanation=decision.explanation,
-                    enforced_by=v2_summary["enforced_by"],
-                    v1_decision=v2_summary["v1_decision"],
-                    v2_recommendation=v2_summary["v2_recommendation"],
-                    v2_effective_decision=v2_summary["v2_effective_decision"],
-                    v2_enforcement_status=v2_summary["v2_enforcement_status"],
+                    guard_evaluation=guard_evaluation,
                 )
             )
         return items
@@ -484,7 +481,7 @@ def _search_text(*values: str) -> str:
     return " ".join(values).lower().replace("_", " ").replace("-", " ")
 
 
-def _v2_summary(events) -> dict:
+def guard_evaluation_from_events(events) -> GuardEvaluationView | None:
     event = next(
         (
             item
@@ -494,22 +491,46 @@ def _v2_summary(events) -> dict:
         None,
     )
     if event is None:
-        return {
-            "enforced_by": "firewall_v1",
-            "v1_decision": None,
-            "v2_recommendation": None,
-            "v2_effective_decision": None,
-            "v2_enforcement_status": None,
-        }
-    payload = event.payload
+        return None
+    return guard_evaluation_from_payload(event.payload)
+
+
+def guard_evaluation_from_payload(payload: dict) -> GuardEvaluationView:
     evaluation = payload.get("evaluation") or {}
     policy_evaluation = evaluation.get("policy_evaluation") or {}
-    v1_decision = (payload.get("v1_decision") or {}).get("decision")
-    effective_decision = (payload.get("effective_decision") or {}).get("decision")
-    return {
-        "enforced_by": str(payload.get("enforced_by") or "firewall_v1"),
-        "v1_decision": v1_decision,
-        "v2_recommendation": policy_evaluation.get("recommendation"),
-        "v2_effective_decision": effective_decision,
-        "v2_enforcement_status": evaluation.get("enforcement_status"),
-    }
+    combined_decision = evaluation.get("combined_decision") or {}
+    recommendation = (
+        (payload.get("effective_decision") or {}).get("decision")
+        or combined_decision.get("final_decision")
+        or evaluation.get("recommendation")
+        or policy_evaluation.get("recommendation")
+    )
+    if recommendation not in DECISION_SEVERITY:
+        recommendation = "block"
+    return GuardEvaluationView(
+        firewall_mode=str(payload.get("firewall_mode") or "v2"),
+        firewall_version=str(
+            evaluation.get("firewall_version") or "agentguard_firewall_v2"
+        ),
+        enforcement_status=str(
+            evaluation.get("enforcement_status") or "enforced"
+        ),
+        recommendation=recommendation,
+        enforced_by=str(
+            combined_decision.get("enforced_by")
+            or payload.get("enforced_by")
+            or "firewall_v2"
+        ),
+        explanation=str(evaluation.get("explanation") or ""),
+        policy_id=policy_evaluation.get("policy_id"),
+        policy_version=policy_evaluation.get("policy_version"),
+        policy_hash=policy_evaluation.get("policy_hash"),
+        matched_rules=list(policy_evaluation.get("matched_rules") or []),
+        deferred_rule_ids=list(
+            policy_evaluation.get("deferred_rule_ids") or []
+        ),
+        normalized_action=evaluation.get("normalized_action"),
+        tier_results=list(evaluation.get("tier_results") or []),
+        combined_decision=combined_decision or None,
+        stages=list(evaluation.get("stages") or []),
+    )

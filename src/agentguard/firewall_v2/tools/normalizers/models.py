@@ -37,6 +37,7 @@ class NormalizedActionV1(BaseModel):
     action_id: str = Field(default_factory=lambda: f"act_{uuid4().hex}")
     trace_id: str
     tool_name: str
+    domain: str = "unknown"
     capabilities: list[str] = Field(default_factory=list)
     operation: str
     resources: list[NormalizedResourceV1] = Field(default_factory=list)
@@ -44,6 +45,11 @@ class NormalizedActionV1(BaseModel):
     side_effect: bool
     reversible: bool | None
     impact: Literal["low", "medium", "high", "unknown"]
+    data_classes: list[str] = Field(default_factory=list)
+    external_impact: bool | None = None
+    privilege_level: str = "standard"
+    estimated_value: float | None = None
+    estimated_value_currency: str | None = None
     flags: list[str] = Field(default_factory=list)
     parser: ParserResultV1
     argument_hash: str | None = None

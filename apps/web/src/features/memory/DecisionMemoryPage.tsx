@@ -71,7 +71,7 @@ export function DecisionMemoryPage() {
         ),
       }),
       columnHelper.accessor("risk_score", {
-        header: "Risk",
+        header: "Decision score",
         cell: ({ getValue }) => {
           const score = getValue();
           return (
@@ -109,6 +109,24 @@ export function DecisionMemoryPage() {
       columnHelper.accessor("decision", {
         header: "Decision",
         cell: ({ getValue }) => <StatusBadge value={getValue()} />,
+      }),
+      columnHelper.accessor("guard_evaluation", {
+        header: "Decision owner",
+        cell: ({ getValue }) => {
+          const guard = getValue();
+          return guard ? (
+            <div>
+              <code className="text-[10px] font-semibold">{guard.enforced_by}</code>
+              <div className="mt-1 text-[9px] uppercase tracking-wider text-[var(--ink-muted)]">
+                {guard.firewall_mode} · {guard.enforcement_status}
+              </div>
+            </div>
+          ) : (
+            <span className="text-[10px] text-[var(--ink-muted)]">
+              Historical trace
+            </span>
+          );
+        },
       }),
     ],
     [],
@@ -259,7 +277,7 @@ export function DecisionMemoryPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Metric
-                  label="Risk score"
+                  label="Decision score"
                   value={detail.data.item.risk_score.toFixed(2)}
                 />
                 <Metric
@@ -282,6 +300,69 @@ export function DecisionMemoryPage() {
               <DetailSection title="Decision explanation">
                 {detail.data.item.explanation}
               </DetailSection>
+              {detail.data.item.guard_evaluation && (
+                <>
+                  <DetailSection title="FirewallV2 decision">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Metric
+                        label="Enforced by"
+                        value={detail.data.item.guard_evaluation.enforced_by}
+                      />
+                      <Metric
+                        label="Policy"
+                        value={`${detail.data.item.guard_evaluation.policy_id ?? "unknown"}@${detail.data.item.guard_evaluation.policy_version ?? "unknown"}`}
+                      />
+                    </div>
+                  </DetailSection>
+                  <DetailSection title="Matched policy rules">
+                    <div className="flex flex-wrap gap-2">
+                      {detail.data.item.guard_evaluation.matched_rules.length ? (
+                        detail.data.item.guard_evaluation.matched_rules.map((rule) => (
+                          <code
+                            className="rounded bg-blue-50 px-2 py-1 text-[10px] text-blue-800"
+                            key={rule.rule_id}
+                          >
+                            {rule.rule_id}: {rule.effect}
+                          </code>
+                        ))
+                      ) : (
+                        <span className="text-[var(--ink-muted)]">
+                          Policy default applied.
+                        </span>
+                      )}
+                    </div>
+                  </DetailSection>
+                  <DetailSection title="Normalized action">
+                    <pre className="whitespace-pre-wrap mono text-[11px]">
+                      {JSON.stringify(
+                        detail.data.item.guard_evaluation.normalized_action,
+                        null,
+                        2,
+                      )}
+                    </pre>
+                  </DetailSection>
+                  <DetailSection title="Tier results">
+                    <div className="space-y-2">
+                      {detail.data.item.guard_evaluation.tier_results.map((tier) => (
+                        <div
+                          className="rounded border border-[var(--border)] p-3"
+                          key={String(tier.tier_result_id ?? tier.tier)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <code className="text-xs font-semibold">
+                              {String(tier.tier)}
+                            </code>
+                            <StatusBadge value={String(tier.recommendation)} />
+                          </div>
+                          <p className="mt-2 text-xs text-[var(--ink-muted)]">
+                            {String(tier.explanation)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </DetailSection>
+                </>
+              )}
               <DetailSection title="Dominant signals">
                 <div className="flex flex-wrap gap-2">
                   {detail.data.score.dominant_signals.map((signal: string) => (

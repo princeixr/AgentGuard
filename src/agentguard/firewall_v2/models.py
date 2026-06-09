@@ -1,4 +1,4 @@
-"""Observe-only FirewallV2 contracts used during phased rollout."""
+"""FirewallV2 evaluation contracts."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ class FirewallV2Evaluation(BaseModel):
     )
     evaluation_id: str = Field(default_factory=lambda: f"eval_{uuid4().hex}")
     timestamp: datetime = Field(default_factory=utc_now, alias="@timestamp")
-    firewall_version: str = "agentguard_firewall_v2_skeleton"
+    firewall_version: str = "agentguard_firewall_v2"
     firewall_mode: FirewallMode
     enforcement_status: Literal["observe_only", "enforced", "not_implemented"] = (
         "observe_only"
