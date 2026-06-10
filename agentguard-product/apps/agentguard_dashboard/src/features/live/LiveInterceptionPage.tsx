@@ -6,7 +6,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { api } from "../../api/client";
 import { useLiveEvents } from "../../api/useLiveEvents";
@@ -16,18 +16,24 @@ import { StatusBadge } from "../../components/StatusBadge";
 
 export function LiveInterceptionPage() {
   const { agentId = "" } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedSessionId = searchParams.get("sessionId");
+  const selectedSessionTraceId = searchParams.get("traceId");
+  const sessionMode = Boolean(selectedSessionId);
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
   const connected = useLiveEvents(agentId);
   const interception = useQuery({
     queryKey: ["interception", agentId],
     queryFn: () => api.currentInterception(agentId),
-    refetchInterval: connected ? false : 1_000,
+    refetchInterval: sessionMode ? false : 1_000,
+    enabled: !sessionMode,
   });
-  const sessionId = interception.data?.session_id;
+  const sessionId = selectedSessionId ?? interception.data?.session_id;
   const session = useQuery({
     queryKey: ["session", agentId, sessionId],
     queryFn: () => api.session(agentId, sessionId!),
     enabled: Boolean(sessionId),
+    refetchInterval: 2_000,
   });
   const selectedDetail = useQuery({
     queryKey: ["memory-detail", agentId, selectedTraceId],
@@ -35,17 +41,38 @@ export function LiveInterceptionPage() {
     enabled: Boolean(selectedTraceId),
   });
   useEffect(() => {
+    if (selectedSessionId) {
+      setSelectedTraceId(selectedSessionTraceId);
+      return;
+    }
     setSelectedTraceId(null);
-  }, [sessionId]);
-  if (interception.isLoading) {
+  }, [selectedSessionId, selectedSessionTraceId, sessionId]);
+  useEffect(() => {
+    if (!selectedSessionId || !session.data?.steps.length || selectedTraceId) return;
+    const nextTraceId = selectedSessionTraceId ?? session.data.steps[0].trace_id;
+    setSelectedTraceId(nextTraceId);
+  }, [selectedSessionId, selectedSessionTraceId, selectedTraceId, session.data]);
+
+  if (!sessionMode && interception.isLoading) {
     return <LoadingState label="Loading interception console" />;
   }
-  if (interception.error) {
+  if (!sessionMode && interception.error) {
     return <ErrorState message="The interception API is unavailable." />;
   }
+  if (sessionMode && session.isLoading) {
+    return <LoadingState label="Loading session traces" />;
+  }
+  if (sessionMode && (session.error || !session.data)) {
+    return <ErrorState message="Unable to load the selected session." />;
+  }
 
-  const state = interception.data!;
-  const detail = selectedDetail.data ?? state.detail;
+  const state = interception.data;
+  const currentStepIndex =
+    selectedTraceId && session.data
+      ? (session.data.steps.find((step) => step.trace_id === selectedTraceId)?.step_index ??
+        session.data.steps.length)
+      : state?.current_step ?? session.data?.steps.length ?? 0;
+  const detail = selectedDetail.data ?? state?.detail;
   const guardEvaluation = detail?.item.guard_evaluation;
   const normalizedAction = guardEvaluation?.normalized_action;
   const intentContract = guardEvaluation?.intent_contract;
@@ -59,10 +86,39 @@ export function LiveInterceptionPage() {
       : "AgentGuard FirewallV2 enforced decision"
     : "Historical trace without V2 evidence";
   const displayedExplanation =
-    guardEvaluation?.explanation || detail?.item.explanation;
-  const visibleSteps =
-    session.data?.steps.filter((step) => step.step_index <= state.current_step) ?? [];
-  const idle = state.status === "idle";
+    sanitizeLegacyText(guardEvaluation?.explanation || detail?.item.explanation);
+  const visibleSteps = session.data?.steps.filter((step) =>
+    sessionMode ? true : step.step_index <= currentStepIndex
+  ) ?? [];
+  const statusValue = sessionMode
+    ? "completed"
+    : state?.status ?? "idle";
+  const isPaused = !sessionMode && state?.status === "paused";
+  const idle = sessionMode ? visibleSteps.length === 0 : state?.status === "idle";
+  const streamLabel = sessionMode
+    ? "Historical session"
+    : connected
+      ? "Runtime events connected"
+      : "Polling fallback";
+  const firewallLabel = guardEvaluation?.firewall_mode ??
+    state?.firewall_mode ??
+    "v2";
+  const guardVersionLabel = guardEvaluation?.firewall_version ??
+    state?.guard_version ??
+    "agentguard_firewall_v2";
+  const intentSummary = detail?.trace.intent.normalized_intent ??
+    (sessionMode
+      ? "Select a trace to inspect that session's intent and decision."
+      : "Run the selected registered agent to inspect its tool calls.");
+
+  const onSelectTrace = (traceId: string) => {
+    setSelectedTraceId(traceId);
+    if (!sessionMode) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("sessionId", selectedSessionId!);
+    next.set("traceId", traceId);
+    setSearchParams(next, { replace: true });
+  };
 
   return (
     <div className="flex h-full min-h-[720px] flex-col gap-4">
@@ -71,34 +127,50 @@ export function LiveInterceptionPage() {
           <div>
             <div className="eyebrow">Intent</div>
             <div className="mt-1 max-w-[520px] text-sm font-medium">
-              {detail?.trace.intent.normalized_intent ??
-                "Run the selected registered agent to inspect its tool calls."}
+              {intentSummary}
+            </div>
+          </div>
+          <div>
+            <div className="eyebrow">Intent outcome</div>
+            <div className="mt-1">
+              <StatusBadge value={displayedDecision ?? "review"} />
             </div>
           </div>
           <div>
             <div className="eyebrow">Progress</div>
             <div className="mt-1 mono text-sm">
-              Step {state.current_step}/{state.total_steps}
+              Step {currentStepIndex}/{session.data?.steps.length ?? state?.total_steps ?? 0}
             </div>
           </div>
           <div>
             <div className="eyebrow">Stream</div>
             <div className="mt-1 flex items-center gap-2 text-sm">
               <span
-                className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-500"}`}
+                className={`h-2 w-2 rounded-full ${
+                  sessionMode
+                    ? "bg-slate-400"
+                    : connected
+                      ? "bg-emerald-500"
+                      : "bg-amber-500"
+                }`}
               />
-              {connected ? "Runtime events connected" : "Polling fallback"}
+              {streamLabel}
             </div>
           </div>
           <div>
             <div className="eyebrow">Firewall</div>
             <div className="mt-1 mono text-sm">
-              {state.firewall_mode} · {state.guard_version}
+              {firewallLabel} · {guardVersionLabel}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <StatusBadge value={state.status} />
+          <StatusBadge value={statusValue} />
+          {sessionMode && selectedSessionId && (
+            <code className="rounded bg-[var(--surface-low)] px-2 py-1 text-[10px]">
+              {selectedSessionId}
+            </code>
+          )}
           <Link
             className="rounded bg-black px-4 py-2 text-xs font-semibold text-white"
             to={`/agents/${agentId}`}
@@ -111,8 +183,10 @@ export function LiveInterceptionPage() {
       <div className="page-grid flex-1 grid-cols-[minmax(300px,0.9fr)_minmax(420px,1.15fr)_minmax(280px,0.9fr)]">
         <section className="panel min-h-0 overflow-hidden">
           <div className="flex h-13 items-center justify-between border-b border-[var(--border)] px-5">
-            <h2 className="eyebrow text-[var(--ink)]">Agent Stream</h2>
-            <StatusBadge value={state.status} />
+            <h2 className="eyebrow text-[var(--ink)]">
+              {sessionMode ? "Session Traces" : "Agent Stream"}
+            </h2>
+            <StatusBadge value={statusValue} />
           </div>
           <div className="h-[calc(100%-52px)] overflow-auto p-5 subtle-scrollbar">
             {idle ? (
@@ -122,8 +196,9 @@ export function LiveInterceptionPage() {
                 </div>
                 <div className="font-semibold">No active interception</div>
                 <p className="mt-2 max-w-[260px] text-sm text-[var(--ink-muted)]">
-                  Run the independent agent from its own UI. Tool proposals and
-                  AgentGuard decisions will stream here after transport is connected.
+                  {sessionMode
+                    ? "No traces were recorded for this session."
+                    : "Run the independent agent from its own UI. Tool proposals and AgentGuard decisions will stream here after transport is connected."}
                 </p>
               </div>
             ) : (
@@ -139,7 +214,7 @@ export function LiveInterceptionPage() {
                     step.guard_evaluation?.recommendation ?? step.decision;
                   const selected =
                     step.trace_id ===
-                    (selectedTraceId ?? state.current_trace_id);
+                    (selectedTraceId ?? state?.current_trace_id);
                   return (
                   <button
                     aria-pressed={selected}
@@ -149,7 +224,7 @@ export function LiveInterceptionPage() {
                         : "border-[var(--border)]"
                     } block w-full text-left`}
                     key={step.trace_id}
-                    onClick={() => setSelectedTraceId(step.trace_id)}
+                    onClick={() => onSelectTrace(step.trace_id)}
                     type="button"
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -159,7 +234,7 @@ export function LiveInterceptionPage() {
                         </code>
                         <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
                           {step.guard_evaluation
-                            ? `${step.guard_evaluation.firewall_mode} · ${step.guard_evaluation.enforced_by}`
+                            ? `${step.guard_evaluation.firewall_mode} · ${sanitizeLegacyText(step.guard_evaluation.enforced_by)}`
                             : "Historical trace"}
                         </div>
                       </div>
@@ -187,18 +262,18 @@ export function LiveInterceptionPage() {
             <div className="flex h-full flex-col">
               <div
                 className={`border-b px-5 py-5 ${
-                  state.status === "paused"
+                  isPaused
                     ? "border-amber-300 bg-[var(--amber-bg)]"
                     : "border-[var(--border)]"
                 }`}
               >
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--amber)]">
-                  {state.status === "paused" ? (
+                  {isPaused ? (
                     <ShieldAlert size={17} />
                   ) : (
                     <Check size={17} />
                   )}
-                  {state.status === "paused"
+                  {isPaused
                     ? "Execution paused · operator decision required"
                     : decisionOwner}
                 </div>
@@ -315,7 +390,7 @@ export function LiveInterceptionPage() {
                     <div className="eyebrow">Decision basis</div>
                     <code className="text-[11px] font-semibold">
                       {guardEvaluation
-                        ? `${guardEvaluation.firewall_version} · ${guardEvaluation.enforced_by}`
+                        ? `${sanitizeLegacyText(guardEvaluation.firewall_version)} · ${sanitizeLegacyText(guardEvaluation.enforced_by)}`
                         : String(detail.decision.tier_used ?? "decision_policy")}
                     </code>
                   </div>
@@ -327,7 +402,7 @@ export function LiveInterceptionPage() {
                             className="rounded bg-[var(--red-bg)] px-2 py-1 text-[11px] font-semibold text-[var(--red)]"
                             key={rule.rule_id}
                           >
-                            {rule.rule_id}: {rule.effect}
+                            {sanitizeLegacyText(rule.rule_id)}: {rule.effect}
                           </code>
                         ),
                       )}
@@ -368,7 +443,7 @@ export function LiveInterceptionPage() {
                   {guardEvaluation ? (
                     <>
                       <p className="mt-2 text-sm leading-5">
-                        {guardEvaluation.explanation}
+                        {sanitizeLegacyText(guardEvaluation.explanation)}
                       </p>
                       {normalizedAction && (
                         <div className="mt-3 rounded border border-blue-200 bg-white p-3">
@@ -473,7 +548,7 @@ export function LiveInterceptionPage() {
                                 className="rounded bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-800"
                                 key={rule.rule_id}
                               >
-                                {rule.rule_id}: {rule.effect}
+                                {sanitizeLegacyText(rule.rule_id)}: {rule.effect}
                               </code>
                             ))}
                           </div>
@@ -481,7 +556,9 @@ export function LiveInterceptionPage() {
                         {guardEvaluation.deferred_rule_ids.length > 0 && (
                           <div className="mt-3 text-[11px] text-[var(--ink-muted)]">
                             Deferred rules:{" "}
-                            {guardEvaluation.deferred_rule_ids.join(", ")}
+                            {guardEvaluation.deferred_rule_ids
+                              .map((id) => sanitizeLegacyText(id))
+                              .join(", ")}
                           </div>
                         )}
                       </div>
@@ -529,7 +606,7 @@ export function LiveInterceptionPage() {
                                 <StatusBadge value={String(tier.recommendation)} />
                               </div>
                               <p className="mt-2 text-[var(--ink-muted)]">
-                                {String(tier.explanation)}
+                                {sanitizeLegacyText(String(tier.explanation))}
                               </p>
                             </div>
                           ))}
@@ -569,11 +646,11 @@ export function LiveInterceptionPage() {
               </div>
 
               <div className="border-t border-[var(--border)] bg-[var(--surface-low)] p-4 text-xs leading-5 text-[var(--ink-muted)]">
-                Event source: {state.event_source}.{" "}
+                Event source: {sessionMode ? "session_history" : state?.event_source}.{" "}
                 {guardEvaluation
                   ? observeOnly
-                    ? `V2 recommendation owner: ${guardEvaluation.enforced_by}; execution was not controlled by V2.`
-                    : `Decision owner: ${guardEvaluation.enforced_by}.`
+                    ? `V2 recommendation owner: ${sanitizeLegacyText(guardEvaluation.enforced_by)}; execution was not controlled by V2.`
+                    : `Decision owner: ${sanitizeLegacyText(guardEvaluation.enforced_by)}.`
                   : "This historical trace predates the V2 evaluation event."}
               </div>
             </div>
@@ -627,6 +704,14 @@ export function LiveInterceptionPage() {
       </div>
     </div>
   );
+}
+
+function sanitizeLegacyText(value: string | undefined | null): string {
+  if (!value) return "";
+  return value
+    .replace(/\bV1\b/g, "Legacy")
+    .replace(/\bv1\b/g, "legacy")
+    .replace(/_v1\b/g, "");
 }
 
 function IntentValues({

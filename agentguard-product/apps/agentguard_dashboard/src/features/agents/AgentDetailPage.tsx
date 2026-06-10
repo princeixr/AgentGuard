@@ -62,7 +62,7 @@ export function AgentDetailPage() {
           )}
           <Link
             className="rounded bg-[var(--blue)] px-4 py-2 text-xs font-semibold text-white"
-            to={`/agents/${agentId}/live`}
+            to={`/agents/${agentId}/trace-interception`}
           >
             Open guard dashboard
           </Link>

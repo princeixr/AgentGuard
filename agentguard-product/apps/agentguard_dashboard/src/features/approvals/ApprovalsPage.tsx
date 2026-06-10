@@ -90,7 +90,7 @@ export function ApprovalsPage() {
                     <StatusBadge value={approval.status} />
                   </div>
                   <p className="mt-2 max-w-4xl text-sm leading-6">
-                    {approval.explanation}
+                    {sanitizeLegacyText(approval.explanation)}
                   </p>
                 </div>
                 <div className="mono text-right text-[11px] text-[var(--ink-muted)]">
@@ -125,7 +125,7 @@ export function ApprovalsPage() {
                     </code>
                   </div>
                   <p className="mt-3 text-xs leading-5 text-[var(--ink-muted)]">
-                    {approval.guard_evaluation?.explanation}
+                    {sanitizeLegacyText(approval.guard_evaluation?.explanation)}
                   </p>
                 </div>
               </div>
@@ -143,7 +143,7 @@ export function ApprovalsPage() {
                         <StatusBadge value={String(tier.recommendation)} />
                       </div>
                       <p className="mt-2 text-xs leading-5 text-[var(--ink-muted)]">
-                        {String(tier.explanation ?? "")}
+                        {sanitizeLegacyText(String(tier.explanation ?? ""))}
                       </p>
                     </div>
                   ))}
@@ -185,4 +185,12 @@ export function ApprovalsPage() {
       )}
     </div>
   );
+}
+
+function sanitizeLegacyText(value: string | undefined | null): string {
+  if (!value) return "";
+  return value
+    .replace(/\bV1\b/g, "Legacy")
+    .replace(/\bv1\b/g, "legacy")
+    .replace(/_v1\b/g, "");
 }

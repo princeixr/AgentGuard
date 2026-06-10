@@ -86,10 +86,14 @@ export function GuardAdminPage() {
 
   const data = guard.data;
   const policyData = policy.data;
+  const visibleComponents = data.components.filter(
+    (component) =>
+      component.status !== "placeholder" && component.status !== "not_implemented",
+  );
   const flow = FLOW_IDS.map((id) =>
-    data.components.find((component) => component.component_id === id),
+    visibleComponents.find((component) => component.component_id === id),
   ).filter((component): component is GuardAdminComponent => Boolean(component));
-  const remaining = data.components.filter(
+  const remaining = visibleComponents.filter(
     (component) => !FLOW_IDS.includes(component.component_id),
   );
   const openEditor = () => {

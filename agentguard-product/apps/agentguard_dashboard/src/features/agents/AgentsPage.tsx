@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   Clock3,
   KeyRound,
-  Plus,
   RadioTower,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -40,13 +39,6 @@ export function AgentsPage() {
             Signed in as {me.data?.user.name} · {me.data?.user.role}
           </p>
         </div>
-        <button
-          className="flex items-center gap-2 rounded bg-black px-4 py-2.5 text-xs font-semibold text-white opacity-60"
-          title="Agents register through the AgentGuard SDK."
-        >
-          <Plus size={15} />
-          Register Agent
-        </button>
       </section>
 
       <div className="grid gap-4">
@@ -84,7 +76,7 @@ export function AgentsPage() {
                   </Link>
                 <Link
                   className="rounded bg-[var(--blue)] px-4 py-2 text-xs font-semibold text-white"
-                  to={`/agents/${agent.agent_id}/live`}
+                  to={`/agents/${agent.agent_id}/trace-interception`}
                 >
                   Open Dashboard
                 </Link>
@@ -100,12 +92,12 @@ export function AgentsPage() {
                 <AgentMetric
                   icon={<Activity size={16} />}
                   label="Environment"
-                  value={deployment?.environment ?? "development"}
+                  value={deployment?.environment ?? "n/a"}
                 />
                 <AgentMetric
                   icon={<CheckCircle2 size={16} />}
                   label="Integration"
-                  value={String(agent.metadata.integration_status ?? "registered")}
+                  value={String(agent.metadata.integration_status ?? "n/a")}
                 />
                 <AgentMetric
                   icon={<Clock3 size={16} />}
@@ -118,7 +110,7 @@ export function AgentsPage() {
                 <div className="flex items-center gap-2 text-[var(--ink-muted)]">
                   <KeyRound size={14} />
                   Integration credential configured for{" "}
-                  <code>{deployment?.runtime_agent_name}</code>
+                  <code>{deployment?.runtime_agent_name ?? "n/a"}</code>
                 </div>
                 <div>
                   Policy: <code>{agent.default_policy_id}</code>

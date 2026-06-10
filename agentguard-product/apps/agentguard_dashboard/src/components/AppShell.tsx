@@ -1,11 +1,7 @@
 import {
-  Activity,
-  Bell,
-  BookOpen,
-  Bot,
+  BarChart3,
   Boxes,
-  History,
-  ListTree,
+  Clock3,
   Settings,
   Shield,
   ShieldCheck,
@@ -27,24 +23,19 @@ export function AppShell() {
   const me = useQuery({ queryKey: ["me"], queryFn: api.me });
   const navigation = selectedAgentId ? [
     {
-      to: `/agents/${selectedAgentId}/live`,
-      label: "Live Interception",
+      to: `/agents/${selectedAgentId}/summary`,
+      label: "Agent Summary",
+      icon: BarChart3,
+    },
+    {
+      to: `/agents/${selectedAgentId}/sessions`,
+      label: "Session History",
+      icon: Clock3,
+    },
+    {
+      to: `/agents/${selectedAgentId}/trace-interception`,
+      label: "Trace Interception",
       icon: Shield,
-    },
-    {
-      to: `/agents/${selectedAgentId}/replay`,
-      label: "Trace Replay",
-      icon: History,
-    },
-    {
-      to: `/agents/${selectedAgentId}/memory`,
-      label: "Decision Memory",
-      icon: ListTree,
-    },
-    {
-      to: `/agents/${selectedAgentId}/operations`,
-      label: "Risk & Operations",
-      icon: Activity,
     },
     {
       to: `/agents/${selectedAgentId}/guard`,
@@ -55,17 +46,21 @@ export function AppShell() {
   const pageTitle = location.pathname === "/agents"
     ? "Agents"
     : location.pathname === "/approvals"
-      ? "Approvals"
+      ? "Agents"
     : /^\/agents\/[^/]+$/.test(location.pathname)
       ? "Agent Details"
-    : location.pathname.endsWith("/live")
-      ? "Live Interception"
-      : location.pathname.endsWith("/replay")
-        ? "Trace Replay"
-        : location.pathname.endsWith("/memory")
-          ? "Decision Memory"
-          : location.pathname.endsWith("/operations")
-            ? "Risk & Operations"
+    : location.pathname.endsWith("/trace-interception") ||
+        location.pathname.endsWith("/live")
+      ? "Trace Interception"
+      : location.pathname.endsWith("/sessions")
+        ? "Session History"
+        : location.pathname.endsWith("/summary")
+          ? "Agent Summary"
+      : location.pathname.endsWith("/replay") ||
+          location.pathname.endsWith("/memory")
+        ? "Trace Interception"
+        : location.pathname.endsWith("/operations")
+          ? "Agent Summary"
             : location.pathname.endsWith("/guard")
               ? "Guard Admin"
             : "AgentGuard";
@@ -100,20 +95,6 @@ export function AppShell() {
             <Boxes size={18} />
             Agents
           </NavLink>
-          <NavLink
-            to="/approvals"
-            className={({ isActive }) =>
-              [
-                "flex items-center gap-3 rounded px-4 py-3 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-[var(--blue)] text-white"
-                  : "text-[#333] hover:bg-[var(--surface-highest)]",
-              ].join(" ")
-            }
-          >
-            <Bell size={18} />
-            Approvals
-          </NavLink>
           <div className="px-4 pb-1 pt-4">
             <div className="eyebrow">Selected agent</div>
             <div className="mt-2 truncate text-sm font-semibold">
@@ -139,16 +120,9 @@ export function AppShell() {
           ))}
         </nav>
 
-        <div className="space-y-2 border-t border-[var(--border)] p-4">
-          <button className="flex w-full items-center justify-center gap-2 rounded bg-black py-2.5 text-sm font-semibold text-white opacity-60">
-            <Bot size={17} />
-            New Agent
-          </button>
+        <div className="border-t border-[var(--border)] p-4">
           <div className="flex items-center gap-3 px-3 py-2 text-sm text-[var(--ink-muted)]">
             <Settings size={17} /> Settings
-          </div>
-          <div className="flex items-center gap-3 px-3 py-2 text-sm text-[var(--ink-muted)]">
-            <BookOpen size={17} /> Docs
           </div>
         </div>
       </aside>
@@ -175,7 +149,6 @@ export function AppShell() {
               />
               {agent.data?.status === "live" ? "Live" : "Setup required"}
             </div>
-            <Bell size={19} />
             <Settings size={20} />
             <div className="border-l border-[var(--border)] pl-4 text-right">
               <div className="text-xs font-semibold">

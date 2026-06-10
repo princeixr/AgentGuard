@@ -9,6 +9,16 @@ const LiveInterceptionPage = lazy(() =>
     default: module.LiveInterceptionPage,
   })),
 );
+const SessionHistoryPage = lazy(() =>
+  import("../features/sessions/SessionHistoryPage").then((module) => ({
+    default: module.SessionHistoryPage,
+  })),
+);
+const SecuritySummaryPage = lazy(() =>
+  import("../features/summary/SecuritySummaryPage").then((module) => ({
+    default: module.SecuritySummaryPage,
+  })),
+);
 const AgentsPage = lazy(() =>
   import("../features/agents/AgentsPage").then((module) => ({
     default: module.AgentsPage,
@@ -19,29 +29,9 @@ const AgentDetailPage = lazy(() =>
     default: module.AgentDetailPage,
   })),
 );
-const TraceReplayPage = lazy(() =>
-  import("../features/replay/TraceReplayPage").then((module) => ({
-    default: module.TraceReplayPage,
-  })),
-);
-const DecisionMemoryPage = lazy(() =>
-  import("../features/memory/DecisionMemoryPage").then((module) => ({
-    default: module.DecisionMemoryPage,
-  })),
-);
-const OperationsPage = lazy(() =>
-  import("../features/operations/OperationsPage").then((module) => ({
-    default: module.OperationsPage,
-  })),
-);
 const GuardAdminPage = lazy(() =>
   import("../features/guard/GuardAdminPage").then((module) => ({
     default: module.GuardAdminPage,
-  })),
-);
-const ApprovalsPage = lazy(() =>
-  import("../features/approvals/ApprovalsPage").then((module) => ({
-    default: module.ApprovalsPage,
   })),
 );
 
@@ -52,27 +42,41 @@ export function App() {
         <Route element={<AppShell />}>
           <Route index element={<Navigate replace to="/agents" />} />
           <Route path="/agents" element={<AgentsPage />} />
-          <Route path="/approvals" element={<ApprovalsPage />} />
+          <Route path="/approvals" element={<Navigate replace to="/agents" />} />
           <Route path="/agents/:agentId" element={<AgentDetailPage />} />
           <Route path="/live" element={<Navigate replace to="/agents" />} />
           <Route path="/replay" element={<Navigate replace to="/agents" />} />
           <Route path="/memory" element={<Navigate replace to="/agents" />} />
           <Route path="/operations" element={<Navigate replace to="/agents" />} />
+          <Route path="/sessions" element={<Navigate replace to="/agents" />} />
+          <Route path="/summary" element={<Navigate replace to="/agents" />} />
           <Route
             path="/agents/:agentId/live"
+            element={<Navigate replace to="../trace-interception" />}
+          />
+          <Route
+            path="/agents/:agentId/trace-interception"
             element={<LiveInterceptionPage />}
           />
           <Route
+            path="/agents/:agentId/sessions"
+            element={<SessionHistoryPage />}
+          />
+          <Route
+            path="/agents/:agentId/summary"
+            element={<SecuritySummaryPage />}
+          />
+          <Route
             path="/agents/:agentId/replay"
-            element={<TraceReplayPage />}
+            element={<Navigate replace to="../trace-interception" />}
           />
           <Route
             path="/agents/:agentId/memory"
-            element={<DecisionMemoryPage />}
+            element={<Navigate replace to="../trace-interception" />}
           />
           <Route
             path="/agents/:agentId/operations"
-            element={<OperationsPage />}
+            element={<Navigate replace to="../summary" />}
           />
           <Route
             path="/agents/:agentId/guard"

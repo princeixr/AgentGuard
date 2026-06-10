@@ -17,6 +17,8 @@ const styles: Record<string, string> = {
   blocked: "bg-[var(--red-bg)] text-[var(--red)]",
   unavailable: "bg-[var(--red-bg)] text-[var(--red)]",
   running: "bg-blue-100 text-blue-700",
+  live: "bg-blue-100 text-blue-700",
+  past_call: "bg-slate-100 text-slate-700",
   completed: "bg-slate-100 text-slate-700",
   idle: "bg-slate-100 text-slate-600",
 };
