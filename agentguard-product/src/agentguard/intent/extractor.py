@@ -176,7 +176,15 @@ def deterministic_intent_fallback(
         "email.read": ("read email", "summarize email", "latest email"),
         "email.draft": ("draft", "prepare a reply", "write a reply"),
         "email.send": ("send email", "send it", "email them"),
-        "filesystem.inspect": ("list files", "show files", "current directory", "pwd"),
+        "filesystem.inspect": (
+            "list files",
+            "list any ",
+            "show files",
+            "current directory",
+            "run ls",
+            "ls command",
+            "pwd",
+        ),
         "filesystem.read": ("read file", "show file", "open file", "cat "),
         "filesystem.write": ("create file", "write file", "make a file", "mkdir", "touch "),
         "filesystem.delete": ("delete file", "delete folder", "remove file", "remove folder", "rm "),
@@ -209,7 +217,7 @@ def deterministic_intent_fallback(
     requested.update(
         capability
         for capability in known_capabilities
-        if capability.split(".")[-1].replace("_", " ") in text
+        if _explicit_capability_name(capability) in text
     )
     requested.difference_update(forbidden)
     resources = sorted(set(_PATH_PATTERN.findall(user_request)))
@@ -236,6 +244,13 @@ def deterministic_intent_fallback(
         confidence=confidence,
         uncertainties=uncertainties,
     )
+
+
+def _explicit_capability_name(capability: str) -> str:
+    domain, _, operation = capability.partition(".")
+    if operation in {"list", "read", "write", "create", "update", "delete", "send"}:
+        return f"{domain} {operation}".replace("_", " ")
+    return operation.replace("_", " ")
 
 
 def _contract(

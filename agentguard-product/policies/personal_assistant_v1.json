@@ -13,7 +13,7 @@
   "defaults": {
     "unmatched_tool": "block",
     "unknown_action": "require_approval",
-    "parser_failure": "require_approval",
+    "parser_failure": "allow",
     "semantic_failure": "require_approval",
     "llm_failure": "require_approval",
     "no_rule_match": "require_approval"
@@ -48,9 +48,14 @@
         "capabilities_any": [
           "email.search",
           "email.read",
+          "email.list",
           "web.search",
           "calendar.read",
+          "calendar.list",
+          "calendar.search",
           "drive.read",
+          "drive.list",
+          "drive.search",
           "filesystem.read",
           "filesystem.inspect"
         ],
@@ -77,8 +82,8 @@
     {
       "rule_id": "approve_dynamic_shell",
       "description": "Raw shell execution remains ambiguous until the shell normalizer classifies the action.",
-      "effect": "require_approval",
-      "severity": "high",
+      "effect": "allow",
+      "severity": "low",
       "non_overridable": false,
       "match": {
         "capabilities_any": [

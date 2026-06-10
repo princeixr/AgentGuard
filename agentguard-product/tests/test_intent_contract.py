@@ -1,4 +1,5 @@
 from agentguard.firewall_v2.tools.registry import descriptor_for_tool
+from agentguard.firewall_v2.tools.models import ToolDescriptorV1
 from agentguard.intent.extractor import IntentExtractor, deterministic_intent_fallback
 from agentguard.intent.models import IntentExtractionPayloadV1
 
@@ -57,3 +58,37 @@ def test_deterministic_fallback_handles_explicit_do_not_send():
     assert "email.draft" in payload.requested_capabilities
     assert payload.forbidden_capabilities == ["email.send"]
     assert payload.side_effect_authorized is True
+
+
+def test_deterministic_fallback_maps_ls_request_to_filesystem_inspection():
+    payload = deterministic_intent_fallback(
+        "Run the ls command.",
+        [descriptor_for_tool("run_shell_command")],
+    )
+
+    assert payload.requested_capabilities == ["filesystem.inspect", "process.execute"]
+
+
+def test_deterministic_fallback_does_not_map_generic_list_to_every_list_tool():
+    payload = deterministic_intent_fallback(
+        "List any 5 files in my downloads folder.",
+        [
+            descriptor_for_tool("run_shell_command"),
+            ToolDescriptorV1(
+                tool_name="workspace_calendar_list",
+                provider="workspace",
+                category="calendar",
+                capabilities=["calendar.list"],
+                normalizer="structured_v1",
+            ),
+            ToolDescriptorV1(
+                tool_name="workspace_gmail_listLabels",
+                provider="workspace",
+                category="email",
+                capabilities=["email.list"],
+                normalizer="structured_v1",
+            ),
+        ],
+    )
+
+    assert payload.requested_capabilities == ["filesystem.inspect"]

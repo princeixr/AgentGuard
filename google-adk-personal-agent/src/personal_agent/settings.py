@@ -16,6 +16,11 @@ except ModuleNotFoundError:
     pass
 
 
+def _resolve_from_root(value: str) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else ROOT / path
+
+
 @dataclass(frozen=True)
 class Settings:
     workspace_id: str = os.environ.get("AGENT_WORKSPACE_ID", "wsp_agentguard_demo")
@@ -29,8 +34,8 @@ class Settings:
     environment: str = os.environ.get("AGENT_ENVIRONMENT", "development")
     model: str = os.environ.get("ADK_MODEL", "gemini-3-flash-preview")
     agent_ui_url: str | None = os.environ.get("AGENT_UI_URL")
-    mcp_config_path: Path = Path(
-        os.environ.get("ADK_MCP_CONFIG_PATH", str(ROOT / "config/adk_mcp_servers.toml"))
+    mcp_config_path: Path = _resolve_from_root(
+        os.environ.get("ADK_MCP_CONFIG_PATH", "config/adk_mcp_servers.toml")
     )
     command_timeout_seconds: int = int(
         os.environ.get("ADK_COMMAND_TIMEOUT_SECONDS", "60")

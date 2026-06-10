@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, Callable
 
 from agentguard_sdk import (
+    AgentRegistration,
     AgentGuardClient,
     HttpAgentGuardClient,
     OutcomeReport,
@@ -26,14 +27,21 @@ def build_guard_client() -> AgentGuardClient:
 
 
 class AgentGuardAdkInterceptor:
-    def __init__(self, client: AgentGuardClient):
+    def __init__(
+        self,
+        client: AgentGuardClient,
+        registration_factory: Callable[[], AgentRegistration] | None = None,
+    ):
         self.client = client
+        self.registration_factory = registration_factory
         self._intent_by_turn: dict[str, str] = {}
         self._decision_by_call: dict[str, tuple[str, float]] = {}
 
-    def before_tool(self, tool, args: dict[str, Any], context):
-        session_id = _session_id(context)
-        turn_id = _turn_id(context)
+    def before_tool(self, tool, args: dict[str, Any], tool_context):
+        session_id = _session_id(tool_context)
+        turn_id = _turn_id(tool_context)
+        if self.registration_factory is not None:
+            self.client.register(self.registration_factory())
         if turn_id not in self._intent_by_turn:
             result = self.client.start_turn(
                 TurnStart(
@@ -43,12 +51,14 @@ class AgentGuardAdkInterceptor:
                     integration_id=settings.integration_id,
                     session_id=session_id,
                     turn_id=turn_id,
-                    user_request=_user_text(context),
+                    user_request=_user_text(tool_context),
                     manifest_version="development",
                 )
             )
             self._intent_by_turn[turn_id] = result.intent_id
-        call_id = getattr(context, "function_call_id", None) or f"{turn_id}:{_tool_name(tool)}"
+        call_id = getattr(tool_context, "function_call_id", None) or (
+            f"{turn_id}:{_tool_name(tool)}"
+        )
         started = time.perf_counter()
         decision = self.client.evaluate(
             ToolProposal(
@@ -98,11 +108,23 @@ class AgentGuardAdkInterceptor:
             }
         return None
 
-    def after_tool(self, tool, args: dict[str, Any], context, response: dict):
-        self._report(tool, context, "executed", str(response)[:1000])
+    def after_tool(
+        self,
+        tool,
+        args: dict[str, Any],
+        tool_context,
+        tool_response: dict,
+    ):
+        self._report(tool, tool_context, "executed", str(tool_response)[:1000])
 
-    def on_tool_error(self, tool, args: dict[str, Any], context, error: Exception):
-        self._report(tool, context, "failed", str(error)[:1000])
+    def on_tool_error(
+        self,
+        tool,
+        args: dict[str, Any],
+        tool_context,
+        error: Exception,
+    ):
+        self._report(tool, tool_context, "failed", str(error)[:1000])
 
     def _report(self, tool, context, status: str, summary: str) -> None:
         call_id = getattr(context, "function_call_id", None) or (

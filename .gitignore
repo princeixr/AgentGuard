@@ -26,3 +26,4 @@ agentguard-product/data/traces/
 agentguard-product/data/demo_runtime/
 google-adk-personal-agent/.adk/
 google-adk-personal-agent/data/
+data/*

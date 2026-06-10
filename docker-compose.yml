@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile.api
     image: agentguard-api:local
     ports:
-      - "8000:8000"
+      - "${AGENTGUARD_API_PORT:-8000}:8000"
     environment:
       AGENTGUARD_API_KEY: ${AGENTGUARD_API_KEY:-dev-agentguard-key}
       AGENTGUARD_WEB_ORIGINS: ${AGENTGUARD_WEB_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}

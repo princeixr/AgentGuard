@@ -153,8 +153,9 @@ def _from_explicit_annotations(
 
 
 def _tokens(tool: RegisteredTool) -> set[str]:
-    text = f"{tool.name} {tool.source_name} {tool.provider} {tool.description}".lower()
-    return set(re.findall(r"[a-z0-9]+", text))
+    raw = f"{tool.name} {tool.source_name} {tool.provider} {tool.description}"
+    spaced = re.sub(r"([A-Z])", r" \1", raw)
+    return set(re.findall(r"[a-z0-9]+", spaced.lower()))
 
 
 def _infer_operation(tokens: set[str]) -> tuple[str, ToolRiskLevel]:
