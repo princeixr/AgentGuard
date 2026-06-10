@@ -49,10 +49,6 @@ async def events(
     _require_agent(agent_id, registry)
 
     async def generate():
-        yield _format_sse(
-            "state",
-            runtime.current(agent_id).model_dump(mode="json"),
-        )
         async for envelope in runtime.subscribe(agent_id):
             yield _format_sse(envelope.event, envelope.data)
 

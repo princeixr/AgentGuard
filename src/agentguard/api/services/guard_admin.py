@@ -11,6 +11,7 @@ from agentguard.api.models import (
     GuardAdminStatus,
 )
 from agentguard.control_plane.demo_adk_definition import agent_definition
+from agentguard.firewall_v2.config import FirewallV2RuntimeConfig
 from agentguard.firewall_v2.policy.resolver import resolve_demo_policy
 
 
@@ -20,6 +21,7 @@ def guard_admin_status(agent_id: str) -> GuardAdminStatus:
     loaded_policy = resolve_demo_policy()
     policy = loaded_policy.document
     mode = guardrails["firewall_mode"]
+    runtime_config = FirewallV2RuntimeConfig.from_env()
     force_block = _env_bool("AGENTGUARD_FORCE_BLOCK", fallback="FORCE_BLOCK")
     components = [
         GuardAdminComponent(
@@ -31,28 +33,18 @@ def guard_admin_status(agent_id: str) -> GuardAdminStatus:
             management="Configured in the integrated agent callback registration.",
         ),
         GuardAdminComponent(
-            component_id="firewall_v1",
-            name="FirewallV1 enforcement",
-            layer="Legacy enforcement",
-            status="operational",
-            summary=(
-                "The heuristic V1 path is retained as comparison evidence."
-                if mode == "v2"
-                else "The heuristic V1 path remains the active enforcement owner."
-            ),
-            management=(
-                "Not used for the effective runtime decision in v2 mode."
-                if mode == "v2"
-                else "Temporary compatibility layer while V2 is developed and verified."
-            ),
-        ),
-        GuardAdminComponent(
             component_id="tool_descriptors",
             name="Tool capability registry",
             layer="V2 foundation",
             status="operational",
-            summary="Known tools resolve to capabilities, impact, reversibility, and a normalizer ID.",
-            management="Built-in descriptors are code-defined; custom registration is not implemented.",
+            summary=(
+                "Runtime and MCP metadata resolve into security descriptors with "
+                "capabilities, operations, argument roles, provenance, and confidence."
+            ),
+            management=(
+                "Structured tools are inferred automatically. Low-confidence metadata "
+                "falls back conservatively; declarative overrides are the next extension."
+            ),
         ),
         GuardAdminComponent(
             component_id="policy_engine",
@@ -74,12 +66,34 @@ def guard_admin_status(agent_id: str) -> GuardAdminStatus:
             layer="V2 normalization",
             status="operational",
             summary=(
-                "The shell normalizer emits canonical actions for supported single "
-                "commands. Gmail and future MCP normalizers are not implemented yet."
+                "Structured tools use one metadata-driven normalizer. Shell uses a "
+                "specialized parser because its behavior is encoded in command syntax."
             ),
             management=(
-                "Unsupported shell syntax is intentionally low-confidence and falls "
-                "back to policy parser-failure handling."
+                "Schema argument roles populate resources, destinations, data classes, "
+                "and estimated values. Unsupported syntax or weak metadata fails safely."
+            ),
+        ),
+        GuardAdminComponent(
+            component_id="agenttrust_shell",
+            name="AgentTrust shell security",
+            layer="Tier 1 provider",
+            status=(
+                "operational"
+                if runtime_config.agenttrust_shell_enabled
+                else "observe_only"
+            ),
+            summary=(
+                "The real AgentTrust v0.5.0 deterministic interceptor evaluates every "
+                "shell proposal using stateless command-risk and policy checks."
+                if runtime_config.agenttrust_shell_enabled
+                else "AgentTrust shell analysis is implemented but disabled for this process."
+            ),
+            management=(
+                "ALLOW maps to allow; BLOCK remains a strict block; WARN, REVIEW, "
+                "unknown results, and provider failures require approval. The pinned "
+                "254-case shell benchmark records 92.1% AgentTrust verdict agreement "
+                "and zero dangerous false allows after AgentGuard policy combination."
             ),
         ),
         GuardAdminComponent(
@@ -96,18 +110,19 @@ def guard_admin_status(agent_id: str) -> GuardAdminStatus:
             layer="Evaluation",
             status="operational",
             summary=(
-                "Tool descriptors, normalized shell actions, policy defaults, matched "
-                "rules, and restrictive precedence produce the V2 decision."
+                "Central policy and deterministic security-provider results are combined "
+                "using most-restrictive precedence."
             ),
             management=(
-                "Enforced in v2 mode and recorded without enforcement in v2_shadow."
+                "A policy or AgentTrust block cannot be downgraded. Approval requirements "
+                "cannot be downgraded to allow."
             ),
         ),
         GuardAdminComponent(
             component_id="tier_2",
             name="Tier 2 semantic analysis",
             layer="Evaluation",
-            status="not_implemented",
+            status="placeholder",
             summary="Elastic-backed semantic retrieval and comparison are planned but not active in V2.",
             management="Will be enabled only after a verified Tier 1 baseline.",
         ),
@@ -115,9 +130,36 @@ def guard_admin_status(agent_id: str) -> GuardAdminStatus:
             component_id="tier_3",
             name="Tier 3 LLM judge",
             layer="Evaluation",
-            status="not_implemented",
-            summary="No LLM judge currently participates in FirewallV2 decisions.",
-            management="Will be optional and constrained by deterministic policy precedence.",
+            status=(
+                "operational"
+                if runtime_config.tier_3_enabled
+                else "observe_only"
+            ),
+            summary=(
+                "The Gemini structured-output judge participates in escalated V2 "
+                "evaluations."
+                if runtime_config.tier_3_enabled
+                else "The Gemini structured-output judge is implemented but disabled."
+            ),
+            management=(
+                "Controlled by AGENTGUARD_TIER_3_ENABLED and "
+                "AGENTGUARD_TIER3_ENFORCEMENT_ENABLED. Deterministic policy remains "
+                "non-overridable."
+            ),
+        ),
+        GuardAdminComponent(
+            component_id="decision_combiner",
+            name="Deterministic decision combiner",
+            layer="Enforcement",
+            status="operational",
+            summary=(
+                "Tier results are reduced to allow, require approval, or block with "
+                "deterministic precedence and recorded decision ownership."
+            ),
+            management=(
+                "In v2 mode the combined decision controls execution. Model-based tiers "
+                "cannot override deterministic policy or shell-security blocks."
+            ),
         ),
         GuardAdminComponent(
             component_id="approval_resume",
@@ -143,11 +185,10 @@ def guard_admin_status(agent_id: str) -> GuardAdminStatus:
                 if mode == "v2"
                 else "V2 stage and descriptor evidence is recorded beside V1 decisions."
                 if mode == "v2_shadow"
-                else "Enable v2_shadow to record V2 rollout evidence beside V1 decisions."
+                else "FirewallV2 is disabled for this process."
             ),
             management=(
-                "Set AGENTGUARD_FIREWALL_MODE to v1, v2_shadow, or v2 and restart "
-                "API and ADK processes."
+                "Set AGENTGUARD_FIREWALL_MODE=v2 and restart API and ADK processes."
             ),
         ),
     ]
@@ -158,16 +199,21 @@ def guard_admin_status(agent_id: str) -> GuardAdminStatus:
             "V1 risk and threshold logic can determine the outcome."
         )
     warnings.append(
-        "Shell paths are normalized, but Gmail recipients, payment amounts, calendar "
-        "targets, intent contracts, Tier 2, and Tier 3 are not implemented."
+        "Metadata-driven normalization and AgentTrust shell security are active. Intent "
+        "contracts, Tier 2 semantic analysis, approval resume, and declarative descriptor "
+        "overrides remain incomplete."
     )
     return GuardAdminStatus(
         agent_id=agent_id,
         firewall_mode=mode,
         active_enforcement=(
-            "firewall_v2_deterministic" if mode == "v2" else "firewall_v1"
+            "firewall_v2"
+            if mode == "v2"
+            else "firewall_v1"
+            if mode == "v2_shadow"
+            else "firewall_v1"
         ),
-        architecture_version="FirewallV2 deterministic policy enforcement",
+        architecture_version="AgentGuard FirewallV2",
         force_block_enabled=force_block,
         approval_enforced=guardrails["approval_enforced"],
         policy=GuardAdminPolicy(
@@ -180,10 +226,7 @@ def guard_admin_status(agent_id: str) -> GuardAdminStatus:
                 "This published policy is schema-validated, editable, and controls "
                 "deterministic V2 execution decisions."
                 if mode == "v2"
-                else (
-                    "This published policy is schema-validated, editable, and used for "
-                    "V2 shadow recommendations. FirewallV1 owns execution enforcement."
-                )
+                else "This published policy is schema-validated and evaluated by FirewallV2."
             ),
             effective_hash=loaded_policy.effective_hash,
             rule_count=len(policy.rules),

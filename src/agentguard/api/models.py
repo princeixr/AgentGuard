@@ -38,6 +38,24 @@ class SessionSummary(BaseModel):
     tool_sequence: list[str]
 
 
+class GuardEvaluationView(BaseModel):
+    firewall_mode: str
+    firewall_version: str
+    enforcement_status: str
+    recommendation: Decision
+    enforced_by: str
+    explanation: str
+    policy_id: str | None = None
+    policy_version: str | None = None
+    policy_hash: str | None = None
+    matched_rules: list[dict[str, Any]] = Field(default_factory=list)
+    deferred_rule_ids: list[str] = Field(default_factory=list)
+    normalized_action: dict[str, Any] | None = None
+    tier_results: list[dict[str, Any]] = Field(default_factory=list)
+    combined_decision: dict[str, Any] | None = None
+    stages: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class ReplayStep(BaseModel):
     trace_id: str
     step_index: int
@@ -55,11 +73,7 @@ class ReplayStep(BaseModel):
     explanation: str
     execution_status: str
     output_summary: str | None = None
-    enforced_by: str = "firewall_v1"
-    v1_decision: Decision | None = None
-    v2_recommendation: Decision | None = None
-    v2_effective_decision: Decision | None = None
-    v2_enforcement_status: str | None = None
+    guard_evaluation: GuardEvaluationView | None = None
 
 
 class PrecedentSummary(BaseModel):
@@ -92,11 +106,7 @@ class MemoryItem(BaseModel):
     decision: Decision
     labels: list[str]
     explanation: str
-    enforced_by: str = "firewall_v1"
-    v1_decision: Decision | None = None
-    v2_recommendation: Decision | None = None
-    v2_effective_decision: Decision | None = None
-    v2_enforcement_status: str | None = None
+    guard_evaluation: GuardEvaluationView | None = None
 
 
 class MemoryPage(BaseModel):
@@ -159,8 +169,8 @@ class EventEnvelope(BaseModel):
 class CurrentInterception(BaseModel):
     status: Literal["idle", "running", "paused", "completed"]
     event_source: str = "google_adk_runtime"
-    firewall_mode: str = "v1"
-    guard_version: str = "agentguard_v0.1"
+    firewall_mode: str = "v2"
+    guard_version: str = "agentguard_firewall_v2"
     agent_id: str | None = None
     scenario_id: str | None = None
     session_id: str | None = None
@@ -214,11 +224,16 @@ class AgentToolDefinition(BaseModel):
     irreversible: bool
     enabled: bool
     provider: str
+    domain: str = "unknown"
+    operation: str = "unknown"
     capabilities: list[str] = Field(default_factory=list)
     impact: str = "unknown"
     reversible: bool | None = None
     normalizer: str = "unsupported"
     metadata_status: str = "inferred"
+    metadata_confidence: float = 0.0
+    metadata_provenance: list[str] = Field(default_factory=list)
+    argument_roles: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class AgentTestScenario(BaseModel):
@@ -328,9 +343,7 @@ class AgentGuardTestDecision(BaseModel):
     risk_score: float
     explanation: str
     rules_fired: list[str]
-    enforced_by: str = "firewall_v1"
-    firewall_mode: str = "v1"
-    v2_evaluation: dict[str, Any] | None = None
+    guard_evaluation: GuardEvaluationView | None = None
 
 
 class AgentTestRunResponse(BaseModel):

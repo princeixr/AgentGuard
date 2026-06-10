@@ -121,6 +121,10 @@ class AgentGuardFirewallV1:
             integration_id=trace.source.integration_id,
             payload=payload or {},
         )
+        self.record_live_event(event)
+
+    def record_live_event(self, event: LiveEventV1) -> None:
+        """Persist a runtime event to every configured live-event backend."""
         self.trace_store.append_live_event_v1(event, namespace=self.namespace)
         self._index_live_event(event)
 

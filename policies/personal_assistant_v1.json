@@ -1,7 +1,7 @@
 {
   "schema_version": "agentguard.policy.v1",
   "policy_id": "pol_personal_assistant",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "name": "Personal Assistant Safety Policy",
   "description": "Capability guardrails for a laptop-resident personal assistant with terminal, communication, scheduling, workspace, search, and future payment access.",
   "status": "published",
@@ -184,6 +184,9 @@
             "~/.aws",
             "~/.config/gcloud",
             "~/Library/Keychains",
+            "~/Library/LaunchAgents",
+            "/Library/LaunchAgents",
+            "/Library/LaunchDaemons",
             "/etc"
           ]
         }
@@ -225,8 +228,8 @@
     }
   ],
   "notes": [
-    "Phase 3 evaluates tool and capability predicates only.",
-    "Path, recipient, amount, calendar target, and command predicates remain deferred until Phase 4 normalizers emit canonical resources.",
-    "FirewallV1 remains the active enforcement owner while this policy runs in V2 shadow mode."
+    "Structured MCP and function tools are normalized from security metadata and JSON input schemas.",
+    "Path, recipient-domain, and amount predicates are evaluated when their argument roles are available.",
+    "Shell remains a specialized parser because command behavior is encoded inside shell syntax."
   ]
 }

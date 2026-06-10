@@ -22,5 +22,16 @@ def append_jsonl(path: Path, model: BaseModel) -> None:
 def load_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
-    with path.open("r", encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
+    records = []
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        if not line.strip():
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            is_incomplete_tail = index == len(lines) - 1 and not line.endswith("\n")
+            if is_incomplete_tail:
+                break
+            raise
+    return records

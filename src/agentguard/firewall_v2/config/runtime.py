@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 class FirewallV2RuntimeConfig(BaseModel):
     tier_1_enabled: bool = True
+    agenttrust_shell_enabled: bool = True
     tier_2_enabled: bool = False
     tier_3_enabled: bool = False
     tier_3_enforcement_enabled: bool = False
@@ -24,6 +25,10 @@ class FirewallV2RuntimeConfig(BaseModel):
         )
         return cls(
             tier_1_enabled=_env_bool("AGENTGUARD_TIER_1_ENABLED", default=True),
+            agenttrust_shell_enabled=_env_bool(
+                "AGENTGUARD_AGENTTRUST_SHELL_ENABLED",
+                default=True,
+            ),
             tier_2_enabled=_env_bool("AGENTGUARD_TIER_2_ENABLED", default=False),
             tier_3_enabled=tier_3_enabled,
             tier_3_enforcement_enabled=_env_bool(

@@ -127,6 +127,7 @@ export function TraceReplayPage() {
                     body={step.argument_summary}
                     decision={step.decision}
                     risk={step.risk_score}
+                    guard={step.guard_evaluation}
                   />
                 ))}
               </div>
@@ -145,12 +146,25 @@ export function TraceReplayPage() {
                   <p className="mt-1 text-sm text-[var(--ink-muted)]">
                     {detail.data.steps.at(-1)?.explanation}
                   </p>
+                  {detail.data.steps.at(-1)?.guard_evaluation && (
+                    <div className="mt-2 text-xs text-[var(--ink-muted)]">
+                      Enforced by{" "}
+                      <code>
+                        {detail.data.steps.at(-1)?.guard_evaluation?.enforced_by}
+                      </code>{" "}
+                      under{" "}
+                      <code>
+                        {detail.data.steps.at(-1)?.guard_evaluation?.policy_id}@
+                        {detail.data.steps.at(-1)?.guard_evaluation?.policy_version}
+                      </code>
+                    </div>
+                  )}
                 </div>
                 <div className="text-right">
                   <div className="text-4xl font-bold text-[var(--red)]">
                     {Math.round(detail.data.session.max_risk_score * 100)}
                   </div>
-                  <div className="eyebrow">Max risk</div>
+                  <div className="eyebrow">Max decision score</div>
                 </div>
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3">
@@ -170,7 +184,7 @@ export function TraceReplayPage() {
             </section>
 
             <section className="panel min-h-0 p-5">
-              <h3 className="eyebrow text-[var(--ink)]">Risk Trajectory</h3>
+              <h3 className="eyebrow text-[var(--ink)]">Decision Trajectory</h3>
               <Chart
                 option={chartOption}
                 style={{ height: "calc(100% - 22px)", minHeight: 260 }}
@@ -213,12 +227,14 @@ function TimelineCard({
   body,
   decision,
   risk,
+  guard,
 }: {
   icon: React.ReactNode;
   title: string;
   body: string;
   decision?: string;
   risk?: number;
+  guard?: import("../../api/types").GuardEvaluation | null;
 }) {
   return (
     <div className="relative mb-5">
@@ -239,6 +255,26 @@ function TimelineCard({
         <p className="mt-2 mono text-xs leading-5 text-[var(--ink-muted)]">
           {body}
         </p>
+        {guard && (
+          <div className="mt-3 border-t border-[var(--border)] pt-3">
+            <div className="flex items-center justify-between gap-3 text-[10px]">
+              <span className="font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                {guard.firewall_version}
+              </span>
+              <code>{guard.enforced_by}</code>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {guard.matched_rules.map((rule) => (
+                <code
+                  className="rounded bg-[var(--surface-low)] px-2 py-1 text-[9px]"
+                  key={rule.rule_id}
+                >
+                  {rule.rule_id}
+                </code>
+              ))}
+            </div>
+          </div>
+        )}
         {risk !== undefined && (
           <div className="mt-3 h-1.5 overflow-hidden rounded bg-[var(--surface-highest)]">
             <div

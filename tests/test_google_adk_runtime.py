@@ -23,6 +23,7 @@ from agentguard.control_plane.registry import (
     DEMO_WORKSPACE_ID,
     DemoAgentRegistry,
 )
+from agentguard.control_plane.demo_adk_definition import agent_instruction
 from agentguard.api.services.guard_admin import guard_admin_status
 from agentguard.governance.session_risk_v1 import SessionRiskManagerV1
 from agentguard.firewall_v2.config import FirewallV2RuntimeConfig
@@ -33,7 +34,13 @@ from agentguard.firewall_v2.policy.models import PolicyDocumentV1
 from agentguard.firewall_v2.policy.resolver import resolve_demo_policy
 from agentguard.firewall_v2.policy.store import PolicyStore
 from agentguard.firewall_v2.policy.validator import PolicyValidationError
-from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession, adk_runtime_policy
+from agentguard.runtime.google_adk_adapter import (
+    GoogleADKTraceSession,
+    _execution_status,
+    _summarize_tool_response,
+    adk_runtime_policy,
+)
+from agentguard.runtime.mcp_registry import McpRegistry
 from agentguard.firewall_v2.tools.models import ToolDescriptorV1
 from agentguard.firewall_v2.tools.normalizers.shell import ShellNormalizerV1
 from agentguard.firewall_v2.tools.registry import descriptor_for_tool
@@ -61,14 +68,15 @@ def test_google_adk_trace_session_runs_firewall_before_execution(tmp_path):
         agent_id="terminal_assistant",
         runtime_agent_id="terminal_assistant",
         agent_config_id="adk_terminal_assistant",
-        available_tools=["run_shell_command", "gmail_send_email"],
+        available_tools=["run_shell_command", "workspace_gmail_send"],
         trace_store=TraceStore(root_dir=tmp_path / "traces"),
         namespace="google_adk_test",
+        metadata_resolver=_mcp_registry().metadata_for,
     )
     session.start_turn("Draft a reply but do not send it.")
 
     result = session.record_tool_call(
-        "gmail_send_email",
+        "workspace_gmail_send",
         {"to": "finance@example.com", "body": "Draft body"},
         call_id="call_001",
     )
@@ -108,6 +116,42 @@ def test_google_adk_trace_session_propagates_runtime_identity(tmp_path):
     assert result.feature.agent_id == DEMO_AGENT_ID
     assert result.score.agent_id == DEMO_AGENT_ID
     assert result.decision.agent_id == DEMO_AGENT_ID
+
+
+def test_agent_instruction_queries_all_calendars_using_local_day_boundaries():
+    instruction = agent_instruction()
+
+    assert "use local-time boundaries rather than UTC boundaries" in instruction
+    assert "query every visible calendar" in instruction
+    assert "do not assume the primary calendar contains every event" in instruction
+
+
+def test_mcp_response_summary_includes_nested_text_content():
+    response = {
+        "content": [
+            {
+                "type": "text",
+                "text": '[{"summary":"Sprint-Hack","start":"2026-06-08T22:30:00-04:00"}]',
+            }
+        ],
+        "isError": False,
+    }
+
+    summary = _summarize_tool_response(response)
+
+    assert "Sprint-Hack" in summary
+    assert "tool returned an empty response" not in summary
+    assert _execution_status(response) == "executed"
+
+
+def test_mcp_error_response_is_recorded_as_failed():
+    response = {
+        "content": [{"type": "text", "text": '{"error":"calendar unavailable"}'}],
+        "isError": True,
+    }
+
+    assert _execution_status(response) == "failed"
+    assert "calendar unavailable" in _summarize_tool_response(response)
 
 
 def test_session_risk_state_restores_from_persisted_namespace(tmp_path):
@@ -155,6 +199,148 @@ def test_tool_descriptors_mark_known_and_unknown_tools_truthfully():
     assert unknown.metadata_status == "unsupported"
 
 
+def test_metadata_driven_structured_tool_flows_through_v2_policy(tmp_path):
+    from agentguard.runtime.mcp_registry import (
+        McpServerConfig,
+        infer_discovered_mcp_metadata,
+    )
+
+    server = McpServerConfig(
+        id="mail",
+        prefix="mail",
+        enabled=True,
+        transport="stdio",
+        stdio_command="python",
+    )
+    metadata = infer_discovered_mcp_metadata(
+        tool_name="mail_send_email",
+        server=server,
+        raw_tool_name="send_email",
+        description="Send an email message to recipients.",
+        input_schema={
+            "type": "object",
+            "required": ["to", "body"],
+            "properties": {
+                "to": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Recipient email addresses.",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "Message body content.",
+                },
+            },
+        },
+    )
+    session = GoogleADKTraceSession(
+        session_id="structured_v2",
+        agent_id=DEMO_AGENT_ID,
+        available_tools=["mail_send_email"],
+        trace_store=TraceStore(root_dir=tmp_path / "traces"),
+        namespace="google_adk_test",
+        tool_metadata={"mail_send_email": metadata},
+        firewall_mode="v2",
+    )
+    session.start_turn("Send the payroll summary to finance@example.com.")
+
+    result = session.record_tool_call(
+        "mail_send_email",
+        {
+            "to": ["finance@example.com"],
+            "body": "Payroll account information is attached.",
+        },
+        call_id="call_send",
+    )
+
+    assert result.decision.decision == "require_approval"
+    events = load_jsonl(
+        tmp_path / "traces" / "v1" / "google_adk_test" / "live_events.jsonl"
+    )
+    evaluation = next(
+        event["payload"]["evaluation"]
+        for event in events
+        if event["event_type"] == "firewall_v2_evaluated"
+    )
+    descriptor = evaluation["tool_descriptor"]
+    action = evaluation["normalized_action"]
+    assert descriptor["normalizer"] == "structured_v1"
+    assert descriptor["capabilities"] == ["email.send", "communication.send"]
+    assert action["operation"] == "send"
+    assert action["destinations"][0]["value"] == "finance@example.com"
+    assert "financial" in action["data_classes"]
+    assert {
+        rule["rule_id"]
+        for rule in evaluation["policy_evaluation"]["matched_rules"]
+    } == {
+        "approve_external_communication",
+        "approve_untrusted_email_destinations",
+    }
+
+
+def test_metadata_driven_payment_extracts_resource_and_estimated_value(tmp_path):
+    from agentguard.runtime.mcp_registry import (
+        McpServerConfig,
+        infer_discovered_mcp_metadata,
+    )
+
+    server = McpServerConfig(
+        id="wallet",
+        prefix="wallet",
+        enabled=True,
+        transport="stdio",
+        stdio_command="python",
+    )
+    metadata = infer_discovered_mcp_metadata(
+        tool_name="wallet_transfer_funds",
+        server=server,
+        raw_tool_name="transfer_funds",
+        description="Transfer a payment to a wallet account.",
+        input_schema={
+            "type": "object",
+            "required": ["account_id", "amount", "currency"],
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "description": "Destination account ID.",
+                },
+                "amount": {"type": "number", "description": "Payment amount."},
+                "currency": {"type": "string"},
+            },
+        },
+    )
+    session = GoogleADKTraceSession(
+        session_id="payment_v2",
+        agent_id=DEMO_AGENT_ID,
+        available_tools=["wallet_transfer_funds"],
+        trace_store=TraceStore(root_dir=tmp_path / "traces"),
+        namespace="google_adk_test",
+        tool_metadata={"wallet_transfer_funds": metadata},
+        firewall_mode="v2",
+    )
+    session.start_turn("Transfer 250 USD to account acct_42.")
+
+    result = session.record_tool_call(
+        "wallet_transfer_funds",
+        {"account_id": "acct_42", "amount": 250, "currency": "USD"},
+        call_id="call_payment",
+    )
+
+    assert result.decision.decision == "block"
+    events = load_jsonl(
+        tmp_path / "traces" / "v1" / "google_adk_test" / "live_events.jsonl"
+    )
+    action = next(
+        event["payload"]["evaluation"]["normalized_action"]
+        for event in events
+        if event["event_type"] == "firewall_v2_evaluated"
+    )
+    assert action["capabilities"] == ["payment.execute"]
+    assert action["resources"][0]["value"] == "acct_42"
+    assert action["estimated_value"] == 250.0
+    assert action["estimated_value_currency"] == "USD"
+
+
 def test_guard_admin_status_does_not_claim_unimplemented_v2_controls(monkeypatch):
     monkeypatch.setenv("AGENTGUARD_FIREWALL_MODE", "v2_shadow")
     status = guard_admin_status(DEMO_AGENT_ID)
@@ -172,11 +358,14 @@ def test_guard_admin_status_does_not_claim_unimplemented_v2_controls(monkeypatch
     assert components["v2_shadow"].status == "observe_only"
     assert components["policy_engine"].status == "operational"
     assert components["normalization"].status == "operational"
-    assert "Gmail and future MCP normalizers are not implemented yet" in (
-        components["normalization"].summary
-    )
+    assert "metadata-driven normalizer" in components["normalization"].summary
     assert components["intent_contract"].status == "not_implemented"
+    assert components["agenttrust_shell"].status == "operational"
+    assert "AgentTrust v0.5.0" in components["agenttrust_shell"].summary
+    assert "92.1%" in components["agenttrust_shell"].management
     assert components["tier_1"].status == "operational"
+    assert components["decision_combiner"].status == "operational"
+    assert components["approval_resume"].status == "not_implemented"
 
 
 def test_personal_assistant_policy_loads_with_expected_scope():
@@ -516,41 +705,39 @@ def test_policy_uses_most_restrictive_matching_effect(tmp_path):
 
 
 def test_before_tool_callback_blocks_forbidden_call(monkeypatch, tmp_path):
-    monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "true")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
     adk_agent = _load_adk_agent()
     adk_agent._TRACE_SESSIONS.clear()
 
     response = adk_agent._before_tool_callback(
-        SimpleNamespace(name="gmail_send_email"),
+        SimpleNamespace(name="workspace_gmail_send"),
         {"to": "finance@example.com", "body": "Draft body"},
         _fake_tool_context("Draft a reply but do not send it."),
     )
 
     assert response is not None
-    assert response["approval_required"] is False
+    assert response["approval_required"] is True
     assert response["blocked_by_agentguard"] is True
-    assert response["runtime_policy"] == "block"
-    assert response["firewall_decision"] == "block"
+    assert response["runtime_policy"] == "require_approval"
+    assert response["firewall_decision"] == "require_approval"
 
 
-def test_before_tool_callback_always_enforces_explicit_block(monkeypatch, tmp_path):
-    monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
+def test_before_tool_callback_allows_approval_when_enforcement_disabled(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "false")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
     adk_agent = _load_adk_agent()
     adk_agent._TRACE_SESSIONS.clear()
 
     response = adk_agent._before_tool_callback(
-        SimpleNamespace(name="gmail_send_email"),
+        SimpleNamespace(name="workspace_gmail_send"),
         {"to": "finance@example.com", "body": "Draft body"},
         _fake_tool_context("Draft a reply but do not send it."),
     )
 
-    assert response is not None
-    assert response["runtime_policy"] == "block"
-    assert response["blocked_by_agentguard"] is True
+    assert response is None
 
 
 def test_before_tool_callback_enforces_v2_destructive_shell_block(
@@ -586,7 +773,6 @@ def test_before_tool_callback_enforces_v2_destructive_shell_block(
 
 
 def test_before_tool_callback_force_blocks_every_tool_call(monkeypatch, tmp_path):
-    monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "false")
     monkeypatch.setenv("AGENTGUARD_FORCE_BLOCK", "true")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
@@ -943,15 +1129,72 @@ def test_dashboard_query_uses_v2_effective_decision_for_replay(tmp_path):
     assert replay.steps[0].decision == "block"
     assert replay.steps[0].rules_fired == ["block_destructive_actions"]
     assert replay.steps[0].explanation.startswith("FirewallV2 enforced block")
+    guard = replay.steps[0].guard_evaluation
+    assert guard is not None
+    assert guard.firewall_mode == "v2"
+    assert guard.enforcement_status == "enforced"
+    assert guard.recommendation == "block"
+    assert guard.enforced_by == "tier_1_deterministic_policy"
+    assert guard.policy_id == "pol_personal_assistant"
+    assert [rule["rule_id"] for rule in guard.matched_rules] == [
+        "block_destructive_actions"
+    ]
+    assert guard.normalized_action["operation"] == "delete"
+    assert guard.tier_results[0]["tier"] == "tier_1"
+
+    memory = service.memory_detail(
+        result.trace.trace_id,
+        agent_id=result.trace.source.agent_id,
+    )
+    assert memory is not None
+    assert memory.item.guard_evaluation == guard
+
+
+def test_v2_blocks_recursive_folder_deletion(tmp_path):
+    session = _trace_session(tmp_path, firewall_mode="v2")
+    session.start_turn('Delete folder "abc" from the desktop.')
+
+    result = session.record_tool_call(
+        "run_shell_command",
+        {"command": "rm -rf ~/Desktop/abc"},
+        call_id="call_recursive_delete",
+    )
+
+    assert result.decision.decision == "block"
+    events = [
+        json.loads(line)
+        for line in (
+            tmp_path
+            / "traces"
+            / "v1"
+            / "google_adk_test"
+            / "live_events.jsonl"
+        )
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    evaluation = next(
+        event["payload"]["evaluation"]
+        for event in events
+        if event["event_type"] == "firewall_v2_evaluated"
+    )
+    assert evaluation["normalized_action"]["operation"] == "delete"
+    assert evaluation["normalized_action"]["capabilities"] == ["filesystem.delete"]
+    assert evaluation["policy_evaluation"]["recommendation"] == "block"
+    assert evaluation["policy_evaluation"]["matched_rules"][0]["rule_id"] == (
+        "block_destructive_actions"
+    )
 
 
 def test_google_adk_trace_session_records_tool_executed_event(tmp_path):
     session = _trace_session(tmp_path)
     session.start_turn("Search my inbox for the latest budget thread.")
-    result = session.record_tool_call("gmail_search", {"query": "budget"}, call_id="call_search")
+    result = session.record_tool_call(
+        "workspace_gmail_search", {"query": "budget"}, call_id="call_search"
+    )
 
     session.record_tool_response(
-        "gmail_search",
+        "workspace_gmail_search",
         {"results": ["thread_budget_q2"]},
         call_id="call_search",
     )
@@ -969,13 +1212,15 @@ def test_google_adk_trace_uses_adk_tool_metadata(tmp_path):
     session = _trace_session(tmp_path)
     session.start_turn("Search my inbox for the latest budget thread.")
 
-    result = session.record_tool_call("gmail_search", {"query": "budget"}, call_id="call_search")
+    result = session.record_tool_call(
+        "workspace_gmail_search", {"query": "budget"}, call_id="call_search"
+    )
 
     tool = result.trace.proposed_tool_call
     assert tool.tool_category == "email"
     assert tool.risk_level == "read_only"
     assert tool.side_effect_type is None
-    assert tool.mcp_server == "artymclabin_gmail_mcp"
+    assert tool.mcp_server == "workspace"
 
 
 def test_google_adk_shell_trace_uses_shell_metadata(tmp_path):
@@ -995,10 +1240,10 @@ def test_google_adk_shell_trace_uses_shell_metadata(tmp_path):
 def test_runtime_event_references_persisted_decision(tmp_path):
     session = _trace_session(tmp_path)
     session.start_turn("Search my inbox for the latest budget thread.")
-    session.record_tool_call("gmail_search", {"query": "budget"}, call_id="call_search")
+    session.record_tool_call("workspace_gmail_search", {"query": "budget"}, call_id="call_search")
 
     session.record_tool_response(
-        "gmail_search",
+        "workspace_gmail_search",
         {"results": ["thread_budget_q2"]},
         call_id="call_search",
     )
@@ -1012,10 +1257,10 @@ def test_runtime_event_references_persisted_decision(tmp_path):
 def test_google_adk_trace_session_records_tool_failed_event(tmp_path):
     session = _trace_session(tmp_path)
     session.start_turn("Search my inbox for the latest budget thread.")
-    session.record_tool_call("gmail_search", {"query": "budget"}, call_id="call_search")
+    session.record_tool_call("workspace_gmail_search", {"query": "budget"}, call_id="call_search")
 
     session.record_tool_response(
-        "gmail_search",
+        "workspace_gmail_search",
         {"error": "MCP server unavailable"},
         call_id="call_search",
     )
@@ -1031,10 +1276,14 @@ def test_google_adk_trace_session_records_tool_failed_event(tmp_path):
 def test_record_tool_response_is_idempotent_for_same_call_id(tmp_path):
     session = _trace_session(tmp_path)
     session.start_turn("Search my inbox for the latest budget thread.")
-    session.record_tool_call("gmail_search", {"query": "budget"}, call_id="call_search")
+    session.record_tool_call("workspace_gmail_search", {"query": "budget"}, call_id="call_search")
 
-    session.record_tool_response("gmail_search", {"results": ["thread_budget_q2"]}, call_id="call_search")
-    session.record_tool_response("gmail_search", {"results": ["thread_budget_q2"]}, call_id="call_search")
+    session.record_tool_response(
+        "workspace_gmail_search", {"results": ["thread_budget_q2"]}, call_id="call_search"
+    )
+    session.record_tool_response(
+        "workspace_gmail_search", {"results": ["thread_budget_q2"]}, call_id="call_search"
+    )
 
     executed_events = [event for event in _runtime_events(tmp_path) if event["event_type"] == "tool_executed"]
     assert len(executed_events) == 1
@@ -1043,9 +1292,9 @@ def test_record_tool_response_is_idempotent_for_same_call_id(tmp_path):
 def test_record_tool_response_matches_without_call_id(tmp_path):
     session = _trace_session(tmp_path)
     session.start_turn("Search my inbox for the latest budget thread.")
-    session.record_tool_call("gmail_search", {"query": "budget"}, call_id=None)
+    session.record_tool_call("workspace_gmail_search", {"query": "budget"}, call_id=None)
 
-    session.record_tool_response("gmail_search", {"results": ["thread_budget_q2"]}, call_id=None)
+    session.record_tool_response("workspace_gmail_search", {"results": ["thread_budget_q2"]}, call_id=None)
 
     executed_events = [event for event in _runtime_events(tmp_path) if event["event_type"] == "tool_executed"]
     assert len(executed_events) == 1
@@ -1053,7 +1302,6 @@ def test_record_tool_response_matches_without_call_id(tmp_path):
 
 
 def test_before_tool_callback_allows_normal_shell_command(monkeypatch, tmp_path):
-    monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "true")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
     adk_agent = _load_adk_agent()
@@ -1069,7 +1317,6 @@ def test_before_tool_callback_allows_normal_shell_command(monkeypatch, tmp_path)
 
 
 def test_adk_elastic_override_can_disable_global_elastic(monkeypatch, tmp_path):
-    monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_ELASTIC_ENABLED", "true")
     monkeypatch.delenv("ELASTICSEARCH_URL", raising=False)
     monkeypatch.delenv("ELASTICSEARCH_API_KEY", raising=False)
@@ -1088,14 +1335,13 @@ def test_adk_elastic_override_can_disable_global_elastic(monkeypatch, tmp_path):
 
 
 def test_before_tool_callback_records_approval_blocked_runtime_event(monkeypatch, tmp_path):
-    monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_ADK_ENFORCE_APPROVAL", "true")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
     adk_agent = _load_adk_agent()
     adk_agent._TRACE_SESSIONS.clear()
 
     adk_agent._before_tool_callback(
-        SimpleNamespace(name="gmail_send_email"),
+        SimpleNamespace(name="workspace_gmail_send"),
         {"to": "finance@example.com", "body": "Draft body"},
         _fake_tool_context("Draft a reply but do not send it."),
     )
@@ -1110,12 +1356,11 @@ def test_before_tool_callback_records_approval_blocked_runtime_event(monkeypatch
     ]
     assert len(blocked_events) == 1
     assert blocked_events[0]["payload"]["execution_status"] == "blocked"
-    assert blocked_events[0]["payload"]["approval_required"] is False
-    assert blocked_events[0]["payload"]["runtime_policy"] == "block"
+    assert blocked_events[0]["payload"]["approval_required"] is True
+    assert blocked_events[0]["payload"]["runtime_policy"] == "require_approval"
 
 
 def test_adk_callback_uses_registered_dashboard_agent_identity(monkeypatch, tmp_path):
-    monkeypatch.setenv("ADK_GMAIL_MCP_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_ADK_ELASTIC_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_TRACE_ROOT", str(tmp_path / "traces"))
     adk_agent = _load_adk_agent()
@@ -1158,11 +1403,16 @@ def _trace_session(tmp_path, firewall_mode="v1"):
         agent_id="terminal_assistant",
         runtime_agent_id="terminal_assistant",
         agent_config_id="adk_terminal_assistant",
-        available_tools=["run_shell_command", "gmail_search", "gmail_send_email"],
+        available_tools=["run_shell_command", "workspace_gmail_search", "workspace_gmail_send"],
         trace_store=TraceStore(root_dir=tmp_path / "traces"),
         namespace="google_adk_test",
+        metadata_resolver=_mcp_registry().metadata_for,
         firewall_mode=firewall_mode,
     )
+
+
+def _mcp_registry():
+    return McpRegistry.load("config/adk_mcp_servers.toml")
 
 
 def _runtime_events(tmp_path):

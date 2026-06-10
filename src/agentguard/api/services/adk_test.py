@@ -13,6 +13,7 @@ from agentguard.api.models import (
     AgentTestEvent,
     AgentTestRunResponse,
 )
+from agentguard.api.services.query import guard_evaluation_from_payload
 from agentguard.control_plane.demo_adk_definition import agent_definition
 from agentguard.tracing.serializers import load_jsonl
 
@@ -154,6 +155,11 @@ class GoogleADKTestService:
             trace_id = decision["trace_id"]
             v2_payload = v2_by_trace.get(trace_id, {})
             effective_decision = v2_payload.get("effective_decision") or decision
+            guard_evaluation = (
+                guard_evaluation_from_payload(v2_payload)
+                if v2_payload
+                else None
+            )
             items.append(
                 AgentGuardTestDecision(
                     trace_id=trace_id,
@@ -162,15 +168,7 @@ class GoogleADKTestService:
                     risk_score=effective_decision["final_risk_score"],
                     explanation=effective_decision["explanation"],
                     rules_fired=effective_decision.get("decision_rules_fired", []),
-                    enforced_by=v2_payload.get(
-                        "enforced_by",
-                        "firewall_v1",
-                    ),
-                    firewall_mode=v2_payload.get(
-                        "firewall_mode",
-                        "v1",
-                    ),
-                    v2_evaluation=v2_payload.get("evaluation"),
+                    guard_evaluation=guard_evaluation,
                 )
             )
         return items

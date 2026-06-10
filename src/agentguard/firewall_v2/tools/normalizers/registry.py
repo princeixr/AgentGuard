@@ -8,6 +8,9 @@ from agentguard.firewall_v2.tools.normalizers.models import (
     ParserResultV1,
 )
 from agentguard.firewall_v2.tools.normalizers.shell import ShellNormalizerV1
+from agentguard.firewall_v2.tools.normalizers.structured import (
+    StructuredToolNormalizerV1,
+)
 from agentguard.tracing.schema_v1 import AgentGuardTraceV1
 
 
@@ -17,6 +20,8 @@ def normalize_tool_call(
 ) -> NormalizedActionV1:
     if descriptor.normalizer == "shell_v1":
         return ShellNormalizerV1().normalize(trace)
+    if descriptor.normalizer == "structured_v1":
+        return StructuredToolNormalizerV1().normalize(trace, descriptor)
     return NormalizedActionV1(
         trace_id=trace.trace_id,
         tool_name=descriptor.tool_name,

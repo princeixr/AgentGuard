@@ -127,6 +127,7 @@ For the live ADK/V2 Tier 3 path, configure:
 GOOGLE_API_KEY=...
 AGENTGUARD_FIREWALL_MODE=v2
 AGENTGUARD_TIER_1_ENABLED=true
+AGENTGUARD_AGENTTRUST_SHELL_ENABLED=true
 AGENTGUARD_TIER_3_ENABLED=true
 AGENTGUARD_TIER3_ENFORCEMENT_ENABLED=false
 ```
@@ -146,6 +147,18 @@ Verify both applications:
 make test
 make build-frontend
 ```
+
+Run the pinned 300-case AgentTrust shell-security benchmark:
+
+```bash
+python scripts/run_agenttrust_benchmark.py
+```
+
+The production report uses the same stateless Tier 1 path as live ADK calls. The
+optional `--benchmark-compatibility-rules` flag enables upstream benchmark-only rules
+and is labeled separately in the generated report. The default `--scope shell`
+evaluates 254 shell-compatible scenarios; use `--scope all` only to intentionally
+project all 300 upstream cases through the shell interception path.
 
 ## OpenClaw Productivity Agent
 

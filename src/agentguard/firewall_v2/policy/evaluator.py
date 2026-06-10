@@ -43,7 +43,6 @@ class PolicyEvaluatorV1:
             )
         if (
             action is not None
-            and action.parser.name == "shell_v1"
             and action.parser.status in {"invalid", "unsupported"}
         ):
             recommendation = policy.defaults.parser_failure
@@ -93,8 +92,6 @@ class PolicyEvaluatorV1:
                             matched_resources=resource_match,
                         )
                     )
-                elif base_match:
-                    deferred_rule_ids.append(rule.rule_id)
                 continue
             if base_match:
                 matches.append(
@@ -155,6 +152,28 @@ def _match_resource_constraints(
             and any(_path_is_under(resource.value, prefix) for prefix in configured_paths)
         ]
         return matched
+    if "recipient_domain_not_in" in constraints:
+        if not action.destinations:
+            return None
+        allowed = {
+            str(domain).lower()
+            for domain in constraints.get("recipient_domain_not_in") or []
+        }
+        return [
+            destination.value
+            for destination in action.destinations
+            if destination.type == "email"
+            and _email_domain(destination.value) not in allowed
+        ]
+    if "amount_greater_than" in constraints:
+        if action.estimated_value is None:
+            return None
+        threshold = float(constraints["amount_greater_than"])
+        return (
+            [str(action.estimated_value)]
+            if action.estimated_value > threshold
+            else []
+        )
     return None
 
 
@@ -166,3 +185,7 @@ def _path_is_under(value: str, configured_prefix: str) -> bool:
     return normalized_value == normalized_prefix or normalized_value.startswith(
         normalized_prefix + os.sep
     )
+
+
+def _email_domain(value: str) -> str:
+    return value.rsplit("@", 1)[-1].lower() if "@" in value else ""
