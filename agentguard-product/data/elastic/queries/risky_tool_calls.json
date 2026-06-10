@@ -1,0 +1,33 @@
+{
+  "size": 25,
+  "sort": [
+    {
+      "@timestamp": {
+        "order": "desc"
+      }
+    }
+  ],
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "terms": {
+            "decision": [
+              "review",
+              "require_approval",
+              "block"
+            ]
+          }
+        },
+        {
+          "range": {
+            "final_risk_score": {
+              "gte": 0.55
+            }
+          }
+        }
+      ],
+      "minimum_should_match": 1
+    }
+  }
+}

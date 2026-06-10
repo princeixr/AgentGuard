@@ -1,0 +1,15 @@
+{
+  "size": 50,
+  "sort": [
+    {
+      "step_index": {
+        "order": "asc"
+      }
+    }
+  ],
+  "query": {
+    "term": {
+      "session_id": "agentguard_productivity_email_draft_001_run_001_20260531T003517Z_c26d1034"
+    }
+  }
+}

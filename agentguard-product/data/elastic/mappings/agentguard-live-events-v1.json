@@ -1,0 +1,56 @@
+{
+  "mappings": {
+    "dynamic": true,
+    "properties": {
+      "@timestamp": {
+        "type": "date"
+      },
+      "agent_framework": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "agent_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "deployment_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "event_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "event_type": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "integration_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "payload": {
+        "type": "flattened"
+      },
+      "schema_version": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "session_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "step_index": {
+        "type": "integer"
+      },
+      "trace_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "workspace_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      }
+    }
+  }
+}

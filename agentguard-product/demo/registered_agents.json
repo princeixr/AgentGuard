@@ -1,0 +1,84 @@
+{
+  "workspace": {
+    "workspace_id": "wsp_agentguard_demo",
+    "name": "AgentGuard Demo Workspace",
+    "plan": "Enterprise Demo",
+    "created_at": "2026-06-06T14:30:00Z"
+  },
+  "user": {
+    "user_id": "usr_demo_owner",
+    "workspace_id": "wsp_agentguard_demo",
+    "name": "Demo Owner",
+    "email": "owner@agentguard.local",
+    "role": "owner"
+  },
+  "agents": [
+    {
+      "agent_id": "agt_google_adk_assistant",
+      "workspace_id": "wsp_agentguard_demo",
+      "name": "Google ADK Assistant",
+      "description": "Separately deployed personal productivity assistant registered with AgentGuard.",
+      "framework": "google_adk",
+      "status": "offline",
+      "created_at": "2026-06-06T14:30:00Z",
+      "created_by": "usr_demo_owner",
+      "default_policy_id": "pol_personal_assistant",
+      "last_seen_at": "2026-06-06T14:30:00Z",
+      "metadata": {
+        "integration_status": "awaiting_transport",
+        "registration_source": "demo_fixture"
+      },
+      "deployments": [
+        {
+          "deployment_id": "dep_google_adk_development",
+          "workspace_id": "wsp_agentguard_demo",
+          "agent_id": "agt_google_adk_assistant",
+          "environment": "development",
+          "runtime_framework": "google_adk",
+          "runtime_agent_name": "personal_agent",
+          "version": "development",
+          "status": "offline",
+          "last_seen_at": "2026-06-06T14:30:00Z",
+          "metadata": {
+            "integration": "sdk",
+            "transport": "not_implemented"
+          }
+        }
+      ]
+    }
+  ],
+  "definitions": [
+    {
+      "agent_id": "agt_google_adk_assistant",
+      "deployment_id": "dep_google_adk_development",
+      "integration_id": "int_google_adk_remote",
+      "framework": "google_adk",
+      "runtime_version": "development",
+      "environment": "development",
+      "manifest_version": "development",
+      "system_instruction_summary": "Personal productivity assistant using registered terminal and MCP tools.",
+      "agent_ui_url": "http://127.0.0.1:4173",
+      "tools": [
+        {
+          "name": "run_shell_command",
+          "source_name": "run_shell_command",
+          "provider": "local_terminal",
+          "framework": "google_adk",
+          "transport": "native",
+          "description": "Execute one non-interactive shell command.",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string"
+              }
+            },
+            "required": ["command"]
+          },
+          "annotations": {},
+          "metadata_provenance": ["demo_registration_fixture"]
+        }
+      ]
+    }
+  ]
+}
