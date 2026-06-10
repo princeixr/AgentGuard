@@ -39,6 +39,20 @@ class Settings:
     enforce_approval: bool = os.environ.get(
         "AGENTGUARD_ENFORCE_APPROVAL", "true"
     ).lower() in {"1", "true", "yes", "on"}
+    agentguard_base_url: str = os.environ.get(
+        "AGENTGUARD_BASE_URL",
+        "http://127.0.0.1:8000",
+    )
+    agentguard_api_key: str | None = os.environ.get("AGENTGUARD_API_KEY")
+    agentguard_request_timeout_seconds: float = float(
+        os.environ.get("AGENTGUARD_REQUEST_TIMEOUT_SECONDS", "5")
+    )
+    approval_wait_timeout_seconds: float = float(
+        os.environ.get("AGENTGUARD_APPROVAL_WAIT_TIMEOUT_SECONDS", "60")
+    )
+    approval_poll_interval_seconds: float = float(
+        os.environ.get("AGENTGUARD_APPROVAL_POLL_INTERVAL_SECONDS", "1")
+    )
 
 
 settings = Settings()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -88,11 +89,7 @@ class AgentTrustShellProvider:
                 )
             )
         except Exception as exc:
-            return AgentTrustShellResultV1(
-                status="failed",
-                recommendation="require_approval",
-                explanation=f"AgentTrust shell evaluation failed closed: {exc}",
-            )
+            return _fallback_shell_evaluation(command, reason=str(exc))
 
         verdict = _enum_value(report.verdict)
         return AgentTrustShellResultV1(
@@ -129,3 +126,73 @@ def _model_dump(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {"value": str(value)}
+
+
+_DANGEROUS_PATTERNS = [
+    r"\|\s*(ba)?sh\b",
+    r"\brm\s+-rf\b",
+    r"\bsudo\b",
+    r"\bchmod\s+777\b",
+    r"\bcurl\b.*\|\s*(ba)?sh\b",
+    r"\bwget\b.*\|\s*(ba)?sh\b",
+    r"\bnc\s+.*\s+-e\b",
+    r">\s*/etc/",
+]
+_ALLOW_PATTERNS = [
+    r"^pwd$",
+    r"^ls(\s|$)",
+    r"^cat\s+[\w./-]+$",
+    r"^pytest(\s|$)",
+    r"^python\s+-m\s+pytest(\s|$)",
+    r"^git\s+status(\s|$)",
+]
+
+
+def _fallback_shell_evaluation(
+    command: str,
+    *,
+    reason: str,
+) -> AgentTrustShellResultV1:
+    normalized = command.strip()
+    if any(re.search(pattern, normalized) for pattern in _DANGEROUS_PATTERNS):
+        return AgentTrustShellResultV1(
+            provider="agentguard-shell-fallback",
+            provider_version="1.0.0",
+            status="completed",
+            recommendation="block",
+            upstream_verdict="block",
+            risk_level="high",
+            confidence=0.90,
+            explanation=(
+                "AgentTrust was unavailable, so AgentGuard used its deterministic "
+                f"shell fallback and blocked a dangerous command pattern. Cause: {reason}"
+            ),
+            policy_violations=["dangerous_shell_pattern"],
+        )
+    if any(re.search(pattern, normalized) for pattern in _ALLOW_PATTERNS):
+        return AgentTrustShellResultV1(
+            provider="agentguard-shell-fallback",
+            provider_version="1.0.0",
+            status="completed",
+            recommendation="allow",
+            upstream_verdict="allow",
+            risk_level="low",
+            confidence=0.82,
+            explanation=(
+                "AgentTrust was unavailable, so AgentGuard used its deterministic "
+                f"shell fallback and allowed a recognized read/test command. Cause: {reason}"
+            ),
+        )
+    return AgentTrustShellResultV1(
+        provider="agentguard-shell-fallback",
+        provider_version="1.0.0",
+        status="completed",
+        recommendation="require_approval",
+        upstream_verdict="review",
+        risk_level="unknown",
+        confidence=0.55,
+        explanation=(
+            "AgentTrust was unavailable, so AgentGuard used its deterministic shell "
+            f"fallback and required approval for an unrecognized command. Cause: {reason}"
+        ),
+    )

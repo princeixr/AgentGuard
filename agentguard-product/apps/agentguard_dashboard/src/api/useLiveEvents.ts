@@ -24,8 +24,8 @@ export function useLiveEvents(agentId: string) {
       "live_event",
       "interception_paused",
       "approval_resolved",
-      "scenario_completed",
-      "demo_reset",
+      "approval.pending",
+      "approval.resolved",
     ]) {
       source.addEventListener(event, refresh);
     }

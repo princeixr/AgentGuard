@@ -148,6 +148,29 @@ export interface CurrentInterception {
   detail: MemoryDetail | null;
 }
 
+export interface PendingApproval {
+  approval_id: string;
+  decision_id: string;
+  trace_id: string;
+  call_id: string;
+  workspace_id: string;
+  agent_id: string;
+  deployment_id: string;
+  integration_id: string;
+  session_id: string;
+  turn_id: string;
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  user_request: string;
+  explanation: string;
+  guard_evaluation: GuardEvaluation | null;
+  status: "pending" | "approved" | "rejected" | "aborted" | "expired";
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  note: string | null;
+}
+
 export interface OperationsSummary {
   intercepted_calls: number;
   intervention_count: number;
@@ -160,15 +183,6 @@ export interface OperationsSummary {
   riskiest_tools: Array<{ name: string; count: number; rate: number }>;
   failure_modes: Array<{ name: string; count: number; rate: number }>;
   health: ComponentHealth[];
-}
-
-export interface Scenario {
-  scenario_id: string;
-  domain: string;
-  task_category: string;
-  user_request: string;
-  failure_type: string;
-  gold_final_verdict: string;
 }
 
 export interface Deployment {
@@ -199,7 +213,7 @@ export interface Agent {
   deployments: Deployment[];
 }
 
-export interface DemoSessionContext {
+export interface WorkspaceContext {
   user: {
     user_id: string;
     workspace_id: string;

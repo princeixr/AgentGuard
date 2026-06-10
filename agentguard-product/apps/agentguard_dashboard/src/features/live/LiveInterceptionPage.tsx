@@ -579,7 +579,7 @@ export function LiveInterceptionPage() {
             </div>
           ) : (
             <div className="flex h-full items-center justify-center p-8 text-center text-sm text-[var(--ink-muted)]">
-              Decision details will appear here as the scenario runs.
+              Decision details will appear here when a connected agent proposes a tool call.
             </div>
           )}
         </section>

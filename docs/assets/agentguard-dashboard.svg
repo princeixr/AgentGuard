@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500">
+  <rect width="900" height="500" fill="#eef2ff"/>
+  <rect x="40" y="40" width="820" height="420" rx="22" fill="white" stroke="#cbd5e1"/>
+  <rect x="40" y="40" width="190" height="420" rx="22" fill="#0f172a"/>
+  <text x="75" y="92" fill="white" font-family="Inter, Arial" font-size="26" font-weight="700">AgentGuard</text>
+  <rect x="270" y="85" width="540" height="70" rx="14" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="300" y="128" fill="#0f172a" font-family="Inter, Arial" font-size="22" font-weight="700">Pending Tool Calls</text>
+  <rect x="270" y="185" width="540" height="190" rx="16" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="300" y="235" fill="#9a3412" font-family="Inter, Arial" font-size="18" font-weight="700">run_shell_command requires approval</text>
+  <rect x="300" y="300" width="120" height="44" rx="10" fill="#111827"/>
+  <text x="330" y="328" fill="white" font-family="Inter, Arial" font-size="15">Approve</text>
+  <rect x="440" y="300" width="120" height="44" rx="10" fill="#dc2626"/>
+  <text x="475" y="328" fill="white" font-family="Inter, Arial" font-size="15">Reject</text>
+</svg>

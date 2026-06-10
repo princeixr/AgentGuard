@@ -28,13 +28,8 @@ class LoadedPolicy:
 
 class PolicyLoader:
     def __init__(self, default_path: Path | None = None):
-        repo_root = Path(__file__).resolve().parents[4]
         configured = os.environ.get("AGENTGUARD_POLICY_PATH")
-        self.default_path = Path(
-            configured
-            or default_path
-            or repo_root / "policies" / "personal_assistant_v1.json"
-        )
+        self.default_path = _resolve_default_policy_path(configured or default_path)
 
     def load(
         self,
@@ -46,7 +41,7 @@ class PolicyLoader:
     ) -> LoadedPolicy:
         policy_path = path or self.default_path
         if not policy_path.is_absolute():
-            policy_path = Path(__file__).resolve().parents[4] / policy_path
+            policy_path = _repo_root() / policy_path
         try:
             raw_text = policy_path.read_text(encoding="utf-8")
         except OSError as exc:
@@ -71,3 +66,21 @@ class PolicyLoader:
                 f"Policy {document.policy_id}@{document.version} is not published."
             )
         return LoadedPolicy(document=document, path=policy_path, raw_text=raw_text)
+
+
+def _resolve_default_policy_path(configured: str | Path | None) -> Path:
+    if configured:
+        return Path(configured)
+    candidates = [
+        Path.cwd() / "policies" / "personal_assistant_v1.json",
+        _repo_root() / "policies" / "personal_assistant_v1.json",
+        Path("/app/policies/personal_assistant_v1.json"),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[4]

@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import os
 import time
 from typing import Any
 
 from agentguard_sdk import (
     AgentGuardClient,
-    FakeAgentGuardClient,
+    HttpAgentGuardClient,
     OutcomeReport,
     ToolProposal,
     TurnStart,
@@ -18,13 +17,11 @@ from personal_agent.settings import settings
 
 
 def build_guard_client() -> AgentGuardClient:
-    mode = os.environ.get("AGENTGUARD_CLIENT_MODE", "fake")
-    if mode != "fake":
-        raise RuntimeError(
-            "Only the fake client exists before AgentGuard HTTP transport is implemented."
-        )
-    return FakeAgentGuardClient(
-        decision=os.environ.get("AGENTGUARD_FAKE_DECISION", "allow")
+    return HttpAgentGuardClient(
+        base_url=settings.agentguard_base_url,
+        api_key=settings.agentguard_api_key,
+        timeout_seconds=settings.agentguard_request_timeout_seconds,
+        fail_closed=True,
     )
 
 
@@ -68,9 +65,21 @@ class AgentGuardAdkInterceptor:
             )
         )
         self._decision_by_call[call_id] = (decision.decision_id, started)
-        should_stop = decision.decision == "block" or (
-            decision.decision == "require_approval" and settings.enforce_approval
-        )
+        if decision.decision == "require_approval" and settings.enforce_approval:
+            approval = None
+            if decision.approval_request_id:
+                try:
+                    approval = self.client.wait_for_approval(
+                        decision.approval_request_id,
+                        timeout_seconds=settings.approval_wait_timeout_seconds,
+                        poll_interval_seconds=settings.approval_poll_interval_seconds,
+                    )
+                except AttributeError:
+                    approval = None
+            if approval is not None and approval.status == "approved":
+                return None
+
+        should_stop = decision.decision in {"block", "require_approval"}
         if should_stop:
             self.client.report_outcome(
                 OutcomeReport(

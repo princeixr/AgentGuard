@@ -19,6 +19,7 @@ from agentguard.server.routes import (
     approvals,
     demo,
     health,
+    interception,
     live,
     memory,
     operations,
@@ -28,9 +29,11 @@ from agentguard.server.routes import (
 from agentguard.server.services.live import DemoRuntimeService
 from agentguard.server.services.query import DashboardQueryService
 from agentguard.server.services.agent_live import AgentLiveRuntimeService
+from agentguard.server.services.remote_runtime import RemoteInterceptionService
 from agentguard.demo import reset_demo_runtime
 from agentguard.control_plane.registry import AgentRegistry
 from agentguard.storage import AgentGuardElasticStore, load_elastic_config
+from agentguard.tracing.trace_store import TraceStore
 
 
 def create_app(
@@ -119,6 +122,15 @@ def create_app(
     app.state.repository = repository
     app.state.agent_registry = AgentRegistry()
     app.state.query_service = DashboardQueryService(repository)
+    app.state.remote_runtime = RemoteInterceptionService(
+        registry=app.state.agent_registry,
+        trace_store=TraceStore(root_dir=trace_root),
+        namespace=trace_namespace,
+        approval_root=repo_root / os.environ.get(
+            "AGENTGUARD_APPROVAL_ROOT",
+            "data/approvals",
+        ),
+    )
     app.state.agent_live_runtime = AgentLiveRuntimeService(
         repository,
         app.state.query_service,
@@ -133,6 +145,7 @@ def create_app(
 
     api = "/api/v1"
     app.include_router(health.router, prefix=api)
+    app.include_router(interception.router, prefix=api)
     app.include_router(agents.router, prefix=api)
     app.include_router(agent_dashboard.router, prefix=api)
     app.include_router(agent_live.router, prefix=api)

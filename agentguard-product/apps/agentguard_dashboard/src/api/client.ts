@@ -3,21 +3,27 @@ import type {
   AgentDefinition,
   AgentPolicy,
   CurrentInterception,
-  DemoSessionContext,
   GuardAdminStatus,
   MemoryDetail,
   MemoryPage,
   OperationsSummary,
+  PendingApproval,
   PolicyValidation,
-  Scenario,
   SessionDetail,
   SessionSummary,
+  WorkspaceContext,
 } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  headers.set("Content-Type", "application/json");
+  const apiKey = getApiKey();
+  if (apiKey) {
+    headers.set("Authorization", `Bearer ${apiKey}`);
+  }
   const response = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...init?.headers },
     ...init,
+    headers,
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
@@ -26,8 +32,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export function getApiKey(): string {
+  return (
+    window.localStorage.getItem("agentguard.apiKey") ??
+    import.meta.env.VITE_AGENTGUARD_API_KEY ??
+    ""
+  );
+}
+
 export const api = {
-  me: () => request<DemoSessionContext>("/api/v1/me"),
+  me: () => request<WorkspaceContext>("/api/v1/me"),
   agents: () => request<{ items: Agent[] }>("/api/v1/agents"),
   agent: (agentId: string) =>
     request<Agent>(`/api/v1/agents/${encodeURIComponent(agentId)}`),
@@ -83,16 +97,9 @@ export const api = {
     request<OperationsSummary>(
       `/api/v1/agents/${encodeURIComponent(agentId)}/operations/summary`,
     ),
-  scenarios: () =>
-    request<{ items: Scenario[] }>("/api/v1/demo/scenarios"),
   currentInterception: (agentId: string) =>
     request<CurrentInterception>(
       `/api/v1/agents/${encodeURIComponent(agentId)}/interceptions/current`,
-    ),
-  startScenario: (agentId: string, id: string) =>
-    request<{ scenario_id: string; session_id: string; status: string }>(
-      `/api/v1/agents/${encodeURIComponent(agentId)}/demo/scenarios/${encodeURIComponent(id)}/start`,
-      { method: "POST" },
     ),
   resolveApproval: (
     agentId: string,
@@ -106,5 +113,24 @@ export const api = {
         body: JSON.stringify({ action }),
       },
     ),
-  resetDemo: () => request("/api/v1/demo/reset", { method: "POST" }),
+  approvals: (status = "pending") =>
+    request<{ items: PendingApproval[] }>(
+      `/api/v1/approvals?status=${encodeURIComponent(status)}`,
+    ),
+  approve: (approvalId: string, note?: string) =>
+    request<PendingApproval>(
+      `/api/v1/approvals/${encodeURIComponent(approvalId)}/approve`,
+      {
+        method: "POST",
+        body: JSON.stringify({ actor: "operator", note }),
+      },
+    ),
+  reject: (approvalId: string, note?: string) =>
+    request<PendingApproval>(
+      `/api/v1/approvals/${encodeURIComponent(approvalId)}/reject`,
+      {
+        method: "POST",
+        body: JSON.stringify({ actor: "operator", note }),
+      },
+    ),
 };

@@ -1,21 +1,28 @@
+# Python
 .venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node/Vite
 node_modules/
 dist/
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts
+
+# Local secrets and runtime data
 .env
-.env.openclaw
-.env.elastic
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.ruff_cache/
+.env.*
+!.env.example
+*.local
 .DS_Store
-.openclaw-agentguard/
-.openclaw-traces/
-data/*
-src/agentguard.egg-info/
-test_*
-!tests/test_google_adk_runtime.py
-!tests/test_mcp_registry.py
+
+# AgentGuard runtime artifacts
+agentguard-product/data/approvals/
+agentguard-product/data/traces/
+agentguard-product/data/demo_runtime/
+google-adk-personal-agent/.adk/
+google-adk-personal-agent/data/

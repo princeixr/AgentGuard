@@ -54,6 +54,8 @@ export function AppShell() {
   ] : [];
   const pageTitle = location.pathname === "/agents"
     ? "Agents"
+    : location.pathname === "/approvals"
+      ? "Approvals"
     : /^\/agents\/[^/]+$/.test(location.pathname)
       ? "Agent Details"
     : location.pathname.endsWith("/live")
@@ -78,7 +80,7 @@ export function AppShell() {
           <div>
             <div className="text-[20px] font-bold leading-5">AgentGuard</div>
             <div className="mt-1 text-xs text-[var(--ink-muted)]">
-              Product Demo
+              Runtime Security
             </div>
           </div>
         </div>
@@ -97,6 +99,20 @@ export function AppShell() {
           >
             <Boxes size={18} />
             Agents
+          </NavLink>
+          <NavLink
+            to="/approvals"
+            className={({ isActive }) =>
+              [
+                "flex items-center gap-3 rounded px-4 py-3 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-[var(--blue)] text-white"
+                  : "text-[#333] hover:bg-[var(--surface-highest)]",
+              ].join(" ")
+            }
+          >
+            <Bell size={18} />
+            Approvals
           </NavLink>
           <div className="px-4 pb-1 pt-4">
             <div className="eyebrow">Selected agent</div>
@@ -163,10 +179,10 @@ export function AppShell() {
             <Settings size={20} />
             <div className="border-l border-[var(--border)] pl-4 text-right">
               <div className="text-xs font-semibold">
-                {me.data?.user.name ?? "Demo Owner"}
+                {me.data?.user.name ?? "Operator"}
               </div>
               <div className="text-[10px] text-[var(--ink-muted)]">
-                Demo login
+                Workspace
               </div>
             </div>
           </div>

@@ -1,0 +1,61 @@
+services:
+  agentguard-api:
+    build:
+      context: ./agentguard-product
+      dockerfile: Dockerfile.api
+    image: agentguard-api:local
+    ports:
+      - "8000:8000"
+    environment:
+      AGENTGUARD_API_KEY: ${AGENTGUARD_API_KEY:-dev-agentguard-key}
+      AGENTGUARD_WEB_ORIGINS: ${AGENTGUARD_WEB_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      AGENTGUARD_TRACE_ROOT: /data/traces
+      AGENTGUARD_TRACE_NAMESPACE: registered_agents
+      AGENTGUARD_APPROVAL_ROOT: /data/approvals
+      AGENTGUARD_REGISTERED_AGENTS_PATH: /app/demo/registered_agents.json
+      AGENTGUARD_POLICY_PATH: /app/policies/personal_assistant_v1.json
+      AGENTGUARD_ELASTIC_ENABLED: "false"
+      AGENTGUARD_FIREWALL_MODE: v2
+      AGENTGUARD_AGENTTRUST_SHELL_ENABLED: ${AGENTGUARD_AGENTTRUST_SHELL_ENABLED:-true}
+      AGENTGUARD_INTENT_LLM_ENABLED: ${AGENTGUARD_INTENT_LLM_ENABLED:-false}
+      AGENTGUARD_TIER3_MODEL: ${AGENTGUARD_TIER3_MODEL:-gemini-2.5-flash}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+    volumes:
+      - agentguard-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  agentguard-dashboard:
+    build:
+      context: ./agentguard-product
+      dockerfile: Dockerfile.dashboard
+      args:
+        VITE_AGENTGUARD_API_KEY: ${AGENTGUARD_API_KEY:-dev-agentguard-key}
+    image: agentguard-dashboard:local
+    ports:
+      - "5173:80"
+    depends_on:
+      agentguard-api:
+        condition: service_healthy
+
+  google-adk-agent:
+    profiles: ["adk-example"]
+    build:
+      context: .
+      dockerfile: google-adk-personal-agent/Dockerfile
+    image: google-adk-personal-agent:local
+    environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      ADK_MODEL: ${ADK_MODEL:-gemini-3-flash-preview}
+      AGENTGUARD_BASE_URL: http://agentguard-api:8000
+      AGENTGUARD_API_KEY: ${AGENTGUARD_API_KEY:-dev-agentguard-key}
+      AGENTGUARD_ENFORCE_APPROVAL: "true"
+    depends_on:
+      agentguard-api:
+        condition: service_healthy
+
+volumes:
+  agentguard-data:

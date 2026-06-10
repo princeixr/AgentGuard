@@ -39,6 +39,11 @@ const GuardAdminPage = lazy(() =>
     default: module.GuardAdminPage,
   })),
 );
+const ApprovalsPage = lazy(() =>
+  import("../features/approvals/ApprovalsPage").then((module) => ({
+    default: module.ApprovalsPage,
+  })),
+);
 
 export function App() {
   return (
@@ -47,6 +52,7 @@ export function App() {
         <Route element={<AppShell />}>
           <Route index element={<Navigate replace to="/agents" />} />
           <Route path="/agents" element={<AgentsPage />} />
+          <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="/agents/:agentId" element={<AgentDetailPage />} />
           <Route path="/live" element={<Navigate replace to="/agents" />} />
           <Route path="/replay" element={<Navigate replace to="/agents" />} />

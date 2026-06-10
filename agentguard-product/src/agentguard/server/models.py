@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from agentguard.control_plane.models import AgentRecord, UserRecord, WorkspaceRecord
 
 Decision = Literal["allow", "warn", "review", "require_approval", "block"]
+RuntimeDecision = Literal["allow", "require_approval", "block"]
 
 
 class ComponentHealth(BaseModel):
@@ -151,17 +152,161 @@ class OperationsSummary(BaseModel):
 
 
 class ApprovalRequest(BaseModel):
-    action: Literal["approve", "reject", "abort"]
-    actor: str = "demo_operator"
+    action: Literal["approve", "reject", "abort"] | None = None
+    actor: str = "operator"
     note: str | None = None
 
 
 class ApprovalRecord(BaseModel):
+    approval_id: str | None = None
     trace_id: str
+    call_id: str | None = None
     action: Literal["approve", "reject", "abort"]
     actor: str
     note: str | None = None
     timestamp: datetime
+
+
+class ToolManifest(BaseModel):
+    schema_version: Literal["agentguard.tool_manifest.v1"] = "agentguard.tool_manifest.v1"
+    name: str
+    source_name: str
+    provider: str
+    framework: str
+    transport: str
+    description: str = ""
+    input_schema: dict[str, Any] = Field(default_factory=dict)
+    annotations: dict[str, Any] = Field(default_factory=dict)
+    metadata_provenance: list[str] = Field(default_factory=list)
+
+
+class AgentRegistrationRequest(BaseModel):
+    schema_version: Literal["agentguard.agent_registration.v1"] = (
+        "agentguard.agent_registration.v1"
+    )
+    workspace_id: str
+    agent_id: str
+    deployment_id: str
+    integration_id: str
+    name: str
+    description: str
+    framework: str
+    runtime_version: str
+    environment: str
+    system_instruction_hash: str | None = None
+    system_instruction_summary: str | None = None
+    manifest_version: str
+    tools: list[ToolManifest]
+    agent_ui_url: str | None = None
+    registered_at: datetime
+
+
+class AgentRegistrationResponse(BaseModel):
+    accepted: bool = True
+    agent_id: str
+    workspace_id: str
+
+
+class TurnStartRequest(BaseModel):
+    schema_version: Literal["agentguard.turn_start.v1"] = "agentguard.turn_start.v1"
+    workspace_id: str
+    agent_id: str
+    deployment_id: str
+    integration_id: str
+    session_id: str
+    turn_id: str
+    user_request: str
+    manifest_version: str
+    timestamp: datetime
+
+
+class TurnStartResponse(BaseModel):
+    schema_version: Literal["agentguard.turn_start_result.v1"] = (
+        "agentguard.turn_start_result.v1"
+    )
+    intent_id: str
+    turn_id: str
+    accepted: bool = True
+
+
+class ToolProposalRequest(BaseModel):
+    schema_version: Literal["agentguard.tool_proposal.v1"] = "agentguard.tool_proposal.v1"
+    workspace_id: str
+    agent_id: str
+    deployment_id: str
+    integration_id: str
+    session_id: str
+    turn_id: str
+    intent_id: str
+    call_id: str
+    tool_name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    trajectory_cursor: str | None = None
+    timestamp: datetime
+
+
+class EnforcementDecisionResponse(BaseModel):
+    schema_version: Literal["agentguard.enforcement_decision.v1"] = (
+        "agentguard.enforcement_decision.v1"
+    )
+    decision_id: str
+    trace_id: str
+    call_id: str
+    decision: RuntimeDecision
+    explanation: str
+    policy_id: str | None = None
+    policy_version: str | None = None
+    policy_hash: str | None = None
+    matched_rules: list[dict[str, Any]] = Field(default_factory=list)
+    normalized_action: dict[str, Any] | None = None
+    tier_evidence: list[dict[str, Any]] = Field(default_factory=list)
+    approval_request_id: str | None = None
+    evaluation_latency_ms: int = 0
+
+
+class OutcomeReportRequest(BaseModel):
+    schema_version: Literal["agentguard.outcome_report.v1"] = (
+        "agentguard.outcome_report.v1"
+    )
+    decision_id: str
+    call_id: str
+    status: Literal["executed", "blocked", "failed", "cancelled"]
+    output_summary: str | None = None
+    latency_ms: int | None = None
+    error_type: str | None = None
+    error_message: str | None = None
+    timestamp: datetime
+
+
+class OutcomeReportResponse(BaseModel):
+    accepted: bool = True
+
+
+class PendingApproval(BaseModel):
+    approval_id: str
+    decision_id: str
+    trace_id: str
+    call_id: str
+    workspace_id: str
+    agent_id: str
+    deployment_id: str
+    integration_id: str
+    session_id: str
+    turn_id: str
+    tool_name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    user_request: str
+    explanation: str
+    guard_evaluation: GuardEvaluationView | None = None
+    status: Literal["pending", "approved", "rejected", "aborted", "expired"] = "pending"
+    created_at: datetime
+    resolved_at: datetime | None = None
+    resolved_by: str | None = None
+    note: str | None = None
+
+
+class ApprovalListResponse(BaseModel):
+    items: list[PendingApproval] = Field(default_factory=list)
 
 
 class EventEnvelope(BaseModel):

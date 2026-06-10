@@ -1,24 +1,24 @@
-.PHONY: api demo demo-data test test-backend test-frontend build-frontend adk-chat
+.PHONY: docker-up docker-down docker-logs test test-product test-dashboard build-dashboard sdk-example
 
-api:
-	uv run agentguard-api
+docker-up:
+	docker compose up --build
 
-demo:
-	uv run python scripts/run_product_demo.py
+docker-down:
+	docker compose down
 
-demo-data:
-	uv run python scripts/reset_demo_data.py
+docker-logs:
+	docker compose logs -f
 
-adk-chat:
-	uv run examples/google_adk_agent/chat.py
+test: test-product test-dashboard
 
-test: test-backend test-frontend
+test-product:
+	cd agentguard-product && PYTHONPATH=src:packages/agentguard-sdk/src ../.venv/bin/python -m pytest -q
 
-test-backend:
-	uv run pytest -q
+test-dashboard:
+	npm --prefix agentguard-product/apps/agentguard_dashboard test
 
-test-frontend:
-	npm --prefix apps/agentguard_dashboard test
+build-dashboard:
+	npm --prefix agentguard-product/apps/agentguard_dashboard run build
 
-build-frontend:
-	npm --prefix apps/agentguard_dashboard run build
+sdk-example:
+	PYTHONPATH=agentguard-product/packages/agentguard-sdk/src python examples/minimal-python-agent/main.py

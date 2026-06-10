@@ -24,7 +24,7 @@ export function AgentsPage() {
   }
   if (agents.error || me.error) {
     return (
-      <ErrorState message="The AgentGuard API is offline. Start the full demo with `make demo`; the dashboard pages remain available from the sidebar." />
+      <ErrorState message="The AgentGuard API is offline. Start the AgentGuard API service and refresh this page." />
     );
   }
 
@@ -42,7 +42,7 @@ export function AgentsPage() {
         </div>
         <button
           className="flex items-center gap-2 rounded bg-black px-4 py-2.5 text-xs font-semibold text-white opacity-60"
-          title="Registration is shown for product context; this demo uses one seeded agent."
+          title="Agents register through the AgentGuard SDK."
         >
           <Plus size={15} />
           Register Agent

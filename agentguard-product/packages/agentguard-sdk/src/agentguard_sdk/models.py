@@ -104,6 +104,29 @@ class EnforcementDecision(BaseModel):
     evaluation_latency_ms: int = 0
 
 
+class PendingApproval(BaseModel):
+    approval_id: str
+    decision_id: str
+    trace_id: str
+    call_id: str
+    workspace_id: str
+    agent_id: str
+    deployment_id: str
+    integration_id: str
+    session_id: str
+    turn_id: str
+    tool_name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    user_request: str
+    explanation: str
+    guard_evaluation: dict[str, Any] | None = None
+    status: Literal["pending", "approved", "rejected", "aborted", "expired"] = "pending"
+    created_at: datetime
+    resolved_at: datetime | None = None
+    resolved_by: str | None = None
+    note: str | None = None
+
+
 class OutcomeReport(BaseModel):
     schema_version: Literal["agentguard.outcome_report.v1"] = (
         "agentguard.outcome_report.v1"
