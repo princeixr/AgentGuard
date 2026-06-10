@@ -105,7 +105,7 @@ FastAPI demo API
 
 ### Frontend
 
-Create `apps/web/` with:
+Create `apps/agentguard_dashboard/` with:
 
 - **React + TypeScript + Vite** for a small, independently deployable dashboard SPA.
 - **React Router** for the four product routes and trace/session deep links.
@@ -160,7 +160,7 @@ Do not ship four copied HTML files. Extract one shell and reusable components wh
 #### Frontend structure
 
 ```text
-apps/web/
+apps/agentguard_dashboard/
     src/
         app/                 router, providers, application shell
         api/                 generated types, client, query keys, SSE client
@@ -351,7 +351,7 @@ Status: completed on 2026-06-06.
 
 Estimated effort: 1 day.
 
-- Scaffold `apps/web`.
+- Scaffold `apps/agentguard_dashboard`.
 - Translate the Stitch colors, typography, spacing, and navigation into Tailwind tokens.
 - Add Radix primitives, TanStack Query/Table, the typed API client, and the SSE hook.
 - Build the persistent sidebar/header and shared primitives.

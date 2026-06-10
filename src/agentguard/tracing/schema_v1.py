@@ -41,6 +41,7 @@ class ExplicitConstraintV1(AgentGuardSchemaV1Model):
 
 
 class IntentContractV1(AgentGuardSchemaV1Model):
+    intent_contract_id: str | None = None
     raw_user_request: str
     normalized_intent: str
     task_goal: str | None = None

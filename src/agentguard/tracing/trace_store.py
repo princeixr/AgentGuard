@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from agentguard.core.models import GuardDecision, LabelRecord, RawTraceRecord
+from agentguard.intent.models import IntentContractV2
 from agentguard.tracing.schema_v1 import (
     AgentGuardTraceV1,
     GuardDecisionV1,
@@ -50,6 +51,15 @@ class TraceStore(BaseModel):
     def append_live_event_v1(self, event: LiveEventV1, namespace: str = "default") -> Path:
         path = self.root_dir / "v1" / namespace / "live_events.jsonl"
         append_jsonl(path, event)
+        return path
+
+    def append_intent_contract_v2(
+        self,
+        contract: IntentContractV2,
+        namespace: str = "default",
+    ) -> Path:
+        path = self.root_dir / "v1" / namespace / "intent_contracts.jsonl"
+        append_jsonl(path, contract)
         return path
 
     def append_label_v1(self, label: LabelRecordV1, namespace: str = "default") -> Path:

@@ -40,7 +40,7 @@ Interception now happens by passing a complete `AgentGuardTraceV1` into
 
 ```text
 Google ADK agent proposes MCP tool call
-    -> apps/adk_agent before_tool_callback
+    -> examples/google_adk_agent before_tool_callback
     -> GoogleADKTraceSession builds AgentGuardTraceV1 using ADK/MCP tool metadata
     -> AgentGuardFirewallV1.intercept(trace)
     -> optional Elastic retrieval adds similar-trace evidence

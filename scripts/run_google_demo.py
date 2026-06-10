@@ -13,7 +13,7 @@ if importlib.util.find_spec("google.adk") is None:
         "with `uv sync`, then rerun `uv run python scripts/run_google_demo.py`."
     )
 
-from apps.adk_agent.chat import main
+from examples.google_adk_agent.chat import main
 
 
 if __name__ == "__main__":

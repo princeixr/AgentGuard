@@ -8,8 +8,8 @@ from types import SimpleNamespace
 import pytest
 
 from agentguard.core.enums import ToolRiskLevel
-from agentguard.runtime.google_adk_adapter import GoogleADKTraceSession
-from agentguard.runtime.mcp_registry import (
+from agentguard.integrations.google_adk import GoogleADKTraceSession
+from agentguard.integrations.google_adk.mcp_registry import (
     McpRegistry,
     McpRegistryError,
 )
@@ -60,7 +60,7 @@ def test_registry_loads_stdio_and_http_servers_and_resolves_metadata(tmp_path, m
 
 def test_adk_builds_one_unfiltered_toolset_per_ready_server(tmp_path):
     pytest.importorskip("google.adk")
-    from apps.adk_agent.agent import _build_mcp_toolsets
+    from examples.google_adk_agent.agent import _build_mcp_toolsets
 
     registry = _load_registry(
         tmp_path,

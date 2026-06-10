@@ -36,6 +36,7 @@ class TraceV1BuildInput:
     domain: str
     task_category: str
     tool_name: str
+    intent_contract_id: str | None = None
     arguments: dict[str, Any] = field(default_factory=dict)
     call_id: str | None = None
     previous_trace_id: str | None = None
@@ -73,6 +74,7 @@ class TraceV1Builder:
             forbidden_tools=data.intent_forbidden_tools,
         )
         intent = IntentContractV1(
+            intent_contract_id=data.intent_contract_id,
             raw_user_request=data.raw_user_request,
             normalized_intent=data.normalized_intent,
             task_goal=infer_task_goal(data.domain, data.task_category),

@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from agentguard.firewall_v2.policy.models import PolicyEvaluationV1
+from agentguard.firewall_v2.routing.models import EvaluationPlanV1
 from agentguard.firewall_v2.tiers.models import TierResultV1
 
 
@@ -36,6 +37,7 @@ class DecisionCombinerV1:
         self,
         policy_evaluation: PolicyEvaluationV1,
         tier_results: list[TierResultV1],
+        evaluation_plan: EvaluationPlanV1 | None = None,
     ) -> CombinedDecisionV1:
         tier_ids = [result.tier_result_id for result in tier_results]
         tier_1 = next(
@@ -86,6 +88,32 @@ class DecisionCombinerV1:
                 ],
                 tier_result_ids=tier_ids,
             )
+
+        required_tiers = (
+            set(evaluation_plan.required_tiers)
+            if evaluation_plan is not None
+            else set()
+        )
+        tier_2 = next(
+            (result for result in reversed(tier_results) if result.tier == "tier_2"),
+            None,
+        )
+        if "tier_2" in required_tiers and (
+            tier_2 is None or tier_2.status != "completed"
+        ) and "tier_3" not in required_tiers:
+            return CombinedDecisionV1(
+                final_decision=(
+                    evaluation_plan.semantic_failure_effect
+                    if evaluation_plan is not None
+                    else "require_approval"
+                ),
+                enforced_by="router_semantic_failure_fallback",
+                confidence=0.0,
+                reasons=[
+                    "The policy required Tier 2, but no completed semantic result was available."
+                ],
+                tier_result_ids=tier_ids,
+            )
         if not self.tier_3_enforcement_enabled:
             return CombinedDecisionV1(
                 final_decision=(
@@ -95,19 +123,25 @@ class DecisionCombinerV1:
                 ),
                 enforced_by="tier_1_deterministic_security",
                 confidence=tier_1.confidence if tier_1 is not None else 0.85,
-                reasons=[
-                    "Tier 3 enforcement is disabled; using deterministic recommendation."
-                ],
+                reasons=["Tier 3 enforcement is disabled; using deterministic recommendation."],
                 tier_result_ids=tier_ids,
             )
 
         tier_3 = next((result for result in reversed(tier_results) if result.tier == "tier_3"), None)
         if tier_3 is None:
             return CombinedDecisionV1(
-                final_decision=policy_evaluation.recommendation,
-                enforced_by="tier_1_deterministic_policy",
-                confidence=0.75,
-                reasons=["No Tier 3 result was available for enforcement."],
+                final_decision=(
+                    evaluation_plan.llm_failure_effect
+                    if evaluation_plan is not None and "tier_3" in required_tiers
+                    else policy_evaluation.recommendation
+                ),
+                enforced_by=(
+                    "router_llm_failure_fallback"
+                    if evaluation_plan is not None and "tier_3" in required_tiers
+                    else "tier_1_deterministic_policy"
+                ),
+                confidence=0.0 if "tier_3" in required_tiers else 0.75,
+                reasons=["No required Tier 3 result was available for enforcement."],
                 tier_result_ids=tier_ids,
             )
         if tier_3.status != "completed" or tier_3.confidence < self.confidence_threshold:
