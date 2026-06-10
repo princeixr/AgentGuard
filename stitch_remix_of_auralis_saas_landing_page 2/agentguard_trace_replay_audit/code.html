@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Session Detail - AgentGuard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "success-green": "#166534",
+                    "primary-fixed-dim": "#c6c6c6",
+                    "secondary": "#085ac0",
+                    "surface-container": "#1e1e1e",
+                    "on-tertiary-fixed": "#1b1b1b",
+                    "inverse-primary": "#000000",
+                    "surface-bright": "#333333",
+                    "outline": "#4a4a4a",
+                    "outline-variant": "#3a3a3a",
+                    "warning-bg": "#422006",
+                    "background": "#121212",
+                    "on-surface": "#e2e2e2",
+                    "tertiary": "#ffffff",
+                    "primary-fixed": "#e2e2e2",
+                    "success-bg": "#052e16",
+                    "on-secondary-fixed-variant": "#adc6ff",
+                    "error-red": "#ffb4ab",
+                    "on-primary-fixed": "#1b1b1b",
+                    "error-bg": "#93000a",
+                    "error-container": "#93000a",
+                    "on-error-container": "#ffdad6",
+                    "surface-container-low": "#181818",
+                    "surface": "#121212",
+                    "inverse-surface": "#e2e2e2",
+                    "warning-yellow": "#fef08a",
+                    "on-error": "#690005",
+                    "primary": "#ffffff",
+                    "surface-dim": "#121212",
+                    "on-tertiary": "#000000",
+                    "tertiary-fixed": "#e2e2e2",
+                    "on-secondary-container": "#d8e2ff",
+                    "on-primary": "#000000",
+                    "tertiary-fixed-dim": "#c6c6c6",
+                    "surface-container-high": "#2b2b2b",
+                    "inverse-on-surface": "#1b1b1b",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "surface-variant": "#4a4a4a",
+                    "surface-container-lowest": "#000000",
+                    "on-background": "#e2e2e2",
+                    "surface-tint": "#c6c6c6",
+                    "surface-container-highest": "#363636",
+                    "on-tertiary-container": "#e2e2e2",
+                    "error": "#ffb4ab",
+                    "secondary-fixed": "#d8e2ff",
+                    "secondary-container": "#004395",
+                    "tertiary-container": "#e2e2e2",
+                    "on-primary-fixed-variant": "#474747",
+                    "on-secondary-fixed": "#001a42",
+                    "on-primary-container": "#e2e2e2",
+                    "on-secondary": "#002c66",
+                    "primary-container": "#e2e2e2",
+                    "on-tertiary-fixed-variant": "#474747",
+                    "on-surface-variant": "#c4c7c7"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter": "16px",
+                    "stack-dense": "4px",
+                    "margin": "24px",
+                    "rail-width": "64px",
+                    "stack-compact": "8px",
+                    "sidebar-width": "240px"
+            },
+            "fontFamily": {
+                    "label-sm": ["Geist"],
+                    "body-md": ["Geist"],
+                    "label-md": ["Geist"],
+                    "mono": ["JetBrains Mono"],
+                    "headline-md": ["Geist"],
+                    "headline-lg": ["Geist"],
+                    "body-sm": ["Geist"]
+            },
+            "fontSize": {
+                    "label-sm": ["11px", {"lineHeight": "14px", "fontWeight": "500"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "mono": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "headline-md": ["18px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Geist', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .icon-fill { font-variation-settings: 'FILL' 1; }
+    </style>
+</head>
+<body class="bg-background text-on-background m-0 p-0 overflow-x-hidden flex flex-row h-screen antialiased selection:bg-secondary-container selection:text-on-secondary-container">
+<!-- App Shell: Sidebar -->
+<aside class="fixed left-0 top-0 h-full w-[240px] flex flex-col bg-surface-container border-r border-outline-variant z-20 hidden md:flex">
+<div class="h-14 px-gutter flex items-center border-b border-outline-variant">
+<div class="h-8 w-8 rounded bg-primary-fixed flex items-center justify-center mr-3">
+<span class="material-symbols-outlined text-on-primary-fixed icon-fill text-[20px]" data-icon="shield">shield</span>
+</div>
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-surface">AgentGuard</h1>
+<p class="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Hackathon Demo</p>
+</div>
+</div>
+<div class="p-gutter pb-stack-compact">
+<button class="w-full bg-secondary text-on-secondary hover:bg-secondary-container hover:text-on-secondary-container transition-colors py-2 px-4 rounded text-body-sm font-body-sm font-semibold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+                New Agent
+            </button>
+</div>
+<nav class="flex-1 overflow-y-auto py-2">
+<ul class="flex flex-col gap-1 px-3">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors text-body-sm font-body-sm" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="security">security</span>
+                        Live Interception
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded bg-secondary-container text-on-secondary-container font-semibold text-body-sm font-body-sm" href="#">
+<span class="material-symbols-outlined text-[18px] icon-fill" data-icon="history">history</span>
+                        Sessions
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors text-body-sm font-body-sm" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="timeline">timeline</span>
+                        Trace Replay
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors text-body-sm font-body-sm" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="storage">storage</span>
+                        Decision Memory
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors text-body-sm font-body-sm" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="policy">policy</span>
+                        Policies
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors text-body-sm font-body-sm" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="analytics">analytics</span>
+                        Risk &amp; Operations
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors text-body-sm font-body-sm" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="extension">extension</span>
+                        Integrations
+                    </a>
+</li>
+</ul>
+</nav>
+<div class="border-t border-outline-variant p-3 mt-auto">
+<ul class="flex flex-col gap-1">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors text-body-sm font-body-sm" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="settings">settings</span>
+                        Settings
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors text-body-sm font-body-sm" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="description">description</span>
+                        Docs
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors text-body-sm font-body-sm" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="account_circle">account_circle</span>
+                        Profile
+                    </a>
+</li>
+</ul>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col md:ml-[240px] min-h-screen">
+<!-- App Shell: TopNav -->
+<header class="h-14 bg-surface border-b border-outline-variant flex justify-between items-center px-gutter sticky top-0 z-10">
+<div class="flex items-center gap-4">
+<button class="md:hidden text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<div class="flex items-center text-body-sm font-body-sm text-on-surface-variant">
+<a class="hover:text-primary transition-colors" href="#">Sessions</a>
+<span class="material-symbols-outlined text-[16px] mx-1 opacity-50" data-icon="chevron_right">chevron_right</span>
+<span class="text-primary font-medium font-mono text-mono">sess_a3f9c2</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-primary transition-colors relative flex items-center justify-center h-8 w-8 rounded-full hover:bg-surface-container-high">
+<span class="material-symbols-outlined text-[20px]" data-icon="notifications">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-secondary"></span>
+</button>
+</div>
+</header>
+<!-- Canvas -->
+<div class="p-margin max-w-5xl mx-auto w-full flex-1 flex flex-col gap-gutter">
+<!-- Breadcrumb -->
+<div class="flex items-center text-body-sm font-body-sm text-on-surface-variant mb-2">
+<span class="material-symbols-outlined text-[16px] mr-1" data-icon="arrow_back">arrow_back</span>
+<a class="hover:text-primary transition-colors" href="#">Trace Explorer</a>
+<span class="mx-2 opacity-50">/</span>
+<span class="font-mono text-mono text-on-surface">sess_a3f9c2</span>
+</div>
+<!-- SESSION HEADER CARD -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 shadow-sm flex flex-col gap-4 relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-secondary"></div>
+<!-- Row 1: Meta -->
+<div class="flex items-center gap-3 text-body-sm font-body-sm text-on-surface-variant flex-wrap">
+<span class="font-mono text-mono text-on-surface bg-surface-container px-2 py-1 rounded">sess_a3f9c2</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span>ADK Demo Agent</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="text-secondary font-semibold flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+                        ACTIVE
+                    </span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="timer">timer</span>
+                        Running 2m 14s
+                    </span>
+</div>
+<!-- Row 2: Prompt -->
+<div>
+<p class="text-headline-md font-headline-md italic text-on-surface">"Book a flight from SFO to JFK for December 14 and send me the confirmation"</p>
+</div>
+<!-- Row 3: Risk Summary -->
+<div class="flex items-center gap-stack-compact flex-wrap">
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container border border-outline-variant text-label-md font-label-md">
+<span class="material-symbols-outlined text-[14px]" data-icon="list_alt">list_alt</span>
+                        6 tool calls
+                    </div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-success-bg/20 border border-success-green text-success-green text-label-md font-label-md">
+<span class="material-symbols-outlined text-[14px]" data-icon="check_circle">check_circle</span>
+                        4 allowed
+                    </div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-error-bg/20 border border-error-red text-error-red text-label-md font-label-md">
+<span class="material-symbols-outlined text-[14px]" data-icon="block">block</span>
+                        1 blocked
+                    </div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-warning-bg/20 border border-warning-yellow text-warning-yellow text-label-md font-label-md">
+<span class="material-symbols-outlined text-[14px]" data-icon="pending">pending</span>
+                        1 pending approval
+                    </div>
+</div>
+<!-- Row 4: Analysis Collapsible -->
+<details class="group border border-outline-variant rounded bg-surface-container mt-2">
+<summary class="flex items-center justify-between cursor-pointer p-3 text-body-sm font-body-sm font-semibold select-none">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" data-icon="robot_2">robot_2</span>
+                            AgentGuard Analysis
+                        </div>
+<span class="material-symbols-outlined group-open:rotate-180 transition-transform" data-icon="expand_more">expand_more</span>
+</summary>
+<div class="p-4 border-t border-outline-variant text-body-sm font-body-sm text-on-surface-variant bg-surface-container-low">
+<p>Agent intent evaluated as safe overall. However, policy <span class="font-mono text-mono text-on-surface bg-surface-container px-1 py-0.5 rounded">POL-FIN-01</span> triggered on step 5 requiring human-in-the-loop for financial transactions over $100. Step 4 blocked due to preemptive action (sending confirmation before transaction success).</p>
+</div>
+</details>
+</div>
+<!-- EXECUTION TIMELINE -->
+<div class="mt-4">
+<h2 class="text-headline-md font-headline-md font-semibold text-on-surface mb-6 flex items-center gap-2">
+                    Execution Timeline
+                    <span class="bg-surface-container text-on-surface-variant text-label-sm font-label-sm px-2 py-0.5 rounded-full">6</span>
+</h2>
+<div class="relative ml-4 md:ml-8 pl-8 md:pl-12 border-l border-outline-variant space-y-gutter">
+<!-- Trace 1 -->
+<div class="relative group">
+<div class="absolute -left-[41px] md:-left-[57px] top-4 w-6 h-6 rounded-full bg-success-bg border border-success-green text-success-green flex items-center justify-center text-label-sm font-label-sm font-bold z-10 shadow-[0_0_0_4px_var(--tw-colors-background)]">
+                            1
+                        </div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-4 shadow-sm hover:border-outline transition-colors">
+<div class="flex items-start justify-between gap-4 mb-2">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-mono text-mono text-on-surface font-semibold">google_drive_read</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant" data-icon="arrow_right_alt">arrow_right_alt</span>
+<span class="font-mono text-mono text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded text-[11px]">drive.read</span>
+<span class="bg-surface-container-high text-on-surface-variant px-1.5 py-0.5 rounded text-mono font-mono text-[10px]">T1</span>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="text-success-green text-label-md font-label-md font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span>
+                                        ALLOW
+                                    </span>
+<span class="text-on-surface-variant text-mono font-mono text-[11px]">9ms</span>
+</div>
+</div>
+<div class="text-body-sm font-body-sm text-on-surface mb-3 border-l-2 border-outline-variant pl-3 py-1 bg-surface-container-low">
+                                'Read file: travel_preferences.txt'
+                            </div>
+<div class="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-secondary hover:text-on-secondary-container text-label-md font-label-md flex items-center gap-1">
+                                    View Evidence <span class="material-symbols-outlined text-[14px]" data-icon="open_in_new">open_in_new</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Trace 2 -->
+<div class="relative group">
+<div class="absolute -left-[41px] md:-left-[57px] top-4 w-6 h-6 rounded-full bg-success-bg border border-success-green text-success-green flex items-center justify-center text-label-sm font-label-sm font-bold z-10 shadow-[0_0_0_4px_var(--tw-colors-background)]">
+                            2
+                        </div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-4 shadow-sm hover:border-outline transition-colors">
+<div class="flex items-start justify-between gap-4 mb-2">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-mono text-mono text-on-surface font-semibold">google_calendar_read</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant" data-icon="arrow_right_alt">arrow_right_alt</span>
+<span class="font-mono text-mono text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded text-[11px]">calendar.read</span>
+<span class="bg-surface-container-high text-on-surface-variant px-1.5 py-0.5 rounded text-mono font-mono text-[10px]">T1</span>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="text-success-green text-label-md font-label-md font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span>
+                                        ALLOW
+                                    </span>
+<span class="text-on-surface-variant text-mono font-mono text-[11px]">11ms</span>
+</div>
+</div>
+<div class="text-body-sm font-body-sm text-on-surface mb-3 border-l-2 border-outline-variant pl-3 py-1 bg-surface-container-low">
+                                'Check availability: Dec 14-16'
+                            </div>
+<div class="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-secondary hover:text-on-secondary-container text-label-md font-label-md flex items-center gap-1">
+                                    View Evidence <span class="material-symbols-outlined text-[14px]" data-icon="open_in_new">open_in_new</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Trace 3 -->
+<div class="relative group">
+<div class="absolute -left-[41px] md:-left-[57px] top-4 w-6 h-6 rounded-full bg-success-bg border border-success-green text-success-green flex items-center justify-center text-label-sm font-label-sm font-bold z-10 shadow-[0_0_0_4px_var(--tw-colors-background)]">
+                            3
+                        </div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-4 shadow-sm hover:border-outline transition-colors">
+<div class="flex items-start justify-between gap-4 mb-2">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-mono text-mono text-on-surface font-semibold">run_shell_command</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant" data-icon="arrow_right_alt">arrow_right_alt</span>
+<span class="font-mono text-mono text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded text-[11px]">shell.network_request</span>
+<span class="bg-surface-container-high text-on-surface-variant px-1.5 py-0.5 rounded text-mono font-mono text-[10px]">T1+T2</span>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="text-success-green text-label-md font-label-md font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span>
+                                        ALLOW
+                                    </span>
+<span class="text-on-surface-variant text-mono font-mono text-[11px]">44ms</span>
+</div>
+</div>
+<div class="text-body-sm font-body-sm text-on-surface mb-3 border-l-2 border-outline-variant pl-3 py-1 bg-surface-container-low font-mono text-mono overflow-x-auto whitespace-nowrap">
+                                'curl https://flights-api.example.com/search?from=SFO&amp;to=JFK&amp;date=2024-12-14'
+                            </div>
+<div class="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-secondary hover:text-on-secondary-container text-label-md font-label-md flex items-center gap-1">
+                                    View Evidence <span class="material-symbols-outlined text-[14px]" data-icon="open_in_new">open_in_new</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Trace 4 - Blocked -->
+<div class="relative group">
+<div class="absolute -left-[41px] md:-left-[57px] top-4 w-6 h-6 rounded-full bg-error-bg border border-error-red text-error-red flex items-center justify-center text-label-sm font-label-sm font-bold z-10 shadow-[0_0_0_4px_var(--tw-colors-background)]">
+                            4
+                        </div>
+<div class="bg-error-bg/5 border border-error-red/50 rounded p-4 shadow-sm hover:border-error-red transition-colors relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-error-red"></div>
+<div class="flex items-start justify-between gap-4 mb-2">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-mono text-mono text-on-surface font-semibold">gmail_send_email</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant" data-icon="arrow_right_alt">arrow_right_alt</span>
+<span class="font-mono text-mono text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded text-[11px]">email.send</span>
+<span class="bg-surface-container-high text-on-surface-variant px-1.5 py-0.5 rounded text-mono font-mono text-[10px]">T1</span>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="text-error-red text-label-md font-label-md font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="block">block</span>
+                                        BLOCKED
+                                    </span>
+<span class="text-on-surface-variant text-mono font-mono text-[11px]">8ms</span>
+</div>
+</div>
+<div class="text-body-sm font-body-sm text-on-surface mb-3 border-l-2 border-error-red/30 pl-3 py-1 bg-surface-container-low">
+                                'Send flight options to user@gmail.com'
+                            </div>
+<div class="bg-error-bg/10 border border-error-red/20 rounded px-3 py-2 text-body-sm font-body-sm text-error-red mb-3 flex items-start gap-2">
+<span class="material-symbols-outlined text-[16px] mt-0.5" data-icon="warning">warning</span>
+<span><strong>Why blocked:</strong> Intent violation — user requested confirmation email AFTER booking. Action aborted to prevent premature notification.</span>
+</div>
+<div class="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-secondary hover:text-on-secondary-container text-label-md font-label-md flex items-center gap-1">
+                                    View Evidence <span class="material-symbols-outlined text-[14px]" data-icon="open_in_new">open_in_new</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Trace 5 - Pending -->
+<div class="relative group">
+<div class="absolute -left-[41px] md:-left-[57px] top-4 w-6 h-6 rounded-full bg-warning-bg border border-warning-yellow text-warning-yellow flex items-center justify-center text-label-sm font-label-sm font-bold z-10 shadow-[0_0_0_4px_var(--tw-colors-background)]">
+                            5
+                        </div>
+<div class="bg-warning-bg/5 border border-warning-yellow/50 rounded p-4 shadow-sm hover:border-warning-yellow transition-colors relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-warning-yellow"></div>
+<div class="flex items-start justify-between gap-4 mb-2">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-mono text-mono text-on-surface font-semibold">proxy_payment_execute</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant" data-icon="arrow_right_alt">arrow_right_alt</span>
+<span class="font-mono text-mono text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded text-[11px]">payment.charge</span>
+<span class="bg-surface-container-high text-on-surface-variant px-1.5 py-0.5 rounded text-mono font-mono text-[10px]">T1</span>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="text-warning-yellow text-label-md font-label-md font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="front_hand">front_hand</span>
+                                        REQUIRES APPROVAL
+                                    </span>
+<span class="text-on-surface-variant text-mono font-mono text-[11px]">12ms</span>
+</div>
+</div>
+<div class="text-body-sm font-body-sm text-on-surface mb-3 border-l-2 border-warning-yellow/30 pl-3 py-1 bg-surface-container-low font-mono text-mono">
+                                'Execute payment $287.00 to Delta Airlines for flight DL-2847'
+                            </div>
+<div class="bg-warning-bg/10 border border-warning-yellow/20 rounded px-3 py-2 text-body-sm font-body-sm text-warning-yellow mb-3 flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] animate-pulse" data-icon="hourglass_empty">hourglass_empty</span>
+<span><strong>Status:</strong> PENDING ADMIN REVIEW</span>
+</div>
+<div class="flex gap-2">
+<button class="bg-surface-container text-on-surface hover:bg-surface-variant px-3 py-1 rounded text-label-md font-label-md border border-outline-variant transition-colors">Deny</button>
+<button class="bg-warning-yellow text-on-tertiary-fixed hover:bg-warning-yellow/80 px-3 py-1 rounded text-label-md font-label-md transition-colors">Approve</button>
+</div>
+</div>
+<div class="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-secondary hover:text-on-secondary-container text-label-md font-label-md flex items-center gap-1">
+                                    View Evidence <span class="material-symbols-outlined text-[14px]" data-icon="open_in_new">open_in_new</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Trace 6 -->
+<div class="relative group">
+<div class="absolute -left-[41px] md:-left-[57px] top-4 w-6 h-6 rounded-full bg-success-bg border border-success-green text-success-green flex items-center justify-center text-label-sm font-label-sm font-bold z-10 shadow-[0_0_0_4px_var(--tw-colors-background)]">
+                            6
+                        </div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-4 shadow-sm hover:border-outline transition-colors">
+<div class="flex items-start justify-between gap-4 mb-2">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-mono text-mono text-on-surface font-semibold">google_calendar_create</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant" data-icon="arrow_right_alt">arrow_right_alt</span>
+<span class="font-mono text-mono text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded text-[11px]">calendar.write</span>
+<span class="bg-surface-container-high text-on-surface-variant px-1.5 py-0.5 rounded text-mono font-mono text-[10px]">T1</span>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="text-success-green text-label-md font-label-md font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span>
+                                        ALLOW
+                                    </span>
+<span class="text-on-surface-variant text-mono font-mono text-[11px]">11ms</span>
+</div>
+</div>
+<div class="text-body-sm font-body-sm text-on-surface mb-3 border-l-2 border-outline-variant pl-3 py-1 bg-surface-container-low">
+                                'Create event: SFO→JFK Dec 14 | Flight DL-2847 | Terminal 2'
+                            </div>
+<div class="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-secondary hover:text-on-secondary-container text-label-md font-label-md flex items-center gap-1">
+                                    View Evidence <span class="material-symbols-outlined text-[14px]" data-icon="open_in_new">open_in_new</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Spacer -->
+<div class="h-8"></div>
+</div>
+</main>
+</body></html>

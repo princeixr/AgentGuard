@@ -38,8 +38,8 @@ class AgentGuardAdkInterceptor:
         self._decision_by_call: dict[str, tuple[str, float]] = {}
 
     def before_tool(self, tool, args: dict[str, Any], tool_context):
-        session_id = _session_id(tool_context)
         turn_id = _turn_id(tool_context)
+        session_id = _guard_session_id(tool_context)
         if self.registration_factory is not None:
             self.client.register(self.registration_factory())
         if turn_id not in self._intent_by_turn:
@@ -157,6 +157,16 @@ def _session_id(context) -> str:
 
 def _turn_id(context) -> str:
     return getattr(context, "invocation_id", None) or f"{_session_id(context)}:turn"
+
+
+def _guard_session_id(context) -> str:
+    """Use one AgentGuard session per ADK invocation.
+
+    ADK keeps the same chat session across many user turns. AgentGuard sessions
+    represent one governed user request, so combining the chat and invocation
+    identities prevents unrelated turns from being merged in trace replay.
+    """
+    return f"{_session_id(context)}:{_turn_id(context)}"
 
 
 def _user_text(context) -> str:

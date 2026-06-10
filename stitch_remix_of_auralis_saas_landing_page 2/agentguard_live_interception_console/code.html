@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AgentGuard - Live Interception</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-fixed-dim": "#adc6ff",
+                    "primary-fixed": "#e5e2e1",
+                    "primary-container": "#1c1b1b",
+                    "surface-container": "#f1edec",
+                    "error": "#ba1a1a",
+                    "on-error-container": "#93000a",
+                    "background": "#fdf8f8",
+                    "on-tertiary-container": "#868382",
+                    "on-surface": "#1c1b1b",
+                    "on-error": "#ffffff",
+                    "on-secondary-fixed": "#001a42",
+                    "surface": "#fdf8f8",
+                    "surface-dim": "#ddd9d8",
+                    "surface-container-low": "#f7f3f2",
+                    "inverse-primary": "#c8c6c5",
+                    "on-primary": "#ffffff",
+                    "on-primary-container": "#858383",
+                    "tertiary-container": "#1c1b1a",
+                    "on-surface-variant": "#444748",
+                    "secondary": "#0058be",
+                    "on-secondary": "#ffffff",
+                    "tertiary-fixed-dim": "#cac6c4",
+                    "surface-tint": "#5f5e5e",
+                    "surface-variant": "#e5e2e1",
+                    "surface-bright": "#fdf8f8",
+                    "primary": "#000000",
+                    "outline-variant": "#c4c7c7",
+                    "on-tertiary-fixed": "#1c1b1a",
+                    "on-background": "#1c1b1b",
+                    "on-tertiary-fixed-variant": "#484645",
+                    "on-primary-fixed": "#1c1b1b",
+                    "on-primary-fixed-variant": "#474746",
+                    "inverse-on-surface": "#f4f0ef",
+                    "error-container": "#ffdad6",
+                    "inverse-surface": "#313030",
+                    "tertiary": "#000000",
+                    "surface-container-lowest": "#ffffff",
+                    "secondary-container": "#2170e4",
+                    "surface-container-highest": "#e5e2e1",
+                    "on-secondary-fixed-variant": "#004395",
+                    "on-secondary-container": "#fefcff",
+                    "secondary-fixed": "#d8e2ff",
+                    "outline": "#747878",
+                    "surface-container-high": "#ebe7e6",
+                    "tertiary-fixed": "#e6e2df",
+                    "primary-fixed-dim": "#c8c6c5",
+                    "on-tertiary": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "rail-width": "64px",
+                    "stack-compact": "8px",
+                    "gutter": "16px",
+                    "sidebar-width": "240px",
+                    "margin": "24px",
+                    "stack-dense": "4px"
+            },
+            "fontFamily": {
+                    "headline-md": [
+                            "Geist"
+                    ],
+                    "body-md": [
+                            "Geist"
+                    ],
+                    "headline-lg": [
+                            "Geist"
+                    ],
+                    "mono": [
+                            "monospace"
+                    ],
+                    "label-sm": [
+                            "Geist"
+                    ],
+                    "body-sm": [
+                            "Geist"
+                    ],
+                    "label-md": [
+                            "Geist"
+                    ]
+            },
+            "fontSize": {
+                    "headline-md": [
+                            "18px",
+                            {
+                                    "lineHeight": "24px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "mono": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "label-sm": [
+                            "11px",
+                            {
+                                    "lineHeight": "14px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "body-sm": [
+                            "13px",
+                            {
+                                    "lineHeight": "18px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "label-md": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "600"
+                            }
+                    ]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body {
+            background-color: #0A0B0E;
+            color: #F9F8F6;
+        }
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+        }
+        .pulse-amber {
+            animation: pulse-amber 2s infinite;
+        }
+        @keyframes pulse-amber {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+        .pulse-red {
+            animation: pulse-red 2s infinite;
+        }
+        @keyframes pulse-red {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+        .slide-in {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .flash-red {
+            animation: flashRed 0.5s ease-out;
+        }
+        @keyframes flashRed {
+            0% { background-color: rgba(220, 38, 38, 0.2); }
+            100% { background-color: transparent; }
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<nav class="bg-primary dark:bg-primary text-secondary dark:text-secondary-fixed-dim font-body-md text-body-md fixed left-0 h-screen w-sidebar-width border-r border-outline-variant flex flex-col h-full py-margin px-gutter z-50">
+<div class="flex items-center gap-3 mb-8 px-4">
+<span class="material-symbols-outlined text-[32px] text-on-primary">shield</span>
+<div>
+<div class="font-headline-md text-headline-md font-bold text-on-primary">AgentGuard</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">AI Governance</div>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Overview</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-secondary font-bold border-r-2 border-secondary bg-surface-container-highest opacity-80" href="#">
+<span class="material-symbols-outlined">security</span>
+<span>Live Interception</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">history_edu</span>
+<span>Trace Explorer</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">admin_panel_settings</span>
+<span>Guard Admin</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Container -->
+<div class="flex-1 ml-sidebar-width flex flex-col h-full bg-[#0A0B0E] relative overflow-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-primary-container text-on-surface dark:text-primary-fixed font-headline-md text-headline-md w-full border-b border-outline-variant flex justify-between items-center h-rail-width px-margin z-40">
+<div class="font-headline-md text-headline-md text-primary dark:text-primary-fixed font-bold">AgentGuard</div>
+<div class="flex items-center gap-4">
+<button class="hover:text-secondary transition-colors p-2 rounded-full hover:bg-surface-variant"><span class="material-symbols-outlined">notifications</span></button>
+<button class="hover:text-secondary transition-colors p-2 rounded-full hover:bg-surface-variant"><span class="material-symbols-outlined">settings</span></button>
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container font-label-md">US</div>
+</div>
+</header>
+<!-- Scrollable Canvas -->
+<main class="flex-1 overflow-y-auto p-margin flex flex-col gap-margin">
+<!-- Agent Status Bar -->
+<div class="bg-[#1C1D21] border border-[#2D2E33] rounded-lg p-4 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-3 h-3 rounded-full bg-green-500 pulse-dot"></div>
+<div>
+<div class="font-headline-md text-headline-md font-bold text-white">ADK Demo Agent</div>
+<div class="font-mono text-mono text-gray-400">session_id: ax92-bt41-00px</div>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex flex-col items-end">
+<span class="font-label-sm text-label-sm text-gray-400 uppercase tracking-wider">Active Policy</span>
+<span class="font-body-sm text-body-sm text-white">Strict Financial</span>
+</div>
+<div class="h-8 w-px bg-[#2D2E33]"></div>
+<div class="flex gap-3">
+<div class="bg-[#2A2B31] px-3 py-1 rounded border border-[#3D3E44] flex items-center gap-2">
+<span class="font-mono text-mono text-gray-400">Intercepted</span>
+<span class="font-body-md text-body-md text-white font-semibold">12</span>
+</div>
+<div class="bg-red-900/20 px-3 py-1 rounded border border-red-900/50 flex items-center gap-2">
+<span class="font-mono text-mono text-red-400">Blocked</span>
+<span class="font-body-md text-body-md text-red-400 font-semibold">3</span>
+</div>
+<div class="bg-amber-900/20 px-3 py-1 rounded border border-amber-900/50 flex items-center gap-2">
+<span class="font-mono text-mono text-amber-400">Pending</span>
+<span class="font-body-md text-body-md text-amber-400 font-semibold">1</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Pending Approvals -->
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-amber-500 pulse-amber"></div>
+<h2 class="font-headline-md text-headline-md text-white font-semibold">Action Required</h2>
+</div>
+<div class="bg-[#1C1D21] border border-amber-500/50 rounded-lg p-5 flex items-start justify-between">
+<div class="flex gap-4">
+<div class="mt-1">
+<span class="material-symbols-outlined text-amber-500">warning</span>
+</div>
+<div>
+<div class="flex items-center gap-2 mb-1">
+<span class="font-mono text-mono text-amber-400 bg-amber-900/20 px-2 py-0.5 rounded text-xs">PENDING</span>
+<span class="font-mono text-mono text-white">payment.execute</span>
+</div>
+<div class="font-body-md text-body-md text-gray-300 mt-2">
+                                Agent requesting to execute payment of <strong class="text-white">$340.00</strong> to <strong class="text-white">Delta Airlines</strong>. Exceeds auto-approve threshold ($100).
+                            </div>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 rounded border border-red-500 text-red-500 hover:bg-red-500/10 transition-colors font-label-md">DENY</button>
+<button class="px-4 py-2 rounded bg-amber-500 text-amber-950 font-bold hover:bg-amber-400 transition-colors font-label-md">APPROVE</button>
+</div>
+</div>
+</div>
+<!-- Live Interception Feed -->
+<div class="flex flex-col gap-4 flex-1">
+<div class="flex items-center justify-between border-b border-[#2D2E33] pb-2">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-red-500 pulse-red"></div>
+<h2 class="font-headline-md text-headline-md text-white font-semibold">Live Trace Feed</h2>
+</div>
+<span class="font-label-sm text-label-sm text-gray-500">Polling active (50ms)</span>
+</div>
+<div class="flex flex-col gap-2">
+<!-- Row 1: PENDING -->
+<div class="bg-[#1C1D21] border border-[#2D2E33] border-l-4 border-l-amber-500 rounded p-3 flex items-center justify-between hover:bg-[#222329] transition-colors cursor-pointer slide-in">
+<div class="flex items-center gap-4 w-1/3">
+<span class="material-symbols-outlined text-gray-500 text-sm">arrow_forward</span>
+<span class="font-mono text-mono text-white">payment.execute</span>
+</div>
+<div class="flex-1 font-body-sm text-body-sm text-gray-400 truncate">
+                            {"amount": 340, "vendor": "Delta Airlines"}
+                        </div>
+<div class="flex items-center gap-6 w-1/4 justify-end">
+<span class="font-mono text-mono text-gray-500 text-xs">T2 eval</span>
+<span class="font-mono text-mono text-gray-500 text-xs">45ms</span>
+<span class="bg-amber-900/20 text-amber-400 border border-amber-900/50 px-2 py-0.5 rounded text-[10px] font-mono w-20 text-center">PENDING</span>
+</div>
+</div>
+<!-- Row 2: ALLOW -->
+<div class="bg-[#1C1D21] border border-[#2D2E33] border-l-4 border-l-green-500 rounded p-3 flex items-center justify-between hover:bg-[#222329] transition-colors cursor-pointer slide-in" style="animation-delay: 0.1s">
+<div class="flex items-center gap-4 w-1/3">
+<span class="material-symbols-outlined text-gray-500 text-sm">arrow_forward</span>
+<span class="font-mono text-mono text-white">shell.execute</span>
+</div>
+<div class="flex-1 font-body-sm text-body-sm text-gray-400 truncate">
+                            ls -la /var/log/app
+                        </div>
+<div class="flex items-center gap-6 w-1/4 justify-end">
+<span class="font-mono text-mono text-gray-500 text-xs">T1 eval</span>
+<span class="font-mono text-mono text-gray-500 text-xs">12ms</span>
+<span class="bg-green-900/20 text-green-400 border border-green-900/50 px-2 py-0.5 rounded text-[10px] font-mono w-20 text-center">ALLOW</span>
+</div>
+</div>
+<!-- Row 3: BLOCKED (Selected State) -->
+<div class="bg-[#2A2B31] border border-red-500/50 border-l-4 border-l-red-500 rounded p-3 flex items-center justify-between cursor-pointer flash-red slide-in relative overflow-hidden" style="animation-delay: 0.2s">
+<div class="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-red-500/5 to-transparent pointer-events-none"></div>
+<div class="flex items-center gap-4 w-1/3 relative z-10">
+<span class="material-symbols-outlined text-gray-500 text-sm">arrow_forward</span>
+<span class="font-mono text-mono text-white">email.send</span>
+</div>
+<div class="flex-1 font-body-sm text-body-sm text-gray-300 truncate relative z-10">
+                            {"to": "external@competitor.com", "subject": "Project Details"}
+                        </div>
+<div class="flex items-center gap-6 w-1/4 justify-end relative z-10">
+<span class="font-mono text-mono text-gray-500 text-xs">T3 eval</span>
+<span class="font-mono text-mono text-gray-500 text-xs">120ms</span>
+<span class="bg-red-900/20 text-red-400 border border-red-900/50 px-2 py-0.5 rounded text-[10px] font-mono w-20 text-center">BLOCKED</span>
+</div>
+</div>
+<!-- Row 4: ALLOW -->
+<div class="bg-[#1C1D21] border border-[#2D2E33] border-l-4 border-l-green-500 rounded p-3 flex items-center justify-between hover:bg-[#222329] transition-colors cursor-pointer slide-in" style="animation-delay: 0.3s">
+<div class="flex items-center gap-4 w-1/3">
+<span class="material-symbols-outlined text-gray-500 text-sm">arrow_forward</span>
+<span class="font-mono text-mono text-white">calendar.write</span>
+</div>
+<div class="flex-1 font-body-sm text-body-sm text-gray-400 truncate">
+                            {"title": "Sync with team", "time": "14:00"}
+                        </div>
+<div class="flex items-center gap-6 w-1/4 justify-end">
+<span class="font-mono text-mono text-gray-500 text-xs">T1 eval</span>
+<span class="font-mono text-mono text-gray-500 text-xs">8ms</span>
+<span class="bg-green-900/20 text-green-400 border border-green-900/50 px-2 py-0.5 rounded text-[10px] font-mono w-20 text-center">ALLOW</span>
+</div>
+</div>
+<!-- Row 5: ALLOW -->
+<div class="bg-[#1C1D21] border border-[#2D2E33] border-l-4 border-l-green-500 rounded p-3 flex items-center justify-between hover:bg-[#222329] transition-colors cursor-pointer slide-in" style="animation-delay: 0.4s">
+<div class="flex items-center gap-4 w-1/3">
+<span class="material-symbols-outlined text-gray-500 text-sm">arrow_forward</span>
+<span class="font-mono text-mono text-white">drive.read</span>
+</div>
+<div class="flex-1 font-body-sm text-body-sm text-gray-400 truncate">
+                            {"file_id": "doc_88x_internal"}
+                        </div>
+<div class="flex items-center gap-6 w-1/4 justify-end">
+<span class="font-mono text-mono text-gray-500 text-xs">T2 eval</span>
+<span class="font-mono text-mono text-gray-500 text-xs">32ms</span>
+<span class="bg-green-900/20 text-green-400 border border-green-900/50 px-2 py-0.5 rounded text-[10px] font-mono w-20 text-center">ALLOW</span>
+</div>
+</div>
+<!-- Row 6: ALLOW -->
+<div class="bg-[#1C1D21] border border-[#2D2E33] border-l-4 border-l-green-500 rounded p-3 flex items-center justify-between hover:bg-[#222329] transition-colors cursor-pointer slide-in" style="animation-delay: 0.5s">
+<div class="flex items-center gap-4 w-1/3">
+<span class="material-symbols-outlined text-gray-500 text-sm">arrow_forward</span>
+<span class="font-mono text-mono text-white">shell.network_request</span>
+</div>
+<div class="flex-1 font-body-sm text-body-sm text-gray-400 truncate">
+                            curl https://api.internal.corp/data
+                        </div>
+<div class="flex items-center gap-6 w-1/4 justify-end">
+<span class="font-mono text-mono text-gray-500 text-xs">T1 eval</span>
+<span class="font-mono text-mono text-gray-500 text-xs">15ms</span>
+<span class="bg-green-900/20 text-green-400 border border-green-900/50 px-2 py-0.5 rounded text-[10px] font-mono w-20 text-center">ALLOW</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Decision Detail Drawer -->
+<aside class="absolute top-rail-width right-0 bottom-0 w-[480px] bg-[#121318] border-l border-[#2D2E33] shadow-2xl z-30 flex flex-col transform transition-transform duration-300 translate-x-0">
+<div class="p-4 border-b border-[#2D2E33] flex items-center justify-between bg-[#1C1D21]">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-red-500">block</span>
+<h3 class="font-headline-md text-headline-md text-white font-semibold">Interception Detail</h3>
+</div>
+<button class="text-gray-500 hover:text-white transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-5 flex flex-col gap-6">
+<!-- Status Header -->
+<div class="flex items-center justify-between">
+<div>
+<div class="font-mono text-mono text-white text-lg">email.send</div>
+<div class="font-body-sm text-body-sm text-gray-500 mt-1">Intercepted at 14:32:01.442 UTC</div>
+</div>
+<span class="bg-red-900/20 text-red-400 border border-red-900/50 px-3 py-1 rounded text-xs font-mono font-bold">BLOCKED - INTENT VIOLATION</span>
+</div>
+<!-- Intent Contract Warning -->
+<div class="bg-red-900/10 border border-red-500/30 rounded p-4">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-red-500 text-sm">warning</span>
+<span class="font-label-md text-label-md text-red-400 uppercase">Intent Contract Violation</span>
+</div>
+<p class="font-body-sm text-body-sm text-gray-300">
+                        Agent attempted to exfiltrate data to an unauthorized external domain (<code class="text-white">competitor.com</code>) contrary to the strict DLP policy bounds.
+                    </p>
+</div>
+<!-- Raw Call (JSON) -->
+<div>
+<h4 class="font-label-sm text-label-sm text-gray-500 uppercase tracking-wider mb-2">Raw Call Payload</h4>
+<div class="bg-[#0A0B0E] border border-[#2D2E33] rounded p-3 font-mono text-mono text-gray-300 text-xs overflow-x-auto code-font">
+<pre class="m-0 text-gray-400">{
+  "tool": "email.send",
+  "args": {
+    "to": "external@competitor.com",
+    "subject": "Project Details",
+    "body": "Attached are the schematics...",
+    "attachments": ["/tmp/schematics.pdf"]
+  },
+  "context": "summarize_and_share"
+}
+</pre>
+</div>
+</div>
+<!-- Normalized Action Grid -->
+<div>
+<h4 class="font-label-sm text-label-sm text-gray-500 uppercase tracking-wider mb-2">Normalized Action</h4>
+<div class="border border-[#2D2E33] rounded divide-y divide-[#2D2E33]">
+<div class="flex p-2 font-body-sm text-body-sm">
+<div class="w-1/3 text-gray-500">Resource</div>
+<div class="w-2/3 text-white">Network/Email</div>
+</div>
+<div class="flex p-2 font-body-sm text-body-sm">
+<div class="w-1/3 text-gray-500">Target</div>
+<div class="w-2/3 text-red-400 font-mono text-xs">external@competitor.com</div>
+</div>
+<div class="flex p-2 font-body-sm text-body-sm">
+<div class="w-1/3 text-gray-500">Risk Level</div>
+<div class="w-2/3 text-white">CRITICAL</div>
+</div>
+</div>
+</div>
+<!-- Evaluation Path -->
+<div>
+<h4 class="font-label-sm text-label-sm text-gray-500 uppercase tracking-wider mb-2">Evaluation Pipeline (120ms)</h4>
+<div class="flex flex-col gap-2 relative before:absolute before:inset-y-2 before:left-2 before:w-px before:bg-[#2D2E33]">
+<div class="flex items-start gap-4 relative z-10">
+<div class="w-4 h-4 rounded-full bg-green-500/20 border border-green-500 flex items-center justify-center mt-1">
+<span class="material-symbols-outlined text-[10px] text-green-500">check</span>
+</div>
+<div>
+<div class="font-body-sm text-body-sm text-white">T1: Syntax &amp; Schema Check</div>
+<div class="font-mono text-mono text-gray-500 text-xs">2ms</div>
+</div>
+</div>
+<div class="flex items-start gap-4 relative z-10">
+<div class="w-4 h-4 rounded-full bg-green-500/20 border border-green-500 flex items-center justify-center mt-1">
+<span class="material-symbols-outlined text-[10px] text-green-500">check</span>
+</div>
+<div>
+<div class="font-body-sm text-body-sm text-white">T2: Static Heuristics</div>
+<div class="font-mono text-mono text-gray-500 text-xs">15ms</div>
+</div>
+</div>
+<div class="flex items-start gap-4 relative z-10">
+<div class="w-4 h-4 rounded-full bg-red-500/20 border border-red-500 flex items-center justify-center mt-1">
+<span class="material-symbols-outlined text-[10px] text-red-500">close</span>
+</div>
+<div>
+<div class="font-body-sm text-body-sm text-red-400">T3: LLM Intent Analysis</div>
+<div class="font-mono text-mono text-gray-500 text-xs">103ms</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</body></html>

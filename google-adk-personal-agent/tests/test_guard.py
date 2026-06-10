@@ -8,14 +8,18 @@ class FakeClient:
     def __init__(self):
         self.outcomes = []
         self.registrations = []
+        self.turns = []
+        self.proposals = []
 
     def register(self, registration):
         self.registrations.append(registration)
 
     def start_turn(self, turn):
+        self.turns.append(turn)
         return SimpleNamespace(intent_id="intent-1")
 
     def evaluate(self, proposal):
+        self.proposals.append(proposal)
         return SimpleNamespace(
             decision_id="decision-1",
             decision="allow",
@@ -75,6 +79,32 @@ def test_callbacks_accept_current_adk_keyword_arguments():
         is None
     )
     assert client.outcomes[-1].status == "failed"
+
+
+def test_each_adk_invocation_gets_a_distinct_agentguard_session():
+    client = FakeClient()
+    interceptor = AgentGuardAdkInterceptor(client)
+    tool = SimpleNamespace(name="run_shell_command")
+
+    first = SimpleNamespace(
+        invocation_id="invocation-1",
+        function_call_id="call-1",
+        session=SimpleNamespace(id="chat-1"),
+        user_content=SimpleNamespace(parts=[SimpleNamespace(text="List downloads")]),
+    )
+    second = SimpleNamespace(
+        invocation_id="invocation-2",
+        function_call_id="call-2",
+        session=SimpleNamespace(id="chat-1"),
+        user_content=SimpleNamespace(parts=[SimpleNamespace(text="List books")]),
+    )
+
+    interceptor.before_tool(tool=tool, args={"command": "ls"}, tool_context=first)
+    interceptor.before_tool(tool=tool, args={"command": "ls books"}, tool_context=second)
+
+    assert client.turns[0].session_id == "chat-1:invocation-1"
+    assert client.turns[1].session_id == "chat-1:invocation-2"
+    assert client.proposals[0].session_id != client.proposals[1].session_id
 
 
 def test_relative_mcp_config_paths_resolve_from_agent_project():
