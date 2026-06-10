@@ -25,6 +25,8 @@ class LlmJudgeInputV1(BaseModel):
     user_request: str
     tool_name: str
     arguments: dict[str, Any]
+    intent_contract: dict[str, Any] | None = None
+    intent_authorization: dict[str, Any] | None = None
     normalized_action: dict[str, Any] | None = None
     policy_evaluation: dict[str, Any] | None = None
     prior_tier_results: list[dict[str, Any]] = Field(default_factory=list)

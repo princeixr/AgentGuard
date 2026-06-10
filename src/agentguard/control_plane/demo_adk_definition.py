@@ -11,8 +11,8 @@ from typing import Any
 from agentguard.control_plane.registry import DEMO_AGENT_ID
 from agentguard.firewall_v2.policy.resolver import resolve_demo_policy
 from agentguard.firewall_v2.tools.registry import descriptor_for_tool
-from agentguard.runtime.google_adk_adapter import infer_adk_tool_metadata
-from agentguard.runtime.mcp_registry import McpRegistry
+from agentguard.integrations.google_adk import infer_adk_tool_metadata
+from agentguard.integrations.google_adk.mcp_registry import McpRegistry
 
 DEMO_ADK_APP_NAME = "adk_terminal_assistant"
 DEMO_ADK_RUNTIME_NAME = "terminal_assistant"

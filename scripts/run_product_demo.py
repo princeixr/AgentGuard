@@ -16,10 +16,11 @@ bootstrap()
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    web_root = repo_root / "apps" / "web"
-    if not (web_root / "node_modules").exists():
+    dashboard_root = repo_root / "apps" / "agentguard_dashboard"
+    if not (dashboard_root / "node_modules").exists():
         raise SystemExit(
-            "Frontend dependencies are missing. Run `npm install` in `apps/web` first."
+            "Frontend dependencies are missing. Run `npm install` in "
+            "`apps/agentguard_dashboard` first."
         )
 
     env = os.environ.copy()
@@ -34,7 +35,7 @@ def main() -> None:
                 sys.executable,
                 "-m",
                 "uvicorn",
-                "agentguard.api.app:app",
+                "agentguard.server.app:app",
                 "--host",
                 "127.0.0.1",
                 "--port",
@@ -45,7 +46,7 @@ def main() -> None:
         ),
         subprocess.Popen(
             ["npm", "run", "dev", "--", "--host", "127.0.0.1"],
-            cwd=web_root,
+            cwd=dashboard_root,
             env=env,
         ),
     ]

@@ -8,14 +8,14 @@ import pytest
 
 from fastapi import HTTPException
 
-from agentguard.api.models import PolicyUpdateRequest, PolicyValidationRequest
-from agentguard.api.repositories.local import LocalDashboardRepository
-from agentguard.api.routes.agents import (
+from agentguard.server.models import PolicyUpdateRequest, PolicyValidationRequest
+from agentguard.server.repositories.local import LocalDashboardRepository
+from agentguard.server.routes.agents import (
     get_agent_policy,
     update_agent_policy,
     validate_agent_policy,
 )
-from agentguard.api.services.query import DashboardQueryService
+from agentguard.server.services.query import DashboardQueryService
 from agentguard.control_plane.registry import (
     DEMO_AGENT_ID,
     DEMO_DEPLOYMENT_ID,
@@ -24,8 +24,9 @@ from agentguard.control_plane.registry import (
     DemoAgentRegistry,
 )
 from agentguard.control_plane.demo_adk_definition import agent_instruction
-from agentguard.api.services.guard_admin import guard_admin_status
+from agentguard.server.services.guard_admin import guard_admin_status
 from agentguard.governance.session_risk_v1 import SessionRiskManagerV1
+from agentguard.intent.models import IntentExtractionPayloadV1
 from agentguard.firewall_v2.config import FirewallV2RuntimeConfig
 from agentguard.firewall_v2.enforcement import DecisionCombinerV1
 from agentguard.firewall_v2.policy.evaluator import PolicyEvaluatorV1
@@ -34,15 +35,20 @@ from agentguard.firewall_v2.policy.models import PolicyDocumentV1
 from agentguard.firewall_v2.policy.resolver import resolve_demo_policy
 from agentguard.firewall_v2.policy.store import PolicyStore
 from agentguard.firewall_v2.policy.validator import PolicyValidationError
-from agentguard.runtime.google_adk_adapter import (
+from agentguard.firewall_v2.routing import EvaluationRouterV1
+from agentguard.integrations.google_adk.adapter import (
     GoogleADKTraceSession,
     _execution_status,
     _summarize_tool_response,
     adk_runtime_policy,
 )
-from agentguard.runtime.mcp_registry import McpRegistry
+from agentguard.integrations.google_adk.mcp_registry import McpRegistry
 from agentguard.firewall_v2.tools.models import ToolDescriptorV1
 from agentguard.firewall_v2.tools.normalizers.shell import ShellNormalizerV1
+from agentguard.firewall_v2.tools.normalizers.models import (
+    NormalizedActionV1,
+    ParserResultV1,
+)
 from agentguard.firewall_v2.tools.registry import descriptor_for_tool
 from agentguard.firewall_v2.tiers.models import TierResultV1
 from agentguard.firewall_v2.tiers.tier_3.models import LlmJudgeInputV1, LlmJudgeResultV1
@@ -56,6 +62,7 @@ def _stable_guard_environment(monkeypatch):
     monkeypatch.setenv("FORCE_BLOCK", "false")
     monkeypatch.setenv("AGENTGUARD_FIREWALL_MODE", "v1")
     monkeypatch.setenv("AGENTGUARD_TIER_1_ENABLED", "true")
+    monkeypatch.setenv("AGENTGUARD_INTENT_LLM_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_TIER_2_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_TIER_3_ENABLED", "false")
     monkeypatch.setenv("AGENTGUARD_TIER3_ENFORCEMENT_ENABLED", "false")
@@ -200,7 +207,7 @@ def test_tool_descriptors_mark_known_and_unknown_tools_truthfully():
 
 
 def test_metadata_driven_structured_tool_flows_through_v2_policy(tmp_path):
-    from agentguard.runtime.mcp_registry import (
+    from agentguard.integrations.google_adk.mcp_registry import (
         McpServerConfig,
         infer_discovered_mcp_metadata,
     )
@@ -279,7 +286,7 @@ def test_metadata_driven_structured_tool_flows_through_v2_policy(tmp_path):
 
 
 def test_metadata_driven_payment_extracts_resource_and_estimated_value(tmp_path):
-    from agentguard.runtime.mcp_registry import (
+    from agentguard.integrations.google_adk.mcp_registry import (
         McpServerConfig,
         infer_discovered_mcp_metadata,
     )
@@ -359,13 +366,116 @@ def test_guard_admin_status_does_not_claim_unimplemented_v2_controls(monkeypatch
     assert components["policy_engine"].status == "operational"
     assert components["normalization"].status == "operational"
     assert "metadata-driven normalizer" in components["normalization"].summary
-    assert components["intent_contract"].status == "not_implemented"
+    assert components["intent_contract"].status == "operational"
     assert components["agenttrust_shell"].status == "operational"
     assert "AgentTrust v0.5.0" in components["agenttrust_shell"].summary
     assert "92.1%" in components["agenttrust_shell"].management
     assert components["tier_1"].status == "operational"
+    assert components["evaluation_router"].status == "operational"
+    assert components["tier_3"].status == "disabled"
     assert components["decision_combiner"].status == "operational"
     assert components["approval_resume"].status == "not_implemented"
+
+
+class _MockIntentProvider:
+    model = "mock-intent-model"
+
+    def __init__(self, payload: IntentExtractionPayloadV1):
+        self.payload = payload
+        self.calls = 0
+
+    def extract(self, user_request, tool_descriptors):
+        self.calls += 1
+        return self.payload
+
+
+def test_intent_contract_is_created_once_and_reused_for_turn(tmp_path):
+    provider = _MockIntentProvider(
+        IntentExtractionPayloadV1(
+            requested_capabilities=["email.search", "email.read", "email.draft"],
+            forbidden_capabilities=["email.send"],
+            side_effect_authorized=True,
+            confidence=0.98,
+        )
+    )
+    session = GoogleADKTraceSession(
+        session_id="intent_turn_session",
+        agent_id="terminal_assistant",
+        available_tools=["workspace_gmail_search", "workspace_gmail_send"],
+        trace_store=TraceStore(root_dir=tmp_path / "traces"),
+        namespace="google_adk_test",
+        metadata_resolver=_mcp_registry().metadata_for,
+        firewall_mode="v2",
+        runtime_config=FirewallV2RuntimeConfig(intent_llm_enabled=True),
+        intent_provider=provider,
+    )
+
+    first = session.start_turn(
+        "Find the latest budget email and draft a reply. Do not send it.",
+        turn_id="turn_budget",
+    )
+    second = session.start_turn(
+        "Find the latest budget email and draft a reply. Do not send it.",
+        turn_id="turn_budget",
+    )
+    result = session.record_tool_call(
+        "workspace_gmail_send",
+        {"to": "finance@example.com", "body": "Budget reply"},
+        call_id="call_send_forbidden",
+    )
+
+    assert first is not None
+    assert second is first
+    assert provider.calls == 1
+    assert result.trace.intent.intent_contract_id == first.intent_id
+    assert result.decision.decision == "block"
+    contracts = load_jsonl(
+        tmp_path
+        / "traces"
+        / "v1"
+        / "google_adk_test"
+        / "intent_contracts.jsonl"
+    )
+    assert len(contracts) == 1
+    assert contracts[0]["intent_id"] == first.intent_id
+    payload = _latest_v2_payload(tmp_path)
+    assert payload["evaluation"]["intent_contract"]["intent_id"] == first.intent_id
+    authorization = payload["evaluation"]["intent_authorization"]
+    assert authorization["recommendation"] == "block"
+    assert authorization["matched_forbidden_capabilities"] == ["email.send"]
+
+
+def test_intent_contract_requires_approval_for_unrequested_side_effect(tmp_path):
+    provider = _MockIntentProvider(
+        IntentExtractionPayloadV1(
+            requested_capabilities=["filesystem.inspect"],
+            side_effect_authorized=False,
+            confidence=0.97,
+        )
+    )
+    session = GoogleADKTraceSession(
+        session_id="intent_scope_session",
+        agent_id="terminal_assistant",
+        available_tools=["run_shell_command"],
+        trace_store=TraceStore(root_dir=tmp_path / "traces"),
+        namespace="google_adk_test",
+        firewall_mode="v2",
+        runtime_config=FirewallV2RuntimeConfig(intent_llm_enabled=True),
+        intent_provider=provider,
+    )
+    session.start_turn("List the current directory.", turn_id="turn_inspect")
+
+    result = session.record_tool_call(
+        "run_shell_command",
+        {"command": "touch unexpected.txt"},
+        call_id="call_unrequested_write",
+    )
+
+    assert result.decision.decision == "require_approval"
+    payload = _latest_v2_payload(tmp_path)
+    authorization = payload["evaluation"]["intent_authorization"]
+    assert authorization["recommendation"] == "require_approval"
+    assert authorization["unauthorized_capabilities"] == ["filesystem.write"]
 
 
 def test_personal_assistant_policy_loads_with_expected_scope():
@@ -976,7 +1086,15 @@ def test_google_adk_trace_session_v2_mode_enforces_policy_recommendation(
     assert result.decision.explanation.startswith("FirewallV2 enforced")
 
 
-def test_v2_shadow_records_tier3_judge_without_enforcement(tmp_path):
+def test_v2_shadow_records_policy_routed_tier3_without_enforcement(
+    tmp_path,
+    monkeypatch,
+):
+    policy = resolve_demo_policy().document.model_dump(mode="json")
+    policy["routing"]["read_only"] = ["tier_1", "tier_3"]
+    policy_path = tmp_path / "tier3_read_policy.json"
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+    monkeypatch.setenv("AGENTGUARD_POLICY_PATH", str(policy_path))
     session = GoogleADKTraceSession(
         session_id="tier3_shadow_session",
         agent_id="terminal_assistant",
@@ -1006,12 +1124,25 @@ def test_v2_shadow_records_tier3_judge_without_enforcement(tmp_path):
 
     assert result.decision.decision == "allow"
     assert payload["enforced_by"] == "firewall_v1"
+    assert payload["evaluation"]["evaluation_plan"]["route_class"] == "read_only"
+    assert payload["evaluation"]["evaluation_plan"]["required_tiers"] == [
+        "tier_1",
+        "tier_3",
+    ]
     assert payload["evaluation"]["tier_results"][-1]["tier"] == "tier_3"
     assert payload["evaluation"]["tier_results"][-1]["recommendation"] == "require_approval"
     assert payload["evaluation"]["combined_decision"]["final_decision"] == "allow"
 
 
-def test_v2_tier3_enforcement_can_escalate_allow_to_approval(tmp_path):
+def test_v2_policy_routed_tier3_can_escalate_allow_to_approval(
+    tmp_path,
+    monkeypatch,
+):
+    policy = resolve_demo_policy().document.model_dump(mode="json")
+    policy["routing"]["read_only"] = ["tier_1", "tier_3"]
+    policy_path = tmp_path / "tier3_read_policy.json"
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+    monkeypatch.setenv("AGENTGUARD_POLICY_PATH", str(policy_path))
     session = GoogleADKTraceSession(
         session_id="tier3_enforced_session",
         agent_id="terminal_assistant",
@@ -1026,7 +1157,7 @@ def test_v2_tier3_enforcement_can_escalate_allow_to_approval(tmp_path):
             tier_2_enabled=True,
             tier_3_enabled=True,
             tier_3_enforcement_enabled=True,
-            tier_confidence_threshold=1.01,
+            tier_confidence_threshold=0.75,
         ),
         tier_3_provider=_MockJudgeProvider(verdict="require_approval", confidence=0.93),
     )
@@ -1039,6 +1170,10 @@ def test_v2_tier3_enforcement_can_escalate_allow_to_approval(tmp_path):
 
     assert result.decision.decision == "require_approval"
     assert result.decision.explanation.startswith("FirewallV2 enforced require_approval")
+    payload = _latest_v2_payload(tmp_path)
+    assert payload["evaluation"]["combined_decision"]["enforced_by"] == (
+        "tier_3_llm_judge"
+    )
 
 
 def test_combiner_does_not_allow_tier3_to_override_deterministic_block(tmp_path):
@@ -1068,6 +1203,105 @@ def test_combiner_does_not_allow_tier3_to_override_deterministic_block(tmp_path)
     assert policy.recommendation == "block"
     assert combined.final_decision == "block"
     assert combined.enforced_by == "tier_1_deterministic_policy"
+
+
+@pytest.mark.parametrize(
+    (
+        "side_effect",
+        "reversible",
+        "impact",
+        "external_impact",
+        "parser_status",
+        "parser_confidence",
+        "expected_class",
+        "expected_tiers",
+    ),
+    [
+        (
+            False,
+            True,
+            "low",
+            False,
+            "parsed",
+            1.0,
+            "read_only",
+            ["tier_1"],
+        ),
+        (
+            True,
+            False,
+            "high",
+            True,
+            "parsed",
+            1.0,
+            "external_or_irreversible",
+            ["tier_1", "tier_2", "tier_3"],
+        ),
+        (
+            True,
+            None,
+            "unknown",
+            False,
+            "partial",
+            0.4,
+            "ambiguous",
+            ["tier_1", "tier_2", "tier_3"],
+        ),
+    ],
+)
+def test_v2_router_builds_policy_driven_evaluation_plan(
+    side_effect,
+    reversible,
+    impact,
+    external_impact,
+    parser_status,
+    parser_confidence,
+    expected_class,
+    expected_tiers,
+):
+    descriptor = ToolDescriptorV1(
+        tool_name="test_tool",
+        provider="test",
+        category="test",
+        domain="filesystem",
+        operation="read" if not side_effect else "write",
+        capabilities=["filesystem.read" if not side_effect else "filesystem.write"],
+        side_effect="local" if side_effect else None,
+        impact=impact,
+        reversible=reversible,
+        normalizer="structured_v1",
+        external_impact=external_impact,
+        metadata_confidence=1.0,
+        metadata_status="built_in",
+    )
+    action = NormalizedActionV1(
+        trace_id="trace_router_test",
+        tool_name="test_tool",
+        domain=descriptor.domain,
+        capabilities=descriptor.capabilities,
+        operation=descriptor.operation,
+        side_effect=side_effect,
+        reversible=reversible,
+        impact=impact,
+        external_impact=external_impact,
+        parser=ParserResultV1(
+            name="test",
+            version="1",
+            status=parser_status,
+            confidence=parser_confidence,
+            unsupported_syntax=parser_status == "unsupported",
+            detail="test parser",
+        ),
+    )
+
+    plan = EvaluationRouterV1().build_plan(
+        resolve_demo_policy().document,
+        descriptor,
+        action,
+    )
+
+    assert plan.route_class == expected_class
+    assert plan.required_tiers == expected_tiers
 
 
 def test_v2_mode_keeps_force_block_as_emergency_override(tmp_path):
@@ -1393,7 +1627,7 @@ def _fake_tool_context(user_text: str):
 
 def _load_adk_agent():
     pytest.importorskip("google.adk", reason="google-adk is an optional runtime dependency")
-    module = importlib.import_module("apps.adk_agent.agent")
+    module = importlib.import_module("examples.google_adk_agent.agent")
     return importlib.reload(module)
 
 

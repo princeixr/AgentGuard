@@ -15,9 +15,13 @@ path. Deeper statistical retrieval is being built on top of this working skeleto
 ## Repository Layout
 
 ```text
-src/agentguard/              reusable AgentGuard framework
-apps/adk_agent/              guarded Google ADK terminal assistant
-apps/web/                    AgentGuard product dashboard
+src/agentguard/server/       standalone AgentGuard server entry points
+src/agentguard/sdk/          public agent-integration client boundary
+src/agentguard/integrations/ framework-specific integration packages
+src/agentguard/firewall_v2/  reusable AgentGuard enforcement engine
+services/agentguard_api/     deployable AgentGuard service boundary
+apps/agentguard_dashboard/   standalone AgentGuard product dashboard boundary
+examples/google_adk_agent/   independent Google ADK example consumer
 apps/openclaw_trace_agents/  OpenClaw historical trace-generation pipeline
 data/scenarios/              benchmark and demo scenario JSONL files
 data/elastic/                Elastic database workspace: mappings, query bodies, notebooks, exports
@@ -49,19 +53,26 @@ and implemented in [src/agentguard/tracing/schema_v1.py](src/agentguard/tracing/
 
 ## Runtime Surfaces
 
-1. `apps/adk_agent/`
+1. `services/agentguard_api/`
 
-   The governed Google ADK runtime. ADK tool callbacks build `AgentGuardTraceV1`
-   records, call `AgentGuardFirewallV1` before execution, and expose `allow`,
-   `require_approval`, and unconditional `block` runtime policies.
+   The standalone AgentGuard product API, served by `agentguard.server.app:app`.
 
-2. `apps/openclaw_trace_agents/`
+2. `examples/google_adk_agent/`
+
+   An independent Google ADK personal-agent example. It consumes the public
+   `agentguard.integrations.google_adk` boundary and owns the ADK agent implementation.
+
+3. `apps/agentguard_dashboard/`
+
+   The standalone AgentGuard product UI and React implementation.
+
+4. `apps/openclaw_trace_agents/`
 
    Historical trace generation. OpenClaw is not guarded during collection. Its
    transcripts are converted into canonical `AgentGuardTraceV1` records so the project
    can build a benchmark dataset from realistic agent behavior.
 
-3. `src/agentguard/`
+5. `src/agentguard/`
 
    The reusable guard library: schemas, adapters, v1 firewall, tool metadata, local
    trace store, replay, and evaluation scaffolding.
@@ -75,7 +86,9 @@ and implemented in [src/agentguard/tracing/schema_v1.py](src/agentguard/tracing/
 | OpenClaw adapter | `src/agentguard/tracing/adapters/openclaw_trace_adapter.py` | Converts OpenClaw tool events into `AgentGuardTraceV1`. |
 | Trace store | `src/agentguard/tracing/trace_store.py` | Persists v1 traces, features, scores, decisions, live events, labels, and session state to local JSONL/JSON. |
 | Tool registry | `src/agentguard/runtime/tool_registry.py` | Stores tool domain, side-effect, confirmation, and risk metadata. |
-| Google ADK adapter | `src/agentguard/runtime/google_adk_adapter.py` | Live ADK trace session, tool metadata mapping, firewall call, runtime policy mapping, and lifecycle events. |
+| Server entry point | `src/agentguard/server/app.py` | Stable ASGI boundary for standalone AgentGuard deployments. |
+| SDK client | `src/agentguard/sdk/client.py` | Framework-independent evaluation client protocol and current in-process client. |
+| Google ADK integration | `src/agentguard/integrations/google_adk/` | ADK trace session, MCP registry, metadata mapping, runtime policy mapping, and lifecycle events. |
 | FirewallV2 tiers | `src/agentguard/firewall_v2/tiers/` | Tier 1 deterministic policy, Tier 2 boundary, and Gemini-backed Tier 3 judge evidence. |
 | V2 combiner | `src/agentguard/firewall_v2/enforcement/combiner.py` | Deterministically combines tier recommendations without allowing Tier 3 to weaken hard policy. |
 | V1 feature builder | `src/agentguard/governance/feature_builder_v1.py` | Derives policy/context/retrieval/statistical feature records from traces. |
@@ -83,7 +96,7 @@ and implemented in [src/agentguard/tracing/schema_v1.py](src/agentguard/tracing/
 | V1 decision policy | `src/agentguard/governance/decision_policy_v1.py` | Maps scores and hard policy signals to verdicts. |
 | V1 firewall | `src/agentguard/governance/firewall_v1.py` | Orchestrates trace persistence, feature extraction, scoring, decisioning, live events, and session risk. |
 | Evaluation | `src/agentguard/evaluation/` | Dataset models, labels, metrics, replay, and baseline guard entrypoints. |
-| Dashboard | `src/agentguard/dashboard/` | Lightweight view helpers for demo/replay surfaces. |
+| Product dashboard | `apps/agentguard_dashboard/` | React UI for agents, live interception, replay, memory, operations, and Guard Admin. |
 
 ## Local Setup
 
@@ -92,6 +105,13 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 python3 -m pytest
+```
+
+The base `agentguard` installation does not require Google ADK. Agent developers can
+install only the integration they need:
+
+```bash
+pip install -e ".[adk,gemini]"
 ```
 
 The scripts also work before package installation because they include a local bootstrap:
@@ -107,7 +127,7 @@ python3 scripts/collect_openclaw_traces.py
 Install the frontend once:
 
 ```bash
-cd apps/web
+cd apps/agentguard_dashboard
 npm install
 cd ../..
 ```
@@ -128,9 +148,16 @@ GOOGLE_API_KEY=...
 AGENTGUARD_FIREWALL_MODE=v2
 AGENTGUARD_TIER_1_ENABLED=true
 AGENTGUARD_AGENTTRUST_SHELL_ENABLED=true
+AGENTGUARD_INTENT_LLM_ENABLED=true
+AGENTGUARD_INTENT_MODEL=gemini-2.5-flash
 AGENTGUARD_TIER_3_ENABLED=true
-AGENTGUARD_TIER3_ENFORCEMENT_ENABLED=false
+AGENTGUARD_TIER3_ENFORCEMENT_ENABLED=true
 ```
+
+FirewallV2 extracts one schema-validated intent contract when the ADK user turn
+starts. Every tool proposal from that turn references the same `intent_id`. Gemini
+structured output is the primary extractor; if it is unavailable, explicit actions
+and constraints are extracted with a conservative deterministic fallback.
 
 For central team testing, set `AGENTGUARD_MOCK_PIPELINE_ONLY=true` so the guard
 pipeline logs decisions without executing tools.
@@ -219,13 +246,13 @@ agentguard-web  React/Vite static site
 Backend start command:
 
 ```bash
-python -m uvicorn agentguard.api.app:app --host 0.0.0.0 --port $PORT
+python -m uvicorn agentguard.server.app:app --host 0.0.0.0 --port $PORT
 ```
 
 Frontend settings:
 
 ```text
-Root directory: apps/web
+Root directory: apps/agentguard_dashboard
 Build command: npm install && npm run build
 Publish directory: dist
 ```

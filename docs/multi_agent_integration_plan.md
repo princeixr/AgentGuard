@@ -588,7 +588,7 @@ Definition of done:
 
 ### Phase E: Google ADK SDK Integration
 
-- Extract ADK callbacks from `apps/adk_agent/agent.py` into a reusable integration
+- Extract ADK callbacks from `examples/google_adk_agent/agent.py` into a reusable integration
   package.
 - Authenticate with an AgentGuard integration key.
 - Send heartbeat and tool proposals to runtime APIs.

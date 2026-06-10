@@ -45,7 +45,10 @@ class FirewallV2Evaluation(BaseModel):
     stages: list[V2StageResult]
     tool_descriptor: dict[str, Any] | None = None
     normalized_action: dict[str, Any] | None = None
+    intent_contract: dict[str, Any] | None = None
+    intent_authorization: dict[str, Any] | None = None
     policy_evaluation: dict[str, Any] | None = None
+    evaluation_plan: dict[str, Any] | None = None
     tier_results: list[dict[str, Any]] = Field(default_factory=list)
     combined_decision: dict[str, Any] | None = None
     explanation: str

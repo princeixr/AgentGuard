@@ -119,6 +119,8 @@ class Tier3LlmJudge:
 def build_judge_input(
     *,
     trace,
+    intent_contract: dict[str, Any] | None,
+    intent_authorization: dict[str, Any] | None,
     normalized_action: dict[str, Any] | None,
     policy_evaluation: dict[str, Any] | None,
     prior_tier_results: list[dict[str, Any]],
@@ -128,6 +130,8 @@ def build_judge_input(
         user_request=trace.intent.raw_user_request,
         tool_name=trace.proposed_tool_call.tool_name,
         arguments=trace.proposed_tool_call.arguments,
+        intent_contract=intent_contract,
+        intent_authorization=intent_authorization,
         normalized_action=normalized_action,
         policy_evaluation=policy_evaluation,
         prior_tier_results=prior_tier_results,

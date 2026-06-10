@@ -71,6 +71,9 @@ V2 rollout is controlled with:
 AGENTGUARD_FIREWALL_MODE=v1 | v2_shadow | v2
 AGENTGUARD_TIER_1_ENABLED=true
 AGENTGUARD_AGENTTRUST_SHELL_ENABLED=true
+AGENTGUARD_INTENT_LLM_ENABLED=true
+AGENTGUARD_INTENT_MODEL=gemini-2.5-flash
+AGENTGUARD_INTENT_CONFIDENCE_THRESHOLD=0.70
 AGENTGUARD_TIER_2_ENABLED=false
 AGENTGUARD_TIER_3_ENABLED=false
 AGENTGUARD_TIER3_ENFORCEMENT_ENABLED=false
@@ -133,7 +136,8 @@ tool_event_mapper.py     legacy compatibility mapper
 mock_tools/              local email, file, and calendar tools
 ```
 
-`GoogleADKTraceSession` is the active callback bridge used by `apps/adk_agent`. It
+`GoogleADKTraceSession` is the active callback bridge used by
+`examples/google_adk_agent`. It
 builds `AgentGuardTraceV1` records with ADK/MCP tool metadata, calls
 `AgentGuardFirewallV1` before execution, optionally evaluates `AgentGuardFirewallV2`,
 stores firewall artifacts, and records post-decision runtime events such as
@@ -166,7 +170,7 @@ configs/productivity_agent/ controlled OpenClaw workspace and tool fixtures
 productivity_ui/         browser UI for the virtual productivity environment
 ```
 
-### `apps/adk_agent/`
+### `examples/google_adk_agent/`
 
 ```text
 agent.py      ADK root_agent, callbacks, shell tool, optional Gmail MCP toolset

@@ -40,7 +40,7 @@ calibrated probabilities of malicious behavior.
 
 ### 1. Google ADK interception
 
-`apps/adk_agent/agent.py` registers:
+`examples/google_adk_agent/agent.py` registers:
 
 - `before_tool_callback`
 - `after_tool_callback`
@@ -345,7 +345,7 @@ from the one used for current real ADK state.
 demo but not a production event transport.
 
 The old Python dashboard package under `src/agentguard/dashboard/` remains a placeholder.
-The active product UI is the React application under `apps/web/`.
+The active product UI is the React application under `apps/agentguard_dashboard/`.
 
 ## Production Target
 

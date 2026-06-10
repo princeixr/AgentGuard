@@ -1,2 +1,0 @@
-"""Dashboard support package."""
-

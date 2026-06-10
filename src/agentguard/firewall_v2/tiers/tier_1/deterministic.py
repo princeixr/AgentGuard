@@ -18,6 +18,8 @@ from agentguard.firewall_v2.tiers.tier_1.agenttrust import (
 )
 from agentguard.firewall_v2.tools.models import ToolDescriptorV1
 from agentguard.firewall_v2.tools.normalizers.models import NormalizedActionV1
+from agentguard.intent.authorization import authorize_action
+from agentguard.intent.models import IntentAuthorizationV1, IntentContractV2
 from agentguard.tracing.schema_v1 import AgentGuardTraceV1
 
 
@@ -28,24 +30,45 @@ class Tier1DeterministicEvaluator:
         *,
         agenttrust_shell_enabled: bool = True,
         agenttrust_provider: AgentTrustShellProvider | None = None,
+        intent_confidence_threshold: float = 0.70,
     ):
         self._policy_evaluator = PolicyEvaluatorV1(loaded_policy)
         self._agenttrust_shell_enabled = agenttrust_shell_enabled
         self._agenttrust_provider = agenttrust_provider or AgentTrustShellProvider()
+        self._intent_confidence_threshold = intent_confidence_threshold
 
     def evaluate(
         self,
         trace: AgentGuardTraceV1,
         descriptor: ToolDescriptorV1,
         action: NormalizedActionV1,
-    ) -> tuple[PolicyEvaluationV1, TierResultV1]:
+        intent_contract: IntentContractV2 | None = None,
+    ) -> tuple[PolicyEvaluationV1, IntentAuthorizationV1 | None, TierResultV1]:
         started = perf_counter()
         policy_evaluation = self._policy_evaluator.evaluate(descriptor, action=action)
         policy_confidence = _confidence(policy_evaluation, action)
+        intent_authorization = (
+            authorize_action(
+                intent_contract,
+                action,
+                confidence_threshold=self._intent_confidence_threshold,
+            )
+            if intent_contract is not None
+            else None
+        )
         agenttrust = self._evaluate_agenttrust(trace, descriptor, action)
-        recommendation = _most_restrictive(
+        recommendation = _most_restrictive_many(
             policy_evaluation.recommendation,
-            agenttrust.recommendation if agenttrust is not None else "not_available",
+            (
+                intent_authorization.recommendation
+                if intent_authorization is not None
+                else "not_available"
+            ),
+            (
+                agenttrust.recommendation
+                if agenttrust is not None
+                else "not_available"
+            ),
         )
         confidence = _combined_confidence(policy_confidence, agenttrust)
         signals = [
@@ -65,7 +88,16 @@ class Tier1DeterministicEvaluator:
                     rationale=agenttrust.explanation,
                 )
             )
-        return policy_evaluation, TierResultV1(
+        if intent_authorization is not None:
+            signals.append(
+                TierSignalV1(
+                    name="turn_intent_authorization",
+                    score=intent_contract.extractor.confidence,
+                    weight=1.0,
+                    rationale=intent_authorization.explanation,
+                )
+            )
+        return policy_evaluation, intent_authorization, TierResultV1(
             tier="tier_1",
             status="completed",
             recommendation=recommendation,
@@ -74,6 +106,16 @@ class Tier1DeterministicEvaluator:
             evidence={
                 "policy_evaluation": policy_evaluation.model_dump(mode="json"),
                 "normalized_action": action.model_dump(mode="json"),
+                "intent_contract": (
+                    intent_contract.model_dump(mode="json")
+                    if intent_contract is not None
+                    else None
+                ),
+                "intent_authorization": (
+                    intent_authorization.model_dump(mode="json")
+                    if intent_authorization is not None
+                    else None
+                ),
                 "agenttrust_shell": (
                     agenttrust.model_dump(mode="json") if agenttrust is not None else None
                 ),
@@ -83,7 +125,12 @@ class Tier1DeterministicEvaluator:
                 if confidence < 0.75
                 else None
             ),
-            explanation=_explanation(policy_evaluation, agenttrust, recommendation),
+            explanation=_explanation(
+                policy_evaluation,
+                intent_authorization,
+                agenttrust,
+                recommendation,
+            ),
             latency_ms=int((perf_counter() - started) * 1000),
         )
 
@@ -119,11 +166,10 @@ _RECOMMENDATION_PRIORITY: dict[TierRecommendation, int] = {
 }
 
 
-def _most_restrictive(
-    first: TierRecommendation,
-    second: TierRecommendation,
+def _most_restrictive_many(
+    *recommendations: TierRecommendation,
 ) -> TierRecommendation:
-    return max((first, second), key=_RECOMMENDATION_PRIORITY.__getitem__)
+    return max(recommendations, key=_RECOMMENDATION_PRIORITY.__getitem__)
 
 
 def _combined_confidence(
@@ -139,13 +185,24 @@ def _combined_confidence(
 
 def _explanation(
     policy_evaluation: PolicyEvaluationV1,
+    intent_authorization: IntentAuthorizationV1 | None,
     agenttrust: AgentTrustShellResultV1 | None,
     recommendation: TierRecommendation,
 ) -> str:
-    if agenttrust is None:
+    if agenttrust is None and intent_authorization is None:
         return policy_evaluation.explanation
+    intent_detail = (
+        f"Intent authorization: {intent_authorization.explanation} "
+        if intent_authorization is not None
+        else ""
+    )
+    agenttrust_detail = (
+        f"AgentTrust shell security: {agenttrust.explanation}"
+        if agenttrust is not None
+        else ""
+    )
     return (
         f"Tier 1 selected {recommendation} using restrictive precedence. "
         f"Central policy: {policy_evaluation.explanation} "
-        f"AgentTrust shell security: {agenttrust.explanation}"
+        f"{intent_detail}{agenttrust_detail}"
     )

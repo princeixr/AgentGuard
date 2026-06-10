@@ -23,7 +23,7 @@ Code outside this package should be limited to integration boundaries:
 
 - `runtime/`: framework adapters that submit intercepted tool calls to V2.
 - `api/`: transport and presentation models for dashboard clients.
-- `apps/web/`: product UI.
+- `apps/agentguard_dashboard/`: product UI.
 - `storage/`: reusable persistence clients.
 - `control_plane/`: agent, deployment, and policy assignment metadata.
 

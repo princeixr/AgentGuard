@@ -996,12 +996,12 @@ For hackathon speed, copying compact documents is acceptable.
 
 ## 13. Frontend Implementation Tasks for Codex
 
-Assuming React + TypeScript + Vite dashboard under `apps/web/`.
+Assuming React + TypeScript + Vite dashboard under `apps/agentguard_dashboard/`.
 
 Add feature folder:
 
 ```text
-apps/web/src/features/annotation/
+apps/agentguard_dashboard/src/features/annotation/
     AnnotationQueuePage.tsx
     AnnotationTable.tsx
     AnnotationDetailDrawer.tsx

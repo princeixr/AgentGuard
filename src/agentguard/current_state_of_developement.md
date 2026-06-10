@@ -306,7 +306,7 @@ in shadow or enforcement mode.
 
 Implemented:
 
-- `apps/adk_agent/agent.py` defines a Google ADK `root_agent` with a local
+- `examples/google_adk_agent/agent.py` defines a Google ADK `root_agent` with a local
   `run_shell_command` tool,
 - optional Docker-backed Gmail MCP tools can be exposed through `McpToolset`,
 - ADK `before_tool_callback` calls `GoogleADKTraceSession.record_tool_call()` before
@@ -325,7 +325,7 @@ Implemented:
   `AGENTGUARD_ADK_ELASTIC_ENABLED`,
 - ADK mock-pipeline mode can evaluate and log the full guard pipeline without executing
   the proposed tool,
-- `apps/adk_agent/chat.py` provides a standalone terminal chat loop.
+- `examples/google_adk_agent/chat.py` provides a standalone terminal chat loop.
 
 Current tested behavior:
 
@@ -353,7 +353,7 @@ Partial or placeholder behavior:
 
 Remaining:
 
-- verify `apps/adk_agent/chat.py`, `adk run apps/adk_agent`, and `adk web` with a real
+- verify `examples/google_adk_agent/chat.py`, `adk run examples/google_adk_agent`, and `adk web` with a real
   Gemini key,
 - verify Gmail MCP Docker image, OAuth volume, Gmail read/draft/send tool exposure, and
   AgentGuard blocking behavior on a test account,
@@ -391,7 +391,7 @@ Remaining:
 .venv/bin/python -m pytest
 python3 scripts/run_mock_session.py
 .venv/bin/python -m pytest tests/test_google_adk_runtime.py
-uv run apps/adk_agent/chat.py
+uv run examples/google_adk_agent/chat.py
 ```
 
 Verification note:
