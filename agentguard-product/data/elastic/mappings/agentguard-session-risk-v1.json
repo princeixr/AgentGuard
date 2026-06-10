@@ -1,0 +1,52 @@
+{
+  "mappings": {
+    "dynamic": true,
+    "properties": {
+      "agent_framework": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "agent_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "deployment_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "last_score_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "last_step_index": {
+        "type": "integer"
+      },
+      "last_trace_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "max_single_step_risk": {
+        "type": "float"
+      },
+      "schema_version": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "session_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "tool_sequence": {
+        "ignore_above": 512,
+        "type": "keyword"
+      },
+      "updated_at": {
+        "type": "date"
+      },
+      "workspace_id": {
+        "ignore_above": 512,
+        "type": "keyword"
+      }
+    }
+  }
+}

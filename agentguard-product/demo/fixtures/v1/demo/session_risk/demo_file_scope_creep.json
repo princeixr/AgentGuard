@@ -1,0 +1,51 @@
+{
+  "schema_version": "agentguard.session_risk.v1",
+  "session_id": "demo_file_scope_creep",
+  "workspace_id": "wsp_agentguard_demo",
+  "deployment_id": "dep_google_adk_development",
+  "agent_framework": "google_adk",
+  "agent_id": "agt_google_adk_assistant",
+  "last_trace_id": "9a1e2869-b03c-5cd1-947f-e4a5148f1cc6",
+  "last_score_id": "6afaa24a-2670-5ad0-a40c-3ffc3662317a",
+  "last_step_index": 3,
+  "updated_at": "2026-06-06T14:20:06.080000Z",
+  "tool_sequence": [
+    "file_search",
+    "file_read",
+    "file_delete"
+  ],
+  "risk_state": {
+    "cumulative_intent_drift": 0.3542756730386494,
+    "cumulative_sequence_deviation": 0.32715,
+    "cumulative_argument_drift": 0.0,
+    "cumulative_permission_risk": 1.0,
+    "cumulative_session_risk": 0.4379527347703024,
+    "drift_streak": 1,
+    "high_risk_streak": 0
+  },
+  "max_single_step_risk": 0.44160021905805036,
+  "counters": {
+    "approval_required_count": 0,
+    "blocked_count": 1
+  },
+  "recent_window": [
+    {
+      "trace_id": "067964fc-029b-5c78-a15f-f58332922da7",
+      "tool_name": "file_search",
+      "intent_drift": 0.07058823529411765,
+      "step_risk": 0.06264705882352942
+    },
+    {
+      "trace_id": "e7d17a23-157c-5c01-b841-994a22d0d140",
+      "tool_name": "file_read",
+      "intent_drift": 0.05547945205479452,
+      "step_risk": 0.08886986301369862
+    },
+    {
+      "trace_id": "9a1e2869-b03c-5cd1-947f-e4a5148f1cc6",
+      "tool_name": "file_delete",
+      "intent_drift": 0.713855421686747,
+      "step_risk": 0.44160021905805036
+    }
+  ]
+}
