@@ -1,0 +1,37 @@
+# Agent-owned MCP connection configuration. Never send these connection details,
+# credentials, headers, commands, or local paths to AgentGuard.
+
+[[servers]]
+id = "gmail_local"
+prefix = "gmail_local"
+enabled = true
+transport = "stdio"
+
+[servers.stdio]
+command = "docker"
+args = [
+  "run",
+  "-i",
+  "--rm",
+  "-v","mcp-gmail:/gmail-server",
+  "-e","GMAIL_OAUTH_PATH=/gmail-server/gcp-oauth.keys.json",
+  "-e","GMAIL_CREDENTIALS_PATH=/gmail-server/credentials.json",
+  "agentguard-gmail-mcp:artymclabin",
+]
+
+[[servers]]
+id = "workspace"
+prefix = "workspace"
+enabled = true
+transport = "stdio"
+
+[servers.stdio]
+command = "npx"
+args = [
+  "-y",
+  "--package=github:gemini-cli-extensions/workspace#v0.0.8",
+  "gemini-workspace-server",
+]
+
+[servers.stdio.env]
+WORKSPACE_FEATURE_OVERRIDES = "docs.read:off,docs.write:off,people.read:off,slides.read:off,slides.write:off,sheets.read:off,sheets.write:off,time.read:off,tasks.read:off,tasks.write:off"

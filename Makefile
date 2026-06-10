@@ -1,21 +1,30 @@
-.PHONY: demo demo-data test test-backend test-frontend build-frontend adk-chat
+.PHONY: docker-up docker-down docker-logs test test-product test-dashboard build-dashboard sdk-example adk-agent start
 
-demo:
-	uv run python scripts/run_product_demo.py
+start:
+	make docker-down; make docker-up; make adk-agent 
+docker-up:
+	docker compose up --build -d
+	# http://127.0.0.1:5173/
+	# agent guard api : http://127.0.0.1:8002/api/docs
+docker-down:
+	docker compose down
 
-demo-data:
-	uv run python scripts/reset_demo_data.py
+docker-logs:
+	docker compose logs -f
 
-adk-chat:
-	uv run apps/adk_agent/chat.py
+adk-agent:
+	uv run --project google-adk-personal-agent adk web --port 8001 google-adk-personal-agent/src
+	# http://127.0.0.1:8001/dev-ui/?app=personal_agent
+test: test-product test-dashboard
 
-test: test-backend test-frontend
+test-product:
+	cd agentguard-product && PYTHONPATH=src:packages/agentguard-sdk/src ../.venv/bin/python -m pytest -q
 
-test-backend:
-	uv run pytest -q
+test-dashboard:
+	npm --prefix agentguard-product/apps/agentguard_dashboard test
 
-test-frontend:
-	npm --prefix apps/web test
+build-dashboard:
+	npm --prefix agentguard-product/apps/agentguard_dashboard run build
 
-build-frontend:
-	npm --prefix apps/web run build
+sdk-example:
+	PYTHONPATH=agentguard-product/packages/agentguard-sdk/src python examples/minimal-python-agent/main.py

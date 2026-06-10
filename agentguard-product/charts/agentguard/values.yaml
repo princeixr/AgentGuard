@@ -1,0 +1,53 @@
+replicaCount: 1
+
+image:
+  api:
+    repository: ghcr.io/your-org/agentguard-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  dashboard:
+    repository: ghcr.io/your-org/agentguard-dashboard
+    tag: latest
+    pullPolicy: IfNotPresent
+
+service:
+  api:
+    type: ClusterIP
+    port: 8000
+  dashboard:
+    type: ClusterIP
+    port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: agentguard.local
+  tls: []
+
+config:
+  webOrigins: "http://localhost:5173"
+  traceNamespace: registered_agents
+  elasticEnabled: "false"
+  firewallMode: v2
+  agenttrustShellEnabled: "true"
+  intentLlmEnabled: "false"
+  tier3Model: gemini-2.5-flash
+
+secrets:
+  existingSecret: ""
+  agentguardApiKey: "change-me"
+  googleApiKey: ""
+
+persistence:
+  enabled: true
+  size: 2Gi
+  storageClass: ""
+
+resources:
+  api: {}
+  dashboard: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

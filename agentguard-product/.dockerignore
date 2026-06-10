@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+apps/agentguard_dashboard/node_modules/
+apps/agentguard_dashboard/dist/
+apps/agentguard_dashboard/*.tsbuildinfo
+data/approvals/
+data/traces/
+data/demo_runtime/
+.env
+.env.*
+!.env.example

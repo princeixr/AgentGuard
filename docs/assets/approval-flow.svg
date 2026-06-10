@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="260" viewBox="0 0 900 260">
+  <rect width="900" height="260" fill="#f8fafc"/>
+  <g font-family="Inter, Arial" font-size="15" fill="#0f172a">
+    <rect x="30" y="90" width="140" height="70" rx="12" fill="#dbeafe" stroke="#60a5fa"/>
+    <text x="70" y="130">Agent</text>
+    <rect x="220" y="90" width="160" height="70" rx="12" fill="#dcfce7" stroke="#22c55e"/>
+    <text x="255" y="130">AgentGuard API</text>
+    <rect x="430" y="90" width="150" height="70" rx="12" fill="#fef3c7" stroke="#f59e0b"/>
+    <text x="475" y="121">Firewall</text><text x="485" y="142">V2</text>
+    <rect x="630" y="90" width="220" height="70" rx="12" fill="#fee2e2" stroke="#ef4444"/>
+    <text x="675" y="130">Approval UI</text>
+    <path d="M170 125h50M380 125h50M580 125h50" stroke="#334155" stroke-width="2" marker-end="url(#a)"/>
+    <path d="M740 160v45H100v-45" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="6 5"/>
+    <text x="305" y="225">approve/reject result returns to agent polling loop</text>
+  </g>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#334155"/></marker></defs>
+</svg>
