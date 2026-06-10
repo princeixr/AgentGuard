@@ -68,3 +68,23 @@ Agent runtime
 make test
 make build-dashboard
 ```
+
+## Setup Google Workspace MCP
+
+No Google Cloud project or OAuth credentials needed — the package ships with its own built-in OAuth client.
+
+**Step 1 — Install Node.js 18+**
+
+```bash
+node --version   # must be 18+
+```
+
+**Step 2 — Authenticate once**
+
+```bash
+npx -y --package=github:gemini-cli-extensions/workspace#v0.0.8 \
+  gemini-workspace-server --login
+```
+
+A browser window opens. Sign in with the Google account whose Calendar, Gmail, and Drive you want the agent to access. The token is stored locally and refreshed automatically.
+
