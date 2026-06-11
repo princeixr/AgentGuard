@@ -13,7 +13,11 @@ from sqlalchemy.orm import Session
 
 from agentguard.server.db.models import UserRecord
 
-_pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+_pwd_ctx = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__truncate_error=False,
+)
 
 PASSWORD_MIN = 4
 PASSWORD_MAX = 40
