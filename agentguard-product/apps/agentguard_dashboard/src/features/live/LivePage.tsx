@@ -21,6 +21,8 @@ import { useProductionAgent } from "../../api/useProductionAgent";
 import { EmptyState, ErrorState, LoadingState } from "../../components/States";
 import { StatusChip } from "../../components/StatusChip";
 
+const DETAIL_DISCLOSURE_GROUP = "live-interception-detail";
+
 export function LivePage() {
   const queryClient = useQueryClient();
   const { agent, agentId, agents } = useProductionAgent();
@@ -316,6 +318,7 @@ export const IntentContractContext = memo(function IntentContractContext({
     <details
       aria-label="Intent Contract"
       className="detail-disclosure intent-contract-card"
+      name={DETAIL_DISCLOSURE_GROUP}
     >
       <summary>
         <span>
@@ -527,7 +530,7 @@ export function InterceptionDetail({
         </p>
       </section>
 
-      <details className="detail-disclosure">
+      <details className="detail-disclosure" name={DETAIL_DISCLOSURE_GROUP}>
         <summary>
           <span>
             <span className="eyebrow">Evidence / precedent</span>
@@ -589,7 +592,10 @@ function TechnicalDisclosure({
   payload: unknown;
 }) {
   return (
-    <details className="detail-disclosure technical-disclosure">
+    <details
+      className="detail-disclosure technical-disclosure"
+      name={DETAIL_DISCLOSURE_GROUP}
+    >
       <summary>
         <span className="eyebrow">{label}</span>
         <ChevronDown size={16} />

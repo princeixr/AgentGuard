@@ -183,6 +183,7 @@ describe("InterceptionDetail", () => {
     expect(disclosures).toHaveLength(2);
     disclosures.forEach((disclosure) => {
       expect(disclosure).not.toHaveAttribute("open");
+      expect(disclosure).toHaveAttribute("name", "live-interception-detail");
     });
   });
 
@@ -234,6 +235,7 @@ describe("SessionContext", () => {
     expect(context.getByText("SCOPE_DEFINED")).toBeInTheDocument();
     const contract = context.getByLabelText("Intent Contract");
     expect(contract).not.toHaveAttribute("open");
+    expect(contract).toHaveAttribute("name", "live-interception-detail");
     expect(contract?.querySelector(".contract-rows")).toBeInTheDocument();
 
     const changedStep = {
