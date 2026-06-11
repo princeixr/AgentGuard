@@ -41,9 +41,7 @@ def test_agenttrust_blocks_pipe_to_shell_when_shell_normalizer_falls_back():
     assert evaluation.normalized_action["parser"]["status"] == "unsupported"
     assert evaluation.policy_evaluation["recommendation"] == "allow"  # parser_failure=allow
     assert evaluation.recommendation == "block"
-    assert evaluation.combined_decision["enforced_by"] == (
-        "tier_1_deterministic_security"
-    )
+    assert evaluation.combined_decision["enforced_by"] == "deterministic_security"
     agenttrust = evaluation.tier_results[0]["evidence"]["agenttrust_shell"]
     assert agenttrust["status"] == "completed"
     assert agenttrust["upstream_verdict"] == "block"

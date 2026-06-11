@@ -47,7 +47,7 @@ class DecisionCombinerV1:
         if policy_evaluation.recommendation == "block":
             return CombinedDecisionV1(
                 final_decision="block",
-                enforced_by="tier_1_deterministic_policy",
+                enforced_by="deterministic_policy",
                 confidence=1.0,
                 reasons=[
                     "Deterministic policy recommended block and is non-overridable.",
@@ -58,10 +58,10 @@ class DecisionCombinerV1:
         if tier_1 is not None and tier_1.recommendation == "block":
             return CombinedDecisionV1(
                 final_decision="block",
-                enforced_by="tier_1_deterministic_security",
+                enforced_by="deterministic_security",
                 confidence=tier_1.confidence,
                 reasons=[
-                    "A deterministic Tier 1 security provider recommended block.",
+                    "A deterministic security provider recommended block.",
                     tier_1.explanation,
                 ],
                 tier_result_ids=tier_ids,
@@ -69,7 +69,7 @@ class DecisionCombinerV1:
         if policy_evaluation.recommendation == "require_approval":
             return CombinedDecisionV1(
                 final_decision="require_approval",
-                enforced_by="tier_1_deterministic_policy",
+                enforced_by="deterministic_policy",
                 confidence=1.0,
                 reasons=[
                     "Deterministic policy requires approval and is non-overridable.",
@@ -80,10 +80,10 @@ class DecisionCombinerV1:
         if tier_1 is not None and tier_1.recommendation == "require_approval":
             return CombinedDecisionV1(
                 final_decision="require_approval",
-                enforced_by="tier_1_deterministic_security",
+                enforced_by="deterministic_security",
                 confidence=tier_1.confidence,
                 reasons=[
-                    "A deterministic Tier 1 security provider requires approval.",
+                    "A deterministic security provider requires approval.",
                     tier_1.explanation,
                 ],
                 tier_result_ids=tier_ids,
@@ -110,7 +110,7 @@ class DecisionCombinerV1:
                 enforced_by="router_semantic_failure_fallback",
                 confidence=0.0,
                 reasons=[
-                    "The policy required Tier 2, but no completed semantic result was available."
+                    "The policy required semantic evaluation, but no completed result was available."
                 ],
                 tier_result_ids=tier_ids,
             )
@@ -121,9 +121,9 @@ class DecisionCombinerV1:
                     if tier_1 is not None and tier_1.recommendation != "not_available"
                     else policy_evaluation.recommendation
                 ),
-                enforced_by="tier_1_deterministic_security",
+                enforced_by="deterministic_security",
                 confidence=tier_1.confidence if tier_1 is not None else 0.85,
-                reasons=["Tier 3 enforcement is disabled; using deterministic recommendation."],
+                reasons=["LLM judge enforcement is disabled; using deterministic recommendation."],
                 tier_result_ids=tier_ids,
             )
 
@@ -141,7 +141,7 @@ class DecisionCombinerV1:
                     else "tier_1_deterministic_policy"
                 ),
                 confidence=0.0 if "tier_3" in required_tiers else 0.75,
-                reasons=["No required Tier 3 result was available for enforcement."],
+                reasons=["No required LLM judge result was available for enforcement."],
                 tier_result_ids=tier_ids,
             )
         if tier_3.status != "completed" or tier_3.confidence < self.confidence_threshold:
@@ -150,7 +150,7 @@ class DecisionCombinerV1:
                 enforced_by="combiner_low_confidence_fallback",
                 confidence=tier_3.confidence,
                 reasons=[
-                    "Tier 3 failed or confidence was below threshold; fail closed to approval.",
+                    "LLM judge failed or confidence was below threshold; fail closed to approval.",
                     tier_3.explanation,
                 ],
                 tier_result_ids=tier_ids,
@@ -161,7 +161,7 @@ class DecisionCombinerV1:
                 enforced_by="combiner_model_block_capped",
                 confidence=tier_3.confidence,
                 reasons=[
-                    "Tier 3 recommended block, but model-based hard blocking is capped to approval.",
+                    "LLM judge recommended block, but model-based hard blocking is capped to approval.",
                     tier_3.explanation,
                 ],
                 tier_result_ids=tier_ids,
@@ -169,7 +169,7 @@ class DecisionCombinerV1:
         if tier_3.recommendation in {"allow", "require_approval", "block"}:
             return CombinedDecisionV1(
                 final_decision=tier_3.recommendation,
-                enforced_by="tier_3_llm_judge",
+                enforced_by="llm_judge",
                 confidence=tier_3.confidence,
                 reasons=[tier_3.explanation],
                 tier_result_ids=tier_ids,

@@ -202,7 +202,7 @@ def _explanation(
         else ""
     )
     return (
-        f"Tier 1 selected {recommendation} using restrictive precedence. "
+        f"AgentGuard selected {recommendation} using restrictive precedence. "
         f"Central policy: {policy_evaluation.explanation} "
         f"{intent_detail}{agenttrust_detail}"
     )

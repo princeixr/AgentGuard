@@ -1,6 +1,6 @@
 # AgentGuard
 
-AgentGuard is an open-source runtime security and approval layer for tool-using AI agents. It intercepts proposed tool calls, evaluates them with Firewall V2, and returns `allow`, `require_approval`, or `block` before the agent executes the tool.
+AgentGuard is an open-source runtime security and approval layer for tool-using AI agents. It intercepts proposed tool calls, evaluates them, and returns `allow`, `require_approval`, or `block` before the agent executes the tool.
 
 ![AgentGuard approval flow](docs/assets/approval-flow.svg)
 
@@ -30,7 +30,7 @@ python examples/minimal-python-agent/main.py
 ## Repository Layout
 
 ```text
-agentguard-product/              AgentGuard API, dashboard, Firewall V2, SDK, Helm chart
+agentguard-product/              AgentGuard API, dashboard, firewall, SDK, Helm chart
 google-adk-personal-agent/       Google ADK example chatbot integration
 examples/minimal-python-agent/   Minimal framework-neutral SDK example
 docs/                            OSS user, architecture, deployment, and security docs
@@ -43,7 +43,7 @@ docs/                            OSS user, architecture, deployment, and securit
 Agent runtime
   -> AgentGuard SDK HTTP client
   -> AgentGuard API
-  -> Firewall V2: intent + Tier 1 + Tier 3 + combiner
+  -> AgentGuard firewall: intent + policy + security + LLM judge + combiner
   -> allow | require_approval | block
   -> AgentGuard approval UI if needed
   -> agent executes only after allow/approval
