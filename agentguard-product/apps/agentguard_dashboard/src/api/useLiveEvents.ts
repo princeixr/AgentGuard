@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { getApiKey } from "./client";
+import { getApiKey, getAuthToken } from "./client";
 
 export function useLiveEvents(agentId: string) {
   const queryClient = useQueryClient();
@@ -8,8 +8,9 @@ export function useLiveEvents(agentId: string) {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    const apiKey = getApiKey();
-    if (apiKey) params.set("access_token", apiKey);
+    // Prefer JWT; fall back to legacy API key for backwards compat
+    const token = getAuthToken() || getApiKey();
+    if (token) params.set("access_token", token);
     const source = new EventSource(
       `/api/v1/agents/${encodeURIComponent(agentId)}/events/stream?${params.toString()}`,
     );

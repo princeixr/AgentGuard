@@ -2,6 +2,10 @@
 
 start:
 	make docker-down; make docker-up; make adk-agent 
+server-start:
+	docker compose down
+	docker compose -f docker-compose.prod.yml up --build -d
+
 docker-up:
 	docker compose up --build -d
 	# http://127.0.0.1:5173/

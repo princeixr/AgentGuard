@@ -250,7 +250,11 @@ class RemoteInterceptionService:
         )
         return response
 
-    def list_approvals(self, status: str | None = "pending") -> ApprovalListResponse:
+    def list_approvals(
+        self,
+        status: str | None = "pending",
+        workspace_id: str | None = None,
+    ) -> ApprovalListResponse:
         items = sorted(
             self._pending_by_id.values(),
             key=lambda item: item.created_at,
@@ -258,11 +262,15 @@ class RemoteInterceptionService:
         )
         if status:
             items = [item for item in items if item.status == status]
+        if workspace_id:
+            items = [item for item in items if item.workspace_id == workspace_id]
         return ApprovalListResponse(items=items)
 
-    def get_approval(self, approval_id: str) -> PendingApproval:
+    def get_approval(self, approval_id: str, workspace_id: str | None = None) -> PendingApproval:
         approval = self._pending_by_id.get(approval_id)
         if approval is None:
+            raise KeyError(approval_id)
+        if workspace_id and approval.workspace_id != workspace_id:
             raise KeyError(approval_id)
         return approval
 
@@ -271,8 +279,9 @@ class RemoteInterceptionService:
         approval_id: str,
         request: ApprovalRequest,
         action: str,
+        workspace_id: str | None = None,
     ) -> PendingApproval:
-        approval = self.get_approval(approval_id)
+        approval = self.get_approval(approval_id, workspace_id=workspace_id)
         if approval.status != "pending":
             return approval
         status = {
