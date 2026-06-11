@@ -18,8 +18,8 @@ export function RegisterPage() {
       setError("Passwords do not match.");
       return;
     }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    if (password.length < 4 || password.length > 40) {
+      setError("Password must be between 4 and 40 characters.");
       return;
     }
     setLoading(true);
@@ -69,7 +69,8 @@ export function RegisterPage() {
               className="input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min. 8 characters"
+              placeholder="4–40 characters"
+              maxLength={40}
               required
             />
           </div>

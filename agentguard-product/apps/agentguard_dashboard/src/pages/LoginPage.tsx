@@ -60,7 +60,8 @@ export function LoginPage() {
               className="input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="Your password"
+              maxLength={40}
               required
             />
           </div>
