@@ -14,24 +14,28 @@ import type {
   WorkspaceContext,
 } from "./types";
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers = new Headers(init?.headers);
-  headers.set("Content-Type", "application/json");
-  const apiKey = getApiKey();
-  if (apiKey) {
-    headers.set("Authorization", `Bearer ${apiKey}`);
-  }
-  const response = await fetch(path, {
-    ...init,
-    headers,
-  });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.detail ?? `Request failed with ${response.status}`);
-  }
-  return response.json() as Promise<T>;
+// ── Auth token storage ────────────────────────────────────────────────────────
+
+export function getAuthToken(): string {
+  return window.localStorage.getItem("agentguard.authToken") ?? "";
 }
 
+export function setAuthToken(token: string): void {
+  window.localStorage.setItem("agentguard.authToken", token);
+}
+
+export function clearAuthToken(): void {
+  window.localStorage.removeItem("agentguard.authToken");
+  window.localStorage.removeItem("agentguard.workspaceId");
+  window.localStorage.removeItem("agentguard.userId");
+  window.localStorage.removeItem("agentguard.email");
+}
+
+export function isAuthenticated(): boolean {
+  return Boolean(getAuthToken());
+}
+
+/** Legacy API key (kept for backwards compat with agent-as-operator flows). */
 export function getApiKey(): string {
   return (
     window.localStorage.getItem("agentguard.apiKey") ??
@@ -39,6 +43,90 @@ export function getApiKey(): string {
     ""
   );
 }
+
+// ── HTTP helper ───────────────────────────────────────────────────────────────
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  headers.set("Content-Type", "application/json");
+
+  // Prefer JWT; fall back to legacy API key
+  const token = getAuthToken() || getApiKey();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(path, { ...init, headers });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.detail ?? `Request failed with ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+// ── Auth endpoints ────────────────────────────────────────────────────────────
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  workspace_id: string;
+  user_id: string;
+  email: string;
+}
+
+export interface MeResponse {
+  user_id: string;
+  email: string;
+  workspace_id: string;
+}
+
+export const authApi = {
+  register: (email: string, password: string) =>
+    request<AuthResponse>("/api/v1/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+
+  login: (email: string, password: string) =>
+    request<AuthResponse>("/api/v1/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+
+  me: () => request<MeResponse>("/api/v1/auth/me"),
+};
+
+// ── Agent token management endpoints ─────────────────────────────────────────
+
+export interface TokenInfo {
+  key_id: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export interface CreatedToken extends TokenInfo {
+  token: string;
+}
+
+export const tokensApi = {
+  list: () =>
+    request<{ items: TokenInfo[] }>("/api/v1/tokens"),
+
+  create: (name: string) =>
+    request<CreatedToken>("/api/v1/tokens", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  revoke: (keyId: string) =>
+    fetch(`/api/v1/tokens/${encodeURIComponent(keyId)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${getAuthToken() || getApiKey()}` },
+    }),
+};
+
+// ── Existing dashboard API ────────────────────────────────────────────────────
 
 export const api = {
   me: () => request<WorkspaceContext>("/api/v1/me"),

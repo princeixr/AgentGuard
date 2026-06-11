@@ -24,6 +24,7 @@ from agentguard.server.routes import (
     agent_live,
     agents,
     approvals,
+    auth,
     demo,
     guard_v2,
     health,
@@ -33,6 +34,7 @@ from agentguard.server.routes import (
     operations,
     scenarios,
     sessions,
+    tokens,
 )
 from agentguard.server.services.live import DemoRuntimeService
 from agentguard.server.services.query import DashboardQueryService
@@ -210,6 +212,8 @@ def create_app(
 
     api = "/api/v1"
     app.include_router(health.router, prefix=api)
+    app.include_router(auth.router, prefix=api)
+    app.include_router(tokens.router, prefix=api)
     app.include_router(interception.router, prefix=api)
     app.include_router(agents.router, prefix=api)
     app.include_router(agent_dashboard.router, prefix=api)

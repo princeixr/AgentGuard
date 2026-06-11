@@ -7,7 +7,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.responses import StreamingResponse
 
-from agentguard.server.dependencies import get_remote_runtime, require_api_key
+from agentguard.server.dependencies import get_remote_runtime, get_request_workspace_id, require_api_key
 from agentguard.server.models import (
     AgentRegistrationRequest,
     AgentRegistrationResponse,
@@ -68,17 +68,22 @@ async def report_tool_outcome(
 def list_approvals(
     status: str | None = Query(default="pending"),
     runtime: RemoteInterceptionService = Depends(get_remote_runtime),
+    workspace_id: str | None = Depends(get_request_workspace_id),
 ) -> ApprovalListResponse:
-    return runtime.list_approvals(status=None if status == "all" else status)
+    return runtime.list_approvals(
+        status=None if status == "all" else status,
+        workspace_id=workspace_id,
+    )
 
 
 @router.get("/approvals/{approval_id}", response_model=PendingApproval)
 def get_approval(
     approval_id: str,
     runtime: RemoteInterceptionService = Depends(get_remote_runtime),
+    workspace_id: str | None = Depends(get_request_workspace_id),
 ) -> PendingApproval:
     try:
-        return runtime.get_approval(approval_id)
+        return runtime.get_approval(approval_id, workspace_id=workspace_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Approval not found.") from exc
 
@@ -88,9 +93,10 @@ async def approve_tool_call(
     approval_id: str,
     request: ApprovalRequest,
     runtime: RemoteInterceptionService = Depends(get_remote_runtime),
+    workspace_id: str | None = Depends(get_request_workspace_id),
 ) -> PendingApproval:
     try:
-        return await runtime.resolve_approval(approval_id, request, "approve")
+        return await runtime.resolve_approval(approval_id, request, "approve", workspace_id=workspace_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Approval not found.") from exc
 
@@ -100,9 +106,10 @@ async def reject_tool_call(
     approval_id: str,
     request: ApprovalRequest,
     runtime: RemoteInterceptionService = Depends(get_remote_runtime),
+    workspace_id: str | None = Depends(get_request_workspace_id),
 ) -> PendingApproval:
     try:
-        return await runtime.resolve_approval(approval_id, request, "reject")
+        return await runtime.resolve_approval(approval_id, request, "reject", workspace_id=workspace_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Approval not found.") from exc
 

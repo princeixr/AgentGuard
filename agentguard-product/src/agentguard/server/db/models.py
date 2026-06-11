@@ -22,6 +22,20 @@ class Base(DeclarativeBase):
 json_type = JSON().with_variant(JSONB, "postgresql")
 
 
+class UserRecord(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    workspace_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    __table_args__ = (Index("ix_users_email", "email", unique=True),)
+
+
 class ApiKeyRecord(Base):
     __tablename__ = "api_keys"
 
@@ -30,6 +44,7 @@ class ApiKeyRecord(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     key_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     workspace_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     scopes: Mapped[list[str]] = mapped_column(json_type, nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

@@ -1,29 +1,43 @@
 import {
   Bell,
   History,
+  Key,
   LayoutDashboard,
+  LogOut,
   Settings,
   Shield,
   ShieldCheck,
 } from "lucide-react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { clearAuthToken } from "../api/client";
 
 const navigation = [
   { to: "/overview", label: "Overview", icon: LayoutDashboard },
   { to: "/live", label: "Live Interception", icon: Shield },
   { to: "/traces", label: "Trace Explorer", icon: History },
   { to: "/admin", label: "Guard Admin", icon: ShieldCheck },
+  { to: "/tokens", label: "API Tokens", icon: Key },
 ];
 
 function pageTitle(pathname: string) {
   if (pathname.startsWith("/live")) return "Live Interception";
   if (pathname.startsWith("/traces")) return "Trace Explorer";
   if (pathname.startsWith("/admin")) return "Guard Admin";
+  if (pathname.startsWith("/tokens")) return "API Tokens";
   return "Overview";
 }
 
 export function AppShell() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    clearAuthToken();
+    navigate("/login");
+  }
+
+  const email = window.localStorage.getItem("agentguard.email") ?? "";
+  const initials = email ? email[0].toUpperCase() : "OP";
 
   return (
     <div className="app-frame">
@@ -69,8 +83,17 @@ export function AppShell() {
             <button aria-label="Settings" className="icon-button" type="button">
               <Settings size={19} />
             </button>
-            <div className="avatar" aria-label="Operator profile">
-              OP
+            <button
+              aria-label="Sign out"
+              className="icon-button"
+              type="button"
+              onClick={handleLogout}
+              title={`Sign out (${email})`}
+            >
+              <LogOut size={19} />
+            </button>
+            <div className="avatar" aria-label="Operator profile" title={email}>
+              {initials}
             </div>
           </div>
         </header>

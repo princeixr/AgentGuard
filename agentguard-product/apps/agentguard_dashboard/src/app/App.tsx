@@ -6,17 +6,40 @@ import { LivePage } from "../features/live/LivePage";
 import { OverviewPage } from "../features/overview/OverviewPage";
 import { TraceDetailPage } from "../features/traces/TraceDetailPage";
 import { TracesPage } from "../features/traces/TracesPage";
+import { LoginPage } from "../pages/LoginPage";
+import { RegisterPage } from "../pages/RegisterPage";
+import { TokensPage } from "../pages/TokensPage";
+import { isAuthenticated } from "../api/client";
+
+function PrivateRoute({ children }: { children: React.ReactNode }) {
+  if (!isAuthenticated()) {
+    return <Navigate replace to="/login" />;
+  }
+  return <>{children}</>;
+}
 
 export function App() {
   return (
     <Routes>
-      <Route element={<AppShell />}>
+      {/* Public auth routes */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+
+      {/* Protected app routes */}
+      <Route
+        element={
+          <PrivateRoute>
+            <AppShell />
+          </PrivateRoute>
+        }
+      >
         <Route index element={<Navigate replace to="/overview" />} />
         <Route path="/overview" element={<OverviewPage />} />
         <Route path="/live" element={<LivePage />} />
         <Route path="/traces" element={<TracesPage />} />
         <Route path="/traces/:id" element={<TraceDetailPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/tokens" element={<TokensPage />} />
         <Route path="*" element={<Navigate replace to="/overview" />} />
       </Route>
     </Routes>

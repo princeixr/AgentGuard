@@ -1,0 +1,88 @@
+# Production deployment: server hosts API + dashboard + DB.
+# Local ADK agents connect via AGENTGUARD_BASE_URL + AGENTGUARD_API_KEY.
+# No agent service here — agents run on developer machines.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agentguard}
+      POSTGRES_USER: ${POSTGRES_USER:-agentguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - agentguard-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD}"]
+    volumes:
+      - agentguard-redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  agentguard-api:
+    build:
+      context: ./agentguard-product
+      dockerfile: Dockerfile.api
+    image: agentguard-api:prod
+    restart: unless-stopped
+    ports:
+      - "${AGENTGUARD_API_PORT:-8000}:8000"
+    environment:
+      AGENTGUARD_ENV: production
+      AGENTGUARD_API_KEY: ${AGENTGUARD_API_KEY:-}
+      AGENTGUARD_API_KEY_PEPPER: ${AGENTGUARD_API_KEY_PEPPER:-}
+      AGENTGUARD_JWT_SECRET: ${AGENTGUARD_JWT_SECRET:?Set AGENTGUARD_JWT_SECRET}
+      AGENTGUARD_REQUIRE_AUTH: "true"
+      AGENTGUARD_DOCS_ENABLED: ${AGENTGUARD_DOCS_ENABLED:-false}
+      AGENTGUARD_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agentguard}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-agentguard}
+      AGENTGUARD_WEB_ORIGINS: ${AGENTGUARD_WEB_ORIGINS:?Set AGENTGUARD_WEB_ORIGINS to your domain}
+      AGENTGUARD_TRACE_ROOT: /data/traces
+      AGENTGUARD_TRACE_NAMESPACE: registered_agents
+      AGENTGUARD_APPROVAL_ROOT: /data/approvals
+      AGENTGUARD_CACHE_ENABLED: "true"
+      AGENTGUARD_REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@redis:6379/0
+      AGENTGUARD_RATE_LIMIT_ENABLED: "true"
+      AGENTGUARD_RATE_LIMIT_PER_MINUTE: ${AGENTGUARD_RATE_LIMIT_PER_MINUTE:-300}
+      AGENTGUARD_FIREWALL_MODE: v2
+      AGENTGUARD_TIER3_MODEL: ${AGENTGUARD_TIER3_MODEL:-gemini-2.5-flash}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+    volumes:
+      - agentguard-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  agentguard-dashboard:
+    build:
+      context: ./agentguard-product
+      dockerfile: Dockerfile.dashboard
+    image: agentguard-dashboard:prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      agentguard-api:
+        condition: service_healthy
+
+volumes:
+  agentguard-data:
+  agentguard-postgres:
+  agentguard-redis:
