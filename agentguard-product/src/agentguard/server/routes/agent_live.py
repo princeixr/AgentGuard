@@ -11,6 +11,7 @@ from agentguard.server.dependencies import (
     get_agent_live_runtime,
     get_agent_registry,
     get_demo_runtime,
+    require_operator_access,
 )
 from agentguard.server.models import (
     ApprovalRecord,
@@ -22,7 +23,11 @@ from agentguard.server.services.live import DemoRuntimeService
 from agentguard.server.services.agent_live import AgentLiveRuntimeService
 from agentguard.control_plane.registry import AgentRegistry
 
-router = APIRouter(prefix="/agents/{agent_id}", tags=["agent live"])
+router = APIRouter(
+    prefix="/agents/{agent_id}",
+    tags=["agent live"],
+    dependencies=[Depends(require_operator_access)],
+)
 
 
 def _require_agent(agent_id: str, registry: AgentRegistry) -> None:

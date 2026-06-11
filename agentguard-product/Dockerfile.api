@@ -8,16 +8,27 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
+    && apt-get install -y --no-install-recommends git gosu \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md requirements.lock ./
 COPY src ./src
 COPY policies ./policies
 COPY demo ./demo
+COPY alembic.ini ./alembic.ini
+COPY alembic ./alembic
 
 RUN pip install --upgrade pip \
-    && pip install ".[gemini]"
+    && pip install -r requirements.lock \
+    && pip install --no-deps .
+
+RUN useradd --create-home --shell /usr/sbin/nologin agentguard \
+    && mkdir -p /data \
+    && chown -R agentguard:agentguard /data
+
+COPY deploy/docker/api-entrypoint.sh /usr/local/bin/api-entrypoint.sh
+RUN chmod +x /usr/local/bin/api-entrypoint.sh
 
 EXPOSE 8000
-CMD ["uvicorn", "agentguard.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["api-entrypoint.sh"]
+CMD ["sh", "-c", "if [ -n \"$AGENTGUARD_DATABASE_URL\" ]; then alembic upgrade head; fi && uvicorn agentguard.server.app:app --host 0.0.0.0 --port 8000 --no-server-header"]

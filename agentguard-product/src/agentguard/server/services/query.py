@@ -83,10 +83,10 @@ class DashboardQueryService:
                 ),
                 ComponentHealth(
                     name="Agent integrations",
-                    status="degraded",
+                    status="operational",
                     detail=(
-                        "Registered agent manifests are available. Remote interception "
-                        "transport is not implemented yet."
+                        "Remote interception APIs, one-call guard checks, and approval "
+                        "events are available."
                     ),
                 ),
                 ComponentHealth(

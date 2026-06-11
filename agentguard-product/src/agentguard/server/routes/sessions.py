@@ -2,11 +2,11 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from agentguard.server.dependencies import get_query_service
+from agentguard.server.dependencies import require_operator_access, get_query_service
 from agentguard.server.models import SessionDetail, SessionSummary
 from agentguard.server.services.query import DashboardQueryService
 
-router = APIRouter(prefix="/sessions", tags=["sessions"])
+router = APIRouter(prefix="/sessions", tags=["sessions"], dependencies=[Depends(require_operator_access)])
 
 
 @router.get("", response_model=list[SessionSummary])

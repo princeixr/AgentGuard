@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+.uv-cache/
 *.egg-info/
 
 # Node/Vite
@@ -17,13 +18,19 @@ vite.config.d.ts
 .env
 .env.*
 !.env.example
+!.env.local.example
 *.local
+*.db
 .DS_Store
 
 # AgentGuard runtime artifacts
+.adk/
+**/.adk/
 agentguard-product/data/approvals/
 agentguard-product/data/traces/
 agentguard-product/data/*
 google-adk-personal-agent/.adk/
 google-adk-personal-agent/data/
+google-adk-personal-agent/Test1/
+agt_google_adk_assistant/
 data/*

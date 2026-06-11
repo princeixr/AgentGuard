@@ -37,9 +37,19 @@ class AgentGuardAdkInterceptor:
         self._intent_by_turn: dict[str, str] = {}
         self._decision_by_call: dict[str, tuple[str, float]] = {}
 
-    def before_tool(self, tool, args: dict[str, Any], tool_context):
-        turn_id = _turn_id(tool_context)
-        session_id = _guard_session_id(tool_context)
+    def before_tool(
+        self,
+        tool,
+        args: dict[str, Any],
+        tool_context=None,
+        context=None,
+        **_kwargs,
+    ):
+        context_obj = tool_context or context
+        if context_obj is None:
+            raise TypeError("AgentGuard callback received neither tool_context nor context.")
+        turn_id = _turn_id(context_obj)
+        session_id = _guard_session_id(context_obj)
         if self.registration_factory is not None:
             self.client.register(self.registration_factory())
         if turn_id not in self._intent_by_turn:
@@ -51,12 +61,12 @@ class AgentGuardAdkInterceptor:
                     integration_id=settings.integration_id,
                     session_id=session_id,
                     turn_id=turn_id,
-                    user_request=_user_text(tool_context),
+                    user_request=_user_text(context_obj),
                     manifest_version="development",
                 )
             )
             self._intent_by_turn[turn_id] = result.intent_id
-        call_id = getattr(tool_context, "function_call_id", None) or (
+        call_id = getattr(context_obj, "function_call_id", None) or (
             f"{turn_id}:{_tool_name(tool)}"
         )
         started = time.perf_counter()
@@ -112,19 +122,31 @@ class AgentGuardAdkInterceptor:
         self,
         tool,
         args: dict[str, Any],
-        tool_context,
-        tool_response: dict,
+        tool_context=None,
+        context=None,
+        tool_response=None,
+        response=None,
+        **_kwargs,
     ):
-        self._report(tool, tool_context, "executed", str(tool_response)[:1000])
+        context_obj = tool_context or context
+        if context_obj is None:
+            raise TypeError("AgentGuard callback received neither tool_context nor context.")
+        response_payload = tool_response if tool_response is not None else response
+        self._report(tool, context_obj, "executed", str(response_payload)[:1000])
 
     def on_tool_error(
         self,
         tool,
         args: dict[str, Any],
-        tool_context,
-        error: Exception,
+        tool_context=None,
+        context=None,
+        error=None,
+        **_kwargs,
     ):
-        self._report(tool, tool_context, "failed", str(error)[:1000])
+        context_obj = tool_context or context
+        if context_obj is None:
+            raise TypeError("AgentGuard callback received neither tool_context nor context.")
+        self._report(tool, context_obj, "failed", str(error)[:1000])
 
     def _report(self, tool, context, status: str, summary: str) -> None:
         call_id = getattr(context, "function_call_id", None) or (

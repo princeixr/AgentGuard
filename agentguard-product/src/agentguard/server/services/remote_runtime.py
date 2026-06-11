@@ -8,6 +8,8 @@ from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
 
+from agentguard.server.cache.base import AgentGuardCache
+from agentguard.server.cache.factory import env_int
 from agentguard.control_plane.models import RegisteredTool
 from agentguard.control_plane.registry import AgentRegistry
 from agentguard.core.models import ExecutedToolCall
@@ -33,6 +35,7 @@ from agentguard.server.models import (
     TurnStartRequest,
     TurnStartResponse,
 )
+from agentguard.server.db.runtime_store import RuntimeDatabaseStore
 from agentguard.server.services.query import guard_evaluation_from_payload
 from agentguard.server.services.live import EventBroker
 from agentguard.tracing.schema_v1 import (
@@ -60,12 +63,16 @@ class RemoteInterceptionService:
         trace_store: TraceStore,
         namespace: str = "registered_agents",
         approval_root: Path | str = "data/approvals",
+        database_store: RuntimeDatabaseStore | None = None,
+        cache: AgentGuardCache | None = None,
     ):
         self.registry = registry
         self.trace_store = trace_store
         self.namespace = namespace
         self.approval_root = Path(approval_root)
-        self.broker = EventBroker()
+        self.database_store = database_store or RuntimeDatabaseStore(None)
+        self.cache = cache
+        self.broker = EventBroker(cache=cache, channel="agentguard.remote.events")
         self._builder = TraceV1Builder()
         self._intent_extractor = IntentExtractor(
             llm_enabled=FirewallV2RuntimeConfig.from_env().intent_llm_enabled
@@ -84,6 +91,13 @@ class RemoteInterceptionService:
         request: AgentRegistrationRequest,
     ) -> AgentRegistrationResponse:
         self.registry.register(request)
+        self.database_store.save_runtime_record(
+            record_type="agent_registration",
+            record_id=request.agent_id,
+            workspace_id=request.workspace_id,
+            agent_id=request.agent_id,
+            payload=request.model_dump(mode="json"),
+        )
         return AgentRegistrationResponse(
             agent_id=request.agent_id,
             workspace_id=request.workspace_id,
@@ -104,6 +118,22 @@ class RemoteInterceptionService:
         )
         self._intent_by_id[contract.intent_id] = contract
         self._turn_request_by_id[request.turn_id] = request
+        self.database_store.save_runtime_record(
+            record_type="turn_start",
+            record_id=request.turn_id,
+            workspace_id=request.workspace_id,
+            agent_id=request.agent_id,
+            session_id=request.session_id,
+            payload=request.model_dump(mode="json"),
+        )
+        self.database_store.save_runtime_record(
+            record_type="intent_contract",
+            record_id=contract.intent_id,
+            workspace_id=request.workspace_id,
+            agent_id=request.agent_id,
+            session_id=request.session_id,
+            payload=contract.model_dump(mode="json"),
+        )
         self.trace_store.append_intent_contract_v2(contract, namespace=self.namespace)
         await self._publish(
             "turn_started",
@@ -122,12 +152,24 @@ class RemoteInterceptionService:
         self,
         request: ToolProposalRequest,
     ) -> EnforcementDecisionResponse:
+        idempotency_key = _proposal_idempotency_key(request)
+        cached_response = await self._cache_get(idempotency_key)
+        if cached_response is not None:
+            return EnforcementDecisionResponse.model_validate(cached_response)
         started = perf_counter()
         definition = self._definition(request.agent_id)
         tool = self._tool(definition.tools, request.tool_name)
         metadata = self._metadata(tool)
         trace = self._build_trace(request, metadata)
         self.trace_store.append_trace_v1(trace, namespace=self.namespace)
+        self.database_store.save_runtime_record(
+            record_type="tool_proposal",
+            record_id=request.call_id,
+            workspace_id=request.workspace_id,
+            agent_id=request.agent_id,
+            session_id=request.session_id,
+            payload=request.model_dump(mode="json"),
+        )
         await self._record_event("tool_proposed", trace, {"proposal": request.model_dump(mode="json")})
 
         config = FirewallV2RuntimeConfig.from_env().model_copy(
@@ -192,7 +234,20 @@ class RemoteInterceptionService:
             approval_request_id=approval_id,
             evaluation_latency_ms=decision.latency_ms,
         )
+        self.database_store.save_runtime_record(
+            record_type="enforcement_decision",
+            record_id=decision.decision_id,
+            workspace_id=request.workspace_id,
+            agent_id=request.agent_id,
+            session_id=request.session_id,
+            payload=response.model_dump(mode="json"),
+        )
         self._decision_by_id[decision.decision_id] = (trace, response)
+        await self._cache_set(
+            idempotency_key,
+            response.model_dump(mode="json"),
+            env_int("AGENTGUARD_IDEMPOTENCY_TTL_SECONDS", 900),
+        )
         return response
 
     def list_approvals(self, status: str | None = "pending") -> ApprovalListResponse:
@@ -235,6 +290,12 @@ class RemoteInterceptionService:
         )
         self._pending_by_id[approval_id] = approval
         append_jsonl(self._approvals_path, approval)
+        self.database_store.save_approval(approval)
+        await self._cache_set(
+            _approval_cache_key(approval_id),
+            approval.model_dump(mode="json"),
+            env_int("AGENTGUARD_APPROVAL_CACHE_TTL_SECONDS", 3600),
+        )
         await self._publish("approval.resolved", approval.model_dump(mode="json"))
         return approval
 
@@ -243,6 +304,11 @@ class RemoteInterceptionService:
         request: OutcomeReportRequest,
     ) -> OutcomeReportResponse:
         pending = self._decision_by_id.get(request.decision_id)
+        self.database_store.save_runtime_record(
+            record_type="tool_outcome",
+            record_id=f"{request.decision_id}:{request.call_id}",
+            payload=request.model_dump(mode="json"),
+        )
         if pending is None:
             return OutcomeReportResponse()
         trace, _decision = pending
@@ -288,6 +354,9 @@ class RemoteInterceptionService:
         return self.approval_root / "approvals.jsonl"
 
     def _load_approvals(self) -> dict[str, PendingApproval]:
+        database_approvals = self.database_store.load_approvals()
+        if database_approvals:
+            return database_approvals
         latest: dict[str, PendingApproval] = {}
         for record in load_jsonl(self._approvals_path):
             approval = PendingApproval.model_validate(record)
@@ -482,6 +551,12 @@ class RemoteInterceptionService:
         )
         self._pending_by_id[approval_id] = approval
         append_jsonl(self._approvals_path, approval)
+        self.database_store.save_approval(approval)
+        await self._cache_set(
+            _approval_cache_key(approval_id),
+            approval.model_dump(mode="json"),
+            env_int("AGENTGUARD_APPROVAL_CACHE_TTL_SECONDS", 3600),
+        )
         await self._publish("approval.pending", approval.model_dump(mode="json"))
         return approval_id
 
@@ -505,10 +580,34 @@ class RemoteInterceptionService:
             payload=payload,
         )
         self.trace_store.append_live_event_v1(event, namespace=self.namespace)
+        self.database_store.save_runtime_record(
+            record_type="live_event",
+            record_id=event.event_id,
+            workspace_id=event.workspace_id,
+            agent_id=event.agent_id,
+            session_id=event.session_id,
+            payload=event.model_dump(mode="json", by_alias=True),
+        )
         await self._publish("live_event", event.model_dump(mode="json", by_alias=True))
 
     async def _publish(self, event: str, data: dict) -> None:
         await self.broker.publish(EventEnvelope(event=event, data=data))
+
+    async def _cache_get(self, key: str):
+        if self.cache is None:
+            return None
+        try:
+            return await self.cache.get_json(key)
+        except Exception:
+            return None
+
+    async def _cache_set(self, key: str, value: dict, ttl_seconds: int) -> None:
+        if self.cache is None:
+            return
+        try:
+            await self.cache.set_json(key, value, ttl_seconds=ttl_seconds)
+        except Exception:
+            return
 
 
 def _feature_from_evaluation(
@@ -570,3 +669,15 @@ def _executed_status(status: str) -> str:
     if status in {"blocked", "blocked_by_guard"}:
         return "blocked"
     return "skipped"
+
+
+def _proposal_idempotency_key(request: ToolProposalRequest) -> str:
+    return (
+        "idempotency:evaluate:"
+        f"{request.workspace_id}:{request.agent_id}:{request.session_id}:"
+        f"{request.turn_id}:{request.call_id}"
+    )
+
+
+def _approval_cache_key(approval_id: str) -> str:
+    return f"approval:{approval_id}"

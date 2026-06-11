@@ -7,11 +7,11 @@ import json
 from fastapi import APIRouter, Depends
 from starlette.responses import StreamingResponse
 
-from agentguard.server.dependencies import get_demo_runtime
+from agentguard.server.dependencies import require_operator_access, get_demo_runtime
 from agentguard.server.models import CurrentInterception
 from agentguard.server.services.live import DemoRuntimeService
 
-router = APIRouter(tags=["live"])
+router = APIRouter(tags=["live"], dependencies=[Depends(require_operator_access)])
 
 
 @router.get("/interceptions/current", response_model=CurrentInterception)

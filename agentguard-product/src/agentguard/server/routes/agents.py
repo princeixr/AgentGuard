@@ -6,7 +6,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import ValidationError
 
-from agentguard.server.dependencies import get_agent_registry
+from agentguard.server.dependencies import require_operator_access, get_agent_registry
 from agentguard.server.models import (
     AgentDefinition,
     AgentPolicyResponse,
@@ -29,7 +29,7 @@ from agentguard.firewall_v2.tools.registry import descriptor_for_tool
 from agentguard.firewall_v2.tools.metadata_inference import infer_registered_tool_metadata
 from agentguard.server.models import AgentToolDefinition
 
-router = APIRouter(tags=["agents"])
+router = APIRouter(tags=["agents"], dependencies=[Depends(require_operator_access)])
 
 
 @router.get("/me", response_model=DemoSessionContext)

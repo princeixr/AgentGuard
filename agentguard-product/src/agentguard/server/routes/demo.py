@@ -2,12 +2,12 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from agentguard.server.dependencies import get_demo_runtime
+from agentguard.server.dependencies import require_operator_access, get_demo_runtime
 from agentguard.server.models import DemoResetResponse, DemoStartResponse
 from agentguard.server.services.live import DemoRuntimeService
 from agentguard.demo import reset_demo_runtime
 
-router = APIRouter(prefix="/demo", tags=["demo"])
+router = APIRouter(prefix="/demo", tags=["demo"], dependencies=[Depends(require_operator_access)])
 
 
 @router.post("/scenarios/{scenario_id}/start", response_model=DemoStartResponse)

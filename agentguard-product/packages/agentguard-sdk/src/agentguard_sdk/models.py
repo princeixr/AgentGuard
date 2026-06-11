@@ -139,3 +139,54 @@ class OutcomeReport(BaseModel):
     error_type: str | None = None
     error_message: str | None = None
     timestamp: datetime = Field(default_factory=_utc_now)
+
+
+class GuardCheck(BaseModel):
+    schema_version: Literal["agentguard.guard_check.v2"] = "agentguard.guard_check.v2"
+    workspace_id: str = "default"
+    agent_id: str
+    deployment_id: str = "default"
+    integration_id: str = "default"
+    session_id: str | None = None
+    turn_id: str | None = None
+    call_id: str | None = None
+    user_message: str
+    tool_name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    tool_type: str | None = None
+    tool_description: str | None = None
+    tool_input_schema: dict[str, Any] | None = None
+    framework: str = "custom"
+    runtime_version: str = "unknown"
+    environment: str = "production"
+    manifest_version: str = "v2"
+    metadata_overrides: dict[str, Any] = Field(default_factory=dict)
+    approval_mode: Literal["none", "async", "wait"] = "async"
+    timestamp: datetime = Field(default_factory=_utc_now)
+
+
+class GuardCheckResult(BaseModel):
+    schema_version: Literal["agentguard.guard_check_result.v2"] = (
+        "agentguard.guard_check_result.v2"
+    )
+    allowed: bool
+    requires_approval: bool
+    decision: Literal["allow", "require_approval", "block"]
+    reason: str
+    agent_id: str
+    session_id: str
+    turn_id: str
+    call_id: str
+    tool_name: str
+    tool_type: str
+    trace_id: str
+    decision_id: str
+    approval_id: str | None = None
+    risk_level: str | None = None
+    matched_rules: list[dict[str, Any]] = Field(default_factory=list)
+    normalized_action: dict[str, Any] | None = None
+    tier_evidence: list[dict[str, Any]] = Field(default_factory=list)
+
+    @property
+    def blocked(self) -> bool:
+        return self.decision == "block"

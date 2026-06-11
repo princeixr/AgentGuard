@@ -11,6 +11,8 @@ from urllib.request import Request, urlopen
 from agentguard_sdk.models import (
     AgentRegistration,
     EnforcementDecision,
+    GuardCheck,
+    GuardCheckResult,
     OutcomeReport,
     PendingApproval,
     ToolProposal,
@@ -27,6 +29,8 @@ class AgentGuardClient(Protocol):
     def evaluate(self, proposal: ToolProposal) -> EnforcementDecision: ...
 
     def report_outcome(self, outcome: OutcomeReport) -> None: ...
+
+    def check(self, request: GuardCheck) -> GuardCheckResult: ...
 
 
 class FakeAgentGuardClient:
@@ -61,6 +65,24 @@ class FakeAgentGuardClient:
 
     def report_outcome(self, outcome: OutcomeReport) -> None:
         self.outcomes.append(outcome)
+
+    def check(self, request: GuardCheck) -> GuardCheckResult:
+        decision = self.decision
+        return GuardCheckResult(
+            allowed=decision == "allow",
+            requires_approval=decision == "require_approval",
+            decision=decision,
+            reason=f"Fake client returned {decision}.",
+            agent_id=request.agent_id,
+            session_id=request.session_id or "fake_session",
+            turn_id=request.turn_id or "fake_turn",
+            call_id=request.call_id or "fake_call",
+            tool_name=request.tool_name,
+            tool_type=request.tool_type or "custom.fake",
+            trace_id="trace_fake",
+            decision_id="dec_fake",
+            approval_id="apr_fake" if decision == "require_approval" else None,
+        )
 
 
 class HttpAgentGuardClient:
@@ -121,6 +143,28 @@ class HttpAgentGuardClient:
         except Exception:
             if not self.fail_closed:
                 raise
+
+    def check(self, request: GuardCheck) -> GuardCheckResult:
+        try:
+            payload = self._request("POST", "/api/v2/guard/check", request.model_dump(mode="json"))
+            return GuardCheckResult.model_validate(payload)
+        except Exception as exc:
+            if not self.fail_closed:
+                raise
+            return GuardCheckResult(
+                allowed=False,
+                requires_approval=True,
+                decision="require_approval",
+                reason=f"AgentGuard API unavailable; failed closed: {exc}",
+                agent_id=request.agent_id,
+                session_id=request.session_id or "unavailable_session",
+                turn_id=request.turn_id or "unavailable_turn",
+                call_id=request.call_id or "unavailable_call",
+                tool_name=request.tool_name,
+                tool_type=request.tool_type or "custom.unknown",
+                trace_id="trace_unavailable",
+                decision_id="dec_unavailable",
+            )
 
     def get_approval(self, approval_id: str) -> PendingApproval:
         payload = self._request("GET", f"/api/v1/approvals/{approval_id}")

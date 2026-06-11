@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
-from agentguard.server.dependencies import get_agent_registry, get_query_service
+from agentguard.server.dependencies import require_operator_access, get_agent_registry, get_query_service
 from agentguard.server.models import (
     MemoryDetail,
     MemoryPage,
@@ -15,7 +15,7 @@ from agentguard.server.services.query import DashboardQueryService
 from agentguard.server.routes.operations import build_export_response
 from agentguard.control_plane.registry import AgentRegistry
 
-router = APIRouter(prefix="/agents/{agent_id}", tags=["agent dashboard"])
+router = APIRouter(prefix="/agents/{agent_id}", tags=["agent dashboard"], dependencies=[Depends(require_operator_access)])
 
 
 def _require_agent(agent_id: str, registry: AgentRegistry) -> None:
