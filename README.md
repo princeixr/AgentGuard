@@ -70,6 +70,13 @@ make test
 make build-dashboard
 ```
 
+## License
+
+AgentGuard is licensed under the [Apache License 2.0](LICENSE).
+
+Copyright 2026 AgentGuard contributors. See [AUTHORS.md](AUTHORS.md)
+and [NOTICE](NOTICE) for project attribution.
+
 ## Setup Google Workspace MCP
 
 No Google Cloud project or OAuth credentials needed — the package ships with its own built-in OAuth client.
