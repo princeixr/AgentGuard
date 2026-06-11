@@ -8,7 +8,20 @@ version = "0.1.0"
 description = "Trace-conditioned runtime governance for tool-using AI agents."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Nandan Prince" },
+    { name = "Ayman Sayed" },
+    { name = "Aditya Patil" },
+    { name = "Adithya NJ" },
+]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
 dependencies = [
     "agent-trust @ git+https://github.com/chenglin1112/AgentTrust.git@aee262344315e29b4d0a9e23eb180af9b8193d6b",
     "alembic>=1.13",
@@ -38,6 +51,9 @@ gemini = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools]
+license-files = ["LICENSE", "NOTICE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

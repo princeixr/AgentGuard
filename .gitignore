@@ -10,6 +10,7 @@ __pycache__/
 # Node/Vite
 node_modules/
 dist/
+.npm-cache/
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts

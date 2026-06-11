@@ -1,0 +1,15 @@
+AgentGuard
+Copyright 2026 AgentGuard contributors
+
+This product includes software developed by the AgentGuard contributors.
+
+Founding authors:
+- Nandan Prince
+- Ayman Sayed
+- Aditya Patil
+- Adithya NJ
+
+Third-party components retain their own copyright notices and license terms.
+The AgentTrust benchmark corpus included under
+agentguard-product/benchmarks/agenttrust_v0_5_0 is documented separately in
+that directory and is licensed under the Apache License, Version 2.0.

@@ -66,3 +66,9 @@ Not yet without additional auth.
 
 For public internet exposure, add OIDC/session auth or put it behind an identity-aware proxy.
 
+## What license does AgentGuard use?
+
+AgentGuard uses the Apache License, Version 2.0.
+
+This is a permissive open-source license with an explicit patent grant, which
+makes it a strong fit for infrastructure and security tooling.

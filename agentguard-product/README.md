@@ -56,3 +56,8 @@ helm install agentguard charts/agentguard \
   --set redis.password="$(openssl rand -hex 32)" \
   --set config.webOrigins=https://agentguard.example.com
 ```
+
+## License
+
+AgentGuard is licensed under the Apache License, Version 2.0. See the repository
+root `LICENSE`, `NOTICE`, and `AUTHORS.md` files for details.

@@ -7,6 +7,20 @@ name = "google-adk-personal-agent"
 version = "0.1.0"
 description = "Independent Google ADK personal agent integrated through AgentGuard SDK."
 requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Nandan Prince" },
+    { name = "Ayman Sayed" },
+    { name = "Aditya Patil" },
+    { name = "Adithya NJ" },
+]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
 dependencies = [
     "agentguard-sdk>=0.1.0",
     "google-adk>=2.1.0",

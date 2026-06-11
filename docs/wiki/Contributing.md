@@ -44,3 +44,10 @@ docker compose --env-file .env.local.example config --quiet
 - Keep demo code separate from product code.
 - Treat docs as part of the product.
 
+## Contribution License
+
+Unless explicitly stated otherwise, contributions submitted to AgentGuard are
+licensed under the Apache License, Version 2.0.
+
+By opening a pull request, you agree that your contribution may be distributed
+under the project license.
