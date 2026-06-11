@@ -156,7 +156,6 @@ describe("InterceptionDetail", () => {
         evidenceLoading={false}
         precedents={[]}
         step={approvalStep}
-        userIntent="List files in Downloads."
       />,
     );
 
@@ -166,7 +165,7 @@ describe("InterceptionDetail", () => {
     expect(container.querySelector(".verdict-evaluator"))
       .toHaveTextContent("combiner_low_confidence_fallback");
     expect(screen.queryByText(/agentguard_firewall_v2/)).not.toBeInTheDocument();
-    expect(screen.getByText("User requested")).toBeInTheDocument();
+    expect(screen.queryByText("User requested")).not.toBeInTheDocument();
     expect(screen.getByText("Agent attempted")).toBeInTheDocument();
     expect(screen.queryByText("scope violation")).not.toBeInTheDocument();
     expect(screen.queryByText("within scope")).not.toBeInTheDocument();
@@ -194,7 +193,6 @@ describe("InterceptionDetail", () => {
         evidenceLoading={false}
         precedents={[]}
         step={approvalStep}
-        userIntent="List files in Downloads."
       />,
     );
 

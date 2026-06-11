@@ -1123,18 +1123,6 @@ pre,
   gap: 8px;
 }
 
-.intent-action-card blockquote {
-  margin: 16px 0 0;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1.55;
-}
-
-.intent-requested {
-  box-shadow: inset 3px 0 0 var(--brand-cyan);
-}
-
 .intent-attempted {
   box-shadow: inset 3px 0 0 var(--allow);
 }
@@ -1182,7 +1170,6 @@ pre,
   line-height: 1.5;
 }
 
-.scope-list,
 .gap-signals {
   display: flex;
   flex-wrap: wrap;
@@ -1601,10 +1588,6 @@ pre,
 
   .approval-banner-actions {
     justify-content: flex-end;
-  }
-
-  .intent-action-section {
-    grid-template-columns: 1fr;
   }
 
   .precedent-score {

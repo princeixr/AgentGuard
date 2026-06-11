@@ -245,7 +245,6 @@ export function LivePage() {
                 ) : undefined}
                 precedents={selectedDetail.data?.precedents ?? []}
                 step={selectedStep}
-                userIntent={session.data.session.user_intent}
               />
             </div>
           )}
@@ -447,26 +446,19 @@ export function InterceptionDetail({
   intentContractDisclosure,
   precedents,
   step,
-  userIntent,
 }: {
   approval?: PendingApproval;
   evidenceLoading: boolean;
   intentContractDisclosure?: ReactNode;
   precedents: PrecedentSummary[];
   step: ReplayStep;
-  userIntent: string;
 }) {
   const evaluation = step.guard_evaluation;
   const verdict = displayVerdict(step, approval);
   const tone = decisionTone(step, approval);
-  const intentContract = asRecord(evaluation?.intent_contract);
   const authorization = asRecord(evaluation?.intent_authorization);
   const normalizedAction = asRecord(evaluation?.normalized_action);
   const attemptedTone = intentGapTone(authorization);
-  const requestedText =
-    stringValue(intentContract?.raw_user_request) ||
-    approval?.user_request ||
-    userIntent;
   const enforcedBy =
     stringValue(asRecord(evaluation?.combined_decision)?.enforced_by) ||
     evaluation?.enforced_by ||
@@ -497,13 +489,6 @@ export function InterceptionDetail({
       </section>
 
       <section className="intent-action-section">
-        <div className="intent-action-card intent-requested">
-          <div className="intent-action-heading">
-            <span className="eyebrow">User requested</span>
-          </div>
-          <blockquote>“{requestedText || "User request unavailable."}”</blockquote>
-          <ScopeList contract={intentContract} />
-        </div>
         <div className={`intent-action-card intent-attempted intent-attempted-${attemptedTone}`}>
           <div className="intent-action-heading">
             <span className="eyebrow">Agent attempted</span>
@@ -604,22 +589,6 @@ function TechnicalDisclosure({
         <pre className="json">{JSON.stringify(payload, null, 2)}</pre>
       </div>
     </details>
-  );
-}
-
-function ScopeList({ contract }: { contract: Record<string, unknown> | null }) {
-  const capabilities = stringArray(contract?.requested_capabilities);
-  const resources = stringArray(contract?.permitted_resources);
-  if (!capabilities.length && !resources.length) return null;
-  return (
-    <div className="scope-list">
-      {capabilities.map((capability) => (
-        <span className="tag" key={capability}>{capability}</span>
-      ))}
-      {resources.map((resource) => (
-        <span className="tag mono" key={resource}>{resource}</span>
-      ))}
-    </div>
   );
 }
 
