@@ -2,7 +2,89 @@
 
 AgentGuard is an open-source runtime security and approval layer for tool-using AI agents. It intercepts proposed tool calls, evaluates them, and returns `allow`, `require_approval`, or `block` before the agent executes the tool.
 
-![AgentGuard approval flow](docs/assets/approval-flow.svg)
+## Architecture
+
+```mermaid
+flowchart TB
+    User[User]
+    Admin[Administrator]
+
+    subgraph AgentRuntime["Agent Runtime"]
+        Agent["Agent loop<br/>Google ADK / custom agent"]
+        Adapter["AgentGuard SDK / framework adapter"]
+        Tools["Tools, MCP servers, and external APIs"]
+    end
+
+    subgraph AgentGuard["AgentGuard Control Plane"]
+        API["FastAPI runtime API<br/>registration, turns, proposals, outcomes"]
+        Runtime["Remote interception service"]
+
+        subgraph Firewall["Firewall V2 Decision Pipeline"]
+            Intent["Intent extraction and authorization"]
+            Normalize["Tool descriptor and action normalization"]
+            Policy["Deterministic policy evaluation"]
+            Tier1["Tier 1 deterministic security checks"]
+            Tier2["Tier 2 semantic evidence<br/>(optional)"]
+            Tier3["Tier 3 LLM judge"]
+            Combiner["Deterministic decision combiner"]
+            Decision{"allow / require_approval / block"}
+        end
+
+        Approval["Approval service and queue"]
+        Events["Live-event and SSE service"]
+    end
+
+    subgraph Experience["Administrator Experience"]
+        Dashboard["AgentGuard dashboard<br/>live interception, approvals, traces, policy"]
+    end
+
+    subgraph Storage["Persistence and Infrastructure"]
+        Postgres[("Postgres<br/>runtime records, approvals, API keys")]
+        Redis[("Redis<br/>cache, rate limits, idempotency, SSE fanout")]
+        Traces[("Trace artifacts<br/>decisions, evidence, outcomes")]
+        Elastic[("Elastic<br/>optional analytics and retrieval")]
+    end
+
+    User --> Agent
+    Agent -->|"proposes tool call"| Adapter
+    Adapter -->|"HTTP: register, start turn, evaluate proposal"| API
+    API --> Runtime
+    Runtime --> Intent
+    Intent --> Normalize
+    Normalize --> Policy
+    Normalize --> Tier1
+    Normalize --> Tier2
+    Normalize --> Tier3
+    Policy --> Combiner
+    Tier1 --> Combiner
+    Tier2 --> Combiner
+    Tier3 --> Combiner
+    Combiner --> Decision
+
+    Decision -->|allow| Adapter
+    Adapter -->|"execute only after allow or approval"| Tools
+    Tools -->|"result"| Agent
+    Adapter -->|"outcome report"| API
+
+    Decision -->|require_approval| Approval
+    Approval -->|"pending approval + polling"| Adapter
+    Approval --> Events
+    Events -->|"SSE live updates"| Dashboard
+    Admin --> Dashboard
+    Dashboard -->|"approve or reject"| Approval
+    Approval -->|approved| Adapter
+    Approval -->|rejected| Adapter
+    Decision -->|block| Adapter
+    Adapter -->|"blocked or rejected: do not execute"| Agent
+
+    Runtime --> Postgres
+    Runtime --> Redis
+    Runtime --> Traces
+    Runtime --> Elastic
+    Runtime --> Events
+    Redis --> Events
+    Dashboard -->|"HTTP queries and administration"| API
+```
 
 ## Quickstart
 
@@ -35,19 +117,6 @@ google-adk-personal-agent/       Google ADK example chatbot integration
 examples/minimal-python-agent/   Minimal framework-neutral SDK example
 docs/                            OSS user, architecture, deployment, and security docs
 .github/workflows/               CI and publishing workflows
-```
-
-## Runtime Flow
-
-```text
-Agent runtime
-  -> AgentGuard SDK HTTP client
-  -> AgentGuard API
-  -> AgentGuard firewall: intent + policy + security + LLM judge + combiner
-  -> allow | require_approval | block
-  -> AgentGuard approval UI if needed
-  -> agent executes only after allow/approval
-  -> outcome report and live SSE dashboard events
 ```
 
 ## Documentation
