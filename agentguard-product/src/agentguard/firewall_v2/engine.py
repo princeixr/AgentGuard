@@ -59,13 +59,13 @@ class AgentGuardFirewallV2:
                 recommendation="block",
                 stages=[
                     V2StageResult(
-                        name="firewall_v2",
+                        name="agentguard_firewall",
                         status="failed",
-                        detail=f"V2 evaluation failed closed: {exc}",
+                        detail=f"AgentGuard evaluation failed closed: {exc}",
                     )
                 ],
                 explanation=(
-                    "FirewallV2 could not complete evaluation. The fail-closed "
+                    "AgentGuard could not complete evaluation. The fail-closed "
                     "recommendation is block."
                 ),
             )
@@ -221,14 +221,13 @@ class AgentGuardFirewallV2:
             combined_decision=combined.model_dump(mode="json"),
             explanation=(
                 (
-                    f"FirewallV2 combined guard recommends and enforces "
-                    f"{combined.final_decision}. V1 is retained as "
-                    "comparison evidence."
+                    f"AgentGuard firewall recommends and enforces "
+                    f"{combined.final_decision}."
                 )
                 if self.mode == "v2"
                 else (
-                    f"FirewallV2 combined guard recommends {combined.final_decision} "
-                    "in observe-only mode. FirewallV1 remains the active enforcement path."
+                    f"AgentGuard firewall recommends {combined.final_decision} "
+                    "in observe-only mode."
                 )
             ),
         )

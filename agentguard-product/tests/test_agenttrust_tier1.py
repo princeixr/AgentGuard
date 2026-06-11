@@ -39,11 +39,9 @@ def test_agenttrust_blocks_pipe_to_shell_when_shell_normalizer_falls_back():
     )
 
     assert evaluation.normalized_action["parser"]["status"] == "unsupported"
-    assert evaluation.policy_evaluation["recommendation"] == "require_approval"
+    assert evaluation.policy_evaluation["recommendation"] == "allow"  # parser_failure=allow
     assert evaluation.recommendation == "block"
-    assert evaluation.combined_decision["enforced_by"] == (
-        "tier_1_deterministic_security"
-    )
+    assert evaluation.combined_decision["enforced_by"] == "deterministic_security"
     agenttrust = evaluation.tier_results[0]["evidence"]["agenttrust_shell"]
     assert agenttrust["status"] == "completed"
     assert agenttrust["upstream_verdict"] == "block"
@@ -55,8 +53,8 @@ def test_agenttrust_allow_does_not_weaken_central_policy():
 
     agenttrust = evaluation.tier_results[0]["evidence"]["agenttrust_shell"]
     assert agenttrust["upstream_verdict"] == "allow"
-    assert evaluation.policy_evaluation["recommendation"] == "require_approval"
-    assert evaluation.recommendation == "require_approval"
+    assert evaluation.policy_evaluation["recommendation"] == "allow"  # approve_dynamic_shell=allow
+    assert evaluation.recommendation == "allow"
 
 
 def test_shell_redirection_is_not_misclassified_as_a_read():

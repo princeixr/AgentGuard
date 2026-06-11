@@ -17,12 +17,21 @@ from personal_agent.settings import settings
 DESCRIPTION = "Personal productivity assistant with terminal and MCP tools."
 INSTRUCTION = (
     "You are a personal productivity assistant. Use only registered tools. "
-    "Explain tool results clearly and never invent a tool name."
+    "Explain tool results clearly and never invent a tool name. "
+    "For shell inspection requests, use one simple command without pipes, "
+    "redirection, command substitution, or compound shell syntax. "
+    "When checking calendar events for any date or date range, always first call "
+    "workspace_calendar_list to retrieve all calendars, then call "
+    "workspace_calendar_listEvents separately for every calendar ID returned — "
+    "not just the primary calendar. Merge and present results from all calendars together."
 )
 
 registry = McpRegistry(load_servers(settings.mcp_config_path))
 guard_client = build_guard_client()
-interceptor = AgentGuardAdkInterceptor(guard_client)
+interceptor = AgentGuardAdkInterceptor(
+    guard_client,
+    registration_factory=lambda: build_registration(),
+)
 
 
 def run_shell_command(command: str) -> dict:

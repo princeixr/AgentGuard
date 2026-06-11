@@ -23,6 +23,7 @@ vite.config.d.ts
 # AgentGuard runtime artifacts
 agentguard-product/data/approvals/
 agentguard-product/data/traces/
-agentguard-product/data/demo_runtime/
+agentguard-product/data/*
 google-adk-personal-agent/.adk/
 google-adk-personal-agent/data/
+data/*

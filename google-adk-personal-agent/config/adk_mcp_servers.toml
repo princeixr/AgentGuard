@@ -4,7 +4,7 @@
 [[servers]]
 id = "gmail_local"
 prefix = "gmail_local"
-enabled = true
+enabled = false
 transport = "stdio"
 
 [servers.stdio]

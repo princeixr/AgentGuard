@@ -4,7 +4,7 @@ AgentGuard uses HTTP for decisions and SSE for dashboard updates.
 
 ```text
 ToolProposal
-  -> AgentGuard evaluates with Firewall V2
+  -> AgentGuard evaluates the proposal
   -> decision=require_approval
   -> PendingApproval is stored
   -> SSE event approval.pending updates dashboard
@@ -15,4 +15,4 @@ ToolProposal
   -> agent executes or blocks the original tool call
 ```
 
-The approval UI shows user intent, tool arguments, Tier 1 evidence, Tier 3 evidence, combiner owner, and final explanation.
+The approval UI shows user intent, tool arguments, deterministic policy evidence, LLM judge evidence, combiner owner, and final explanation.

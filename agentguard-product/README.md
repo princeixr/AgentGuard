@@ -1,11 +1,11 @@
 # AgentGuard Product
 
-AgentGuard is the API, Firewall V2 runtime, approval dashboard, SDK package, and deployment bundle for open-source users.
+AgentGuard is the API, firewall runtime, approval dashboard, SDK package, and deployment bundle for open-source users.
 
 ## Components
 
 ```text
-src/agentguard/                 FastAPI API, Firewall V2, tracing, storage
+src/agentguard/                 FastAPI API, firewall, tracing, storage
 apps/agentguard_dashboard/      React dashboard and approval UI
 packages/agentguard-sdk/        Lightweight Python SDK for agents
 charts/agentguard/              Helm chart

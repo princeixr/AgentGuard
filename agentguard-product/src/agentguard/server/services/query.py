@@ -386,7 +386,7 @@ class DashboardQueryService:
         ]
 
     def _session_summary(self, session_id, traces, decisions) -> SessionSummary:
-        traces = sorted(traces, key=lambda item: item.step_index)
+        traces = sorted(traces, key=lambda item: item.timestamp)
         session_decisions = [decisions[trace.trace_id] for trace in traces]
         final_decision = max(
             session_decisions,
@@ -411,7 +411,7 @@ class DashboardQueryService:
         for trace in self._agent_traces(agent_id):
             grouped[trace.session_id].append(trace)
         for traces in grouped.values():
-            traces.sort(key=lambda item: item.step_index)
+            traces.sort(key=lambda item: item.timestamp)
         return dict(grouped)
 
     def _agent_traces(self, agent_id: str | None):

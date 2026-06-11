@@ -57,8 +57,10 @@ def authorize_action(
         explanation = (
             "The proposed action targets a destination not authorized by the user."
         )
-    elif action.side_effect and (
-        not contract.side_effect_authorized or unauthorized
+    elif (
+        action.side_effect
+        and action.parser.status not in {"unsupported", "invalid"}
+        and (not contract.side_effect_authorized or unauthorized)
     ):
         recommendation = "require_approval"
         explanation = (
@@ -71,12 +73,16 @@ def authorize_action(
     ):
         recommendation = "require_approval"
         explanation = "The proposed resource scope exceeds the user's authorization."
-    elif contract.extractor.confidence < confidence_threshold and action.side_effect:
+    elif (
+        contract.extractor.confidence < confidence_threshold
+        and action.side_effect
+        and action.parser.status not in {"unsupported", "invalid"}
+    ):
         recommendation = "require_approval"
         explanation = (
             "Intent extraction confidence is too low to authorize a side effect."
         )
-    elif unauthorized:
+    elif unauthorized and (action.side_effect or action.external_impact):
         recommendation = "require_approval"
         explanation = (
             "The proposed capability was not included in the user's requested actions."
