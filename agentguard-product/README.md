@@ -23,6 +23,7 @@ npm --prefix apps/agentguard_dashboard run build
 
 ## API Endpoints
 
+- `POST /api/v2/guard/check`
 - `POST /api/v1/agents/register`
 - `POST /api/v1/turns/start`
 - `POST /api/v1/tool-proposals/evaluate`
@@ -32,16 +33,26 @@ npm --prefix apps/agentguard_dashboard run build
 - `POST /api/v1/tool-outcomes`
 - `GET /api/v1/events/stream`
 
+Most new integrations should start with `POST /api/v2/guard/check` or the
+high-level `AgentGuard.check()` SDK helper. The V1 endpoints remain available
+for framework adapters and advanced custom runtimes.
+
 ## Deployment
 
 Use Docker Compose from the repository root for local self-hosting:
 
 ```bash
-docker compose up --build
+cp ../.env.local.example ../.env
+docker compose --env-file ../.env up --build
 ```
 
 Use Helm for Kubernetes:
 
 ```bash
-helm install agentguard charts/agentguard --set secrets.agentguardApiKey=replace-me
+helm install agentguard charts/agentguard \
+  --set secrets.agentguardApiKey="$(openssl rand -hex 32)" \
+  --set secrets.agentguardApiKeyPepper="$(openssl rand -hex 32)" \
+  --set postgresql.password="$(openssl rand -hex 32)" \
+  --set redis.password="$(openssl rand -hex 32)" \
+  --set config.webOrigins=https://agentguard.example.com
 ```

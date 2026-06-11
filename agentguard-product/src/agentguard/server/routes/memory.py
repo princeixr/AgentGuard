@@ -2,11 +2,11 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from agentguard.server.dependencies import get_query_service
+from agentguard.server.dependencies import require_operator_access, get_query_service
 from agentguard.server.models import MemoryDetail, MemoryPage
 from agentguard.server.services.query import DashboardQueryService
 
-router = APIRouter(prefix="/memory", tags=["memory"])
+router = APIRouter(prefix="/memory", tags=["memory"], dependencies=[Depends(require_operator_access)])
 
 
 @router.get("", response_model=MemoryPage)

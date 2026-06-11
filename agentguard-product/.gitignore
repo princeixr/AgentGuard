@@ -22,3 +22,5 @@ reports/
 test_*
 
 !tests/test_*.py
+!packages/**/tests/
+!packages/**/tests/test_*.py

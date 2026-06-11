@@ -7,11 +7,11 @@ import json
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 
-from agentguard.server.dependencies import get_query_service
+from agentguard.server.dependencies import require_operator_access, get_query_service
 from agentguard.server.models import OperationsSummary
 from agentguard.server.services.query import DashboardQueryService
 
-router = APIRouter(prefix="/operations", tags=["operations"])
+router = APIRouter(prefix="/operations", tags=["operations"], dependencies=[Depends(require_operator_access)])
 
 
 @router.get("/summary", response_model=OperationsSummary)

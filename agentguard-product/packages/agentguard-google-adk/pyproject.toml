@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentguard-google-adk"
+version = "0.1.0"
+description = "Google ADK callback adapter for AgentGuard runtime enforcement."
+requires-python = ">=3.11"
+dependencies = [
+    "agentguard-sdk>=0.1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

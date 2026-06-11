@@ -26,9 +26,19 @@ ingress:
   tls: []
 
 config:
-  webOrigins: "http://localhost:5173"
+  agentguardEnv: production
+  requireAuth: "true"
+  docsEnabled: "false"
+  webOrigins: ""
   traceNamespace: registered_agents
+  registeredAgentsPath: /app/demo/registered_agents.json
+  policyPath: /app/policies/personal_assistant_v1.json
   elasticEnabled: "false"
+  cacheEnabled: "true"
+  rateLimitEnabled: "true"
+  rateLimitPerMinute: "300"
+  idempotencyTtlSeconds: "900"
+  approvalCacheTtlSeconds: "3600"
   firewallMode: v2
   agenttrustShellEnabled: "true"
   intentLlmEnabled: "false"
@@ -36,8 +46,38 @@ config:
 
 secrets:
   existingSecret: ""
-  agentguardApiKey: "change-me"
+  agentguardApiKey: ""
+  agentguardApiKeyPepper: ""
   googleApiKey: ""
+
+postgresql:
+  enabled: true
+  image: postgres:16-alpine
+  database: agentguard
+  username: agentguard
+  password: ""
+  existingSecret: ""
+  host: ""
+  port: 5432
+  databaseUrl: ""
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""
+
+redis:
+  enabled: true
+  image: redis:7-alpine
+  host: ""
+  port: 6379
+  database: 0
+  password: ""
+  existingSecret: ""
+  redisUrl: ""
+  persistence:
+    enabled: true
+    size: 2Gi
+    storageClass: ""
 
 persistence:
   enabled: true

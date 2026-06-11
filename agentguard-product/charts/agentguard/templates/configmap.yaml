@@ -5,11 +5,21 @@ metadata:
   labels:
     {{- include "agentguard.labels" . | nindent 4 }}
 data:
+  AGENTGUARD_ENV: {{ .Values.config.agentguardEnv | quote }}
+  AGENTGUARD_REQUIRE_AUTH: {{ .Values.config.requireAuth | quote }}
+  AGENTGUARD_DOCS_ENABLED: {{ .Values.config.docsEnabled | quote }}
   AGENTGUARD_WEB_ORIGINS: {{ .Values.config.webOrigins | quote }}
   AGENTGUARD_TRACE_ROOT: "/data/traces"
   AGENTGUARD_TRACE_NAMESPACE: {{ .Values.config.traceNamespace | quote }}
   AGENTGUARD_APPROVAL_ROOT: "/data/approvals"
+  AGENTGUARD_REGISTERED_AGENTS_PATH: {{ .Values.config.registeredAgentsPath | quote }}
+  AGENTGUARD_POLICY_PATH: {{ .Values.config.policyPath | quote }}
   AGENTGUARD_ELASTIC_ENABLED: {{ .Values.config.elasticEnabled | quote }}
+  AGENTGUARD_CACHE_ENABLED: {{ .Values.config.cacheEnabled | quote }}
+  AGENTGUARD_RATE_LIMIT_ENABLED: {{ .Values.config.rateLimitEnabled | quote }}
+  AGENTGUARD_RATE_LIMIT_PER_MINUTE: {{ .Values.config.rateLimitPerMinute | quote }}
+  AGENTGUARD_IDEMPOTENCY_TTL_SECONDS: {{ .Values.config.idempotencyTtlSeconds | quote }}
+  AGENTGUARD_APPROVAL_CACHE_TTL_SECONDS: {{ .Values.config.approvalCacheTtlSeconds | quote }}
   AGENTGUARD_FIREWALL_MODE: {{ .Values.config.firewallMode | quote }}
   AGENTGUARD_AGENTTRUST_SHELL_ENABLED: {{ .Values.config.agenttrustShellEnabled | quote }}
   AGENTGUARD_INTENT_LLM_ENABLED: {{ .Values.config.intentLlmEnabled | quote }}

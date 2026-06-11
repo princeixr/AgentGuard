@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 
+from agentguard.server.cache.base import AgentGuardCache
 from agentguard.server.models import (
     ApprovalRecord,
     ApprovalRequest,
@@ -18,14 +19,26 @@ from agentguard.server.services.query import DashboardQueryService
 
 
 class EventBroker:
-    def __init__(self):
+    def __init__(
+        self,
+        cache: AgentGuardCache | None = None,
+        channel: str = "agentguard.events",
+    ):
+        self.cache = cache
+        self.channel = channel
         self._subscribers: set[asyncio.Queue[EventEnvelope]] = set()
 
     async def publish(self, event: EventEnvelope) -> None:
         for queue in list(self._subscribers):
             await queue.put(event)
+        if self.cache is not None:
+            await self.cache.publish(self.channel, event.model_dump(mode="json"))
 
     async def subscribe(self) -> AsyncIterator[EventEnvelope]:
+        if self.cache is not None:
+            async for payload in self.cache.subscribe(self.channel):
+                yield EventEnvelope.model_validate(payload)
+            return
         queue: asyncio.Queue[EventEnvelope] = asyncio.Queue()
         self._subscribers.add(queue)
         try:
@@ -41,11 +54,12 @@ class DemoRuntimeService:
         repository: DashboardRepository,
         query_service: DashboardQueryService,
         step_delay_seconds: float = 0.35,
+        cache: AgentGuardCache | None = None,
     ):
         self.repository = repository
         self.query_service = query_service
         self.step_delay_seconds = step_delay_seconds
-        self.broker = EventBroker()
+        self.broker = EventBroker(cache=cache, channel="agentguard.demo.events")
         self._state = CurrentInterception(status="idle")
         self._task: asyncio.Task | None = None
 

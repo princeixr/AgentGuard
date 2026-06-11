@@ -11,7 +11,7 @@ from agentguard_sdk import AgentRegistration, HttpAgentGuardClient, ToolManifest
 def main() -> None:
     client = HttpAgentGuardClient(
         base_url=os.environ.get("AGENTGUARD_BASE_URL", "http://127.0.0.1:8000"),
-        api_key=os.environ.get("AGENTGUARD_API_KEY", "dev-agentguard-key"),
+        api_key=os.environ["AGENTGUARD_API_KEY"],
         timeout_seconds=10,
     )
     registration = AgentRegistration(

@@ -7,8 +7,8 @@ AgentGuard is an open-source runtime security and approval layer for tool-using 
 ## Quickstart
 
 ```bash
-export AGENTGUARD_API_KEY=dev-agentguard-key
-docker compose up --build
+cp .env.local.example .env
+docker compose --env-file .env up --build
 ```
 
 Open:
@@ -23,7 +23,7 @@ python -m venv .venv
 . .venv/bin/activate
 pip install -e agentguard-product/packages/agentguard-sdk
 AGENTGUARD_BASE_URL=http://127.0.0.1:8000 \
-AGENTGUARD_API_KEY=dev-agentguard-key \
+AGENTGUARD_API_KEY="$(grep '^AGENTGUARD_API_KEY=' .env | cut -d= -f2-)" \
 python examples/minimal-python-agent/main.py
 ```
 
@@ -60,6 +60,7 @@ Agent runtime
 - [Kubernetes Deployment](docs/deployment/kubernetes.md)
 - [Configuration](docs/configuration.md)
 - [Security](docs/security.md)
+- [Release Checklist](docs/release-checklist.md)
 - [Contributing](CONTRIBUTING.md)
 
 ## Development Checks
@@ -87,4 +88,3 @@ npx -y --package=github:gemini-cli-extensions/workspace#v0.0.8 \
 ```
 
 A browser window opens. Sign in with the Google account whose Calendar, Gmail, and Drive you want the agent to access. The token is stored locally and refreshed automatically.
-

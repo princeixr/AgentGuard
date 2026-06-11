@@ -13,11 +13,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: astral-sh/setup-uv@v5
+      - name: Check backend lockfile
+        run: uv lock --project agentguard-product --check
       - name: Install backend and SDK
         run: |
           python -m pip install --upgrade pip
           pip install -e agentguard-product/packages/agentguard-sdk
+          pip install -e agentguard-product/packages/agentguard-google-adk
           pip install -e 'agentguard-product[dev]'
+      - name: Audit backend dependencies
+        run: |
+          python -m pip install pip-audit
+          python -m pip_audit
       - name: Test backend
         working-directory: agentguard-product
         run: PYTHONPATH=src:packages/agentguard-sdk/src pytest -q
@@ -49,14 +57,28 @@ jobs:
           context: agentguard-product
           file: agentguard-product/Dockerfile.api
           push: false
+          load: true
           tags: agentguard-api:ci
+      - name: Generate API image SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: agentguard-api:ci
+          format: spdx-json
+          artifact-name: agentguard-api-sbom.spdx.json
       - name: Build dashboard image
         uses: docker/build-push-action@v6
         with:
           context: agentguard-product
           file: agentguard-product/Dockerfile.dashboard
           push: false
+          load: true
           tags: agentguard-dashboard:ci
+      - name: Generate dashboard image SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: agentguard-dashboard:ci
+          format: spdx-json
+          artifact-name: agentguard-dashboard-sbom.spdx.json
 
   helm:
     runs-on: ubuntu-latest
@@ -64,4 +86,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
       - name: Helm lint
-        run: helm lint agentguard-product/charts/agentguard
+        run: |
+          helm lint agentguard-product/charts/agentguard \
+            --set secrets.agentguardApiKey=ci-agentguard-api-key-strong-value \
+            --set secrets.agentguardApiKeyPepper=ci-agentguard-pepper-strong-value \
+            --set postgresql.password=ci-postgres-password-strong-value \
+            --set redis.password=ci-redis-password-strong-value \
+            --set config.webOrigins=https://agentguard.example.com
