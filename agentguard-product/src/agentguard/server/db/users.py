@@ -2,45 +2,44 @@
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import secrets
 import uuid
 
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from agentguard.server.db.models import UserRecord
-
-_pwd_ctx = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__truncate_error=False,
-)
 
 PASSWORD_MIN = 4
 PASSWORD_MAX = 40
 
 
 def _validate_password(password: str) -> None:
-    length = len(password)
-    if length < PASSWORD_MIN or length > PASSWORD_MAX:
+    if len(password) < PASSWORD_MIN or len(password) > PASSWORD_MAX:
         raise ValueError(
             f"Password must be between {PASSWORD_MIN} and {PASSWORD_MAX} characters."
         )
 
 
-def _prehash(password: str) -> str:
-    """SHA-256 prehash before bcrypt to eliminate the 72-byte silent truncation.
+def _prehash(password: str) -> bytes:
+    """SHA-256 digest of the password, returned as raw bytes (32 bytes).
 
-    bcrypt silently ignores bytes beyond the 72nd, making passwords that differ
-    only after byte 72 hash to the same value. Prehashing with SHA-256 produces
-    a fixed 44-character base64 string, safely within bcrypt's limit regardless
-    of the original password's length or encoding.
+    bcrypt 4+ raises an error for inputs > 72 bytes. SHA-256 output is always
+    32 bytes — safely under the limit regardless of the original password length
+    or Unicode content.
     """
-    digest = hashlib.sha256(password.encode("utf-8")).digest()
-    return base64.b64encode(digest).decode("ascii")
+    return hashlib.sha256(password.encode("utf-8")).digest()
+
+
+def _hash_password(password: str) -> str:
+    hashed = bcrypt.hashpw(_prehash(password), bcrypt.gensalt(12))
+    return hashed.decode("utf-8")
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    return bcrypt.checkpw(_prehash(password), stored_hash.encode("utf-8"))
 
 
 def create_user(session: Session, *, email: str, password: str) -> UserRecord:
@@ -52,7 +51,7 @@ def create_user(session: Session, *, email: str, password: str) -> UserRecord:
     user = UserRecord(
         user_id=f"usr_{secrets.token_urlsafe(12)}",
         email=email,
-        password_hash=_pwd_ctx.hash(_prehash(password)),
+        password_hash=_hash_password(password),
         workspace_id=str(uuid.uuid4()),
     )
     session.add(user)
@@ -71,7 +70,7 @@ def verify_user(session: Session, *, email: str, password: str) -> UserRecord | 
     )
     if user is None:
         return None
-    if not _pwd_ctx.verify(_prehash(password), user.password_hash):
+    if not _verify_password(password, user.password_hash):
         return None
     return user
 
