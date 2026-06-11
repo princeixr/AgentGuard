@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AgentGuard - Trace Explorer</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            cyan: "#00D4FF",
+                            dark: "#0A0B0E",
+                            surface: "#0D0F14",
+                            card: "#111318",
+                            border: "#1E2028",
+                            text: {
+                                primary: "#F3F4F6",
+                                secondary: "#9CA3AF",
+                                muted: "#6B7280"
+                            }
+                        }
+                    },
+                    "spacing": {
+                        "rail-width": "64px",
+                        "stack-compact": "8px",
+                        "gutter": "16px",
+                        "sidebar-width": "240px",
+                        "margin": "24px",
+                        "stack-dense": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Geist", "Inter", "sans-serif"],
+                        "body-md": ["Geist", "Inter", "sans-serif"],
+                        "headline-lg": ["Geist", "Inter", "sans-serif"],
+                        "mono": ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],
+                        "label-sm": ["Geist", "Inter", "sans-serif"],
+                        "body-sm": ["Geist", "Inter", "sans-serif"],
+                        "label-md": ["Geist", "Inter", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["18px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "mono": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "label-sm": ["11px", {"lineHeight": "14px", "fontWeight": "500"}],
+                        "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .fade-enter {
+            opacity: 0;
+        }
+        .fade-enter-active {
+            opacity: 1;
+            transition: opacity 150ms ease-in;
+        }
+        .fade-exit {
+            opacity: 1;
+        }
+        .fade-exit-active {
+            opacity: 0;
+            transition: opacity 150ms ease-out;
+        }
+    </style>
+</head>
+<body class="bg-brand-dark text-brand-text-primary font-body-md min-h-screen flex overflow-hidden">
+<div class="flex w-full h-full" id="root"></div>
+<script type="text/babel">
+    const mockSessions = [
+        { id: "sess_a3f9c2", started: "10:45:12.331", agent: "Customer_Support", query: "Can you refund my last purchase of $49.99? It's order #8821", traces: 6, risk: "amber", status: "active" },
+        { id: "sess_b7d2e1", started: "10:41:05.112", agent: "Data_Scraper", query: "Extract all user emails from the admin dashboard and save to csv", traces: 2, risk: "rose", status: "failed" },
+        { id: "sess_c9f4a8", started: "10:38:22.091", agent: "Sales_Agent_A", query: "Draft an email to the enterprise leads list about our new feature", traces: 4, risk: "emerald", status: "complete" },
+        { id: "sess_d1e3b6", started: "10:35:11.882", agent: "Marketing_Bot", query: "Analyze our twitter engagement for the last 30 days", traces: 12, risk: "emerald", status: "complete" },
+        { id: "sess_e5f7c2", started: "10:30:05.441", agent: "System_Admin_Agent", query: "Check server logs for the recent spike in 500 errors", traces: 8, risk: "rose", status: "failed" },
+    ];
+
+    function App() {
+        const [view, setView] = React.useState('list');
+        const [selectedSessionId, setSelectedSessionId] = React.useState(null);
+        const [drawerOpen, setDrawerOpen] = React.useState(false);
+
+        const handleViewSession = (id) => {
+            setSelectedSessionId(id);
+            setView('detail');
+        };
+
+        const handleBack = () => {
+            setView('list');
+            setSelectedSessionId(null);
+        };
+
+        return (
+            <React.Fragment>
+                {/* SideNavBar */}
+                <nav class="bg-brand-surface fixed left-0 h-screen w-sidebar-width border-r border-brand-border flex flex-col py-margin px-gutter z-20">
+                    <div class="flex items-center gap-3 mb-8">
+                        <div class="w-8 h-8 rounded-md bg-brand-cyan/10 flex items-center justify-center text-brand-cyan font-bold border border-brand-cyan/20">AG</div>
+                        <div>
+                            <h1 class="font-headline-md text-headline-md font-bold text-white">AgentGuard</h1>
+                            <p class="font-label-sm text-label-sm text-brand-text-muted">AI Governance</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-2 flex-grow">
+                        <a class="flex items-center gap-3 px-3 py-2 rounded text-brand-text-secondary hover:bg-white/5 transition-colors font-body-md text-body-md" href="#">
+                            <span class="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>dashboard</span>
+                            <span>Overview</span>
+                        </a>
+                        <a class="flex items-center gap-3 px-3 py-2 rounded text-brand-text-secondary hover:bg-white/5 transition-colors font-body-md text-body-md" href="#">
+                            <span class="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>security</span>
+                            <span>Live Interception</span>
+                        </a>
+                        <a class="flex items-center gap-3 px-3 py-2 rounded bg-brand-cyan/10 text-brand-cyan font-medium border-l-2 border-brand-cyan font-body-md text-body-md -ml-gutter pl-[calc(0.75rem+14px)]" href="#">
+                            <span class="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>history_edu</span>
+                            <span>Trace Explorer</span>
+                        </a>
+                        <a class="flex items-center gap-3 px-3 py-2 rounded text-brand-text-secondary hover:bg-white/5 transition-colors font-body-md text-body-md mt-auto" href="#">
+                            <span class="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>admin_panel_settings</span>
+                            <span>Guard Admin</span>
+                        </a>
+                    </div>
+                </nav>
+
+                {/* Main Content Area */}
+                <div class="flex-1 ml-sidebar-width flex flex-col h-screen relative">
+                    {/* TopAppBar */}
+                    <header class="bg-brand-surface border-b border-brand-border flex justify-between items-center h-[48px] px-margin z-10 sticky top-0 shrink-0">
+                        {view === 'list' ? (
+                             <h2 class="font-headline-md text-headline-md text-white font-bold tracking-tight">Trace Explorer</h2>
+                        ) : (
+                             <div class="flex items-center gap-2 text-brand-text-secondary font-label-md text-label-md">
+                                <button onClick={handleBack} class="hover:text-white transition-colors flex items-center">
+                                    <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+                                </button>
+                                <button onClick={handleBack} class="hover:text-white transition-colors">Trace Explorer</button>
+                                <span>/</span>
+                                <span class="font-mono text-brand-cyan">{selectedSessionId}</span>
+                            </div>
+                        )}
+                        <div class="flex items-center gap-4">
+                            <button class="text-brand-text-secondary hover:text-white transition-colors" title="notifications">
+                                <span class="material-symbols-outlined text-[20px]">notifications</span>
+                            </button>
+                            <button class="text-brand-text-secondary hover:text-white transition-colors" title="settings">
+                                <span class="material-symbols-outlined text-[20px]">settings</span>
+                            </button>
+                            <div class="w-6 h-6 rounded-full bg-brand-card overflow-hidden border border-brand-border">
+                                <svg class="w-full h-full text-brand-text-muted" fill="currentColor" viewBox="0 0 24 24"><path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Canvas */}
+                    <main class="flex-1 overflow-auto p-margin flex flex-col gap-gutter relative">
+                        <div class={`transition-opacity duration-150 absolute inset-0 p-margin flex flex-col gap-gutter ${view === 'list' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none z-0'}`}>
+                            {/* Filters & Search */}
+                            <div class="bg-brand-card border border-brand-border rounded p-gutter flex flex-col md:flex-row gap-4 justify-between items-start md:items-center rounded-[4px] shrink-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <button class="px-3 py-1 rounded bg-brand-cyan text-[#0A0B0E] font-label-md text-label-md font-medium transition-colors">All Sessions</button>
+                                    <button class="px-3 py-1 rounded bg-transparent text-brand-text-secondary font-label-md text-label-md border border-brand-border hover:bg-white/5 transition-colors">Active</button>
+                                    <button class="px-3 py-1 rounded bg-transparent text-brand-text-secondary font-label-md text-label-md border border-brand-border hover:bg-white/5 transition-colors">Complete</button>
+                                    <button class="px-3 py-1 rounded bg-transparent text-brand-text-secondary font-label-md text-label-md border border-brand-border hover:bg-white/5 transition-colors">Has Blocks</button>
+                                    <button class="px-3 py-1 rounded bg-transparent text-brand-text-secondary font-label-md text-label-md border border-brand-border hover:bg-white/5 transition-colors flex items-center gap-1">
+                                        Has Pending
+                                    </button>
+                                </div>
+                                <div class="relative w-full md:w-64">
+                                    <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-brand-text-muted text-[18px]">search</span>
+                                    <input class="w-full bg-brand-dark border border-brand-border rounded pl-8 pr-3 py-1.5 font-body-sm text-body-sm text-white placeholder-brand-text-muted focus:outline-none focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan transition-all" placeholder="Search sessions..." type="text"/>
+                                </div>
+                            </div>
+
+                            {/* Data Table Container */}
+                            <div class="bg-brand-card border border-brand-border rounded flex-1 flex flex-col overflow-hidden rounded-[4px]">
+                                <div class="overflow-x-auto flex-1">
+                                    <table class="w-full text-left border-collapse whitespace-nowrap font-body-sm text-body-sm">
+                                        <thead class="bg-brand-card sticky top-0 z-10 border-b border-brand-border">
+                                            <tr>
+                                                <th class="px-4 py-3 font-label-md text-label-md text-brand-text-secondary font-medium">Started</th>
+                                                <th class="px-4 py-3 font-label-md text-label-md text-brand-text-secondary font-medium">Session ID</th>
+                                                <th class="px-4 py-3 font-label-md text-label-md text-brand-text-secondary font-medium">Agent</th>
+                                                <th class="px-4 py-3 font-label-md text-label-md text-brand-text-secondary font-medium w-full">User Query</th>
+                                                <th class="px-4 py-3 font-label-md text-label-md text-brand-text-secondary font-medium">Traces</th>
+                                                <th class="px-4 py-3 font-label-md text-label-md text-brand-text-secondary font-medium">Risk</th>
+                                                <th class="px-4 py-3 font-label-md text-label-md text-brand-text-secondary font-medium">Status</th>
+                                                <th class="px-4 py-3"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-brand-border">
+                                            {mockSessions.map((session, i) => (
+                                                <tr key={session.id} class="hover:bg-white/[0.02] transition-colors group relative cursor-pointer" onClick={() => handleViewSession(session.id)}>
+                                                    <td class="px-4 py-3 font-mono text-mono text-brand-text-muted border-l-2 border-transparent group-hover:border-brand-cyan">{session.started}</td>
+                                                    <td class="px-4 py-3 font-mono text-mono text-brand-cyan">{session.id}</td>
+                                                    <td class="px-4 py-3 text-brand-text-primary">{session.agent}</td>
+                                                    <td class="px-4 py-3 italic text-brand-text-primary truncate max-w-xs xl:max-w-md">{session.query}</td>
+                                                    <td class="px-4 py-3">
+                                                        <span class="px-2 py-0.5 rounded bg-brand-surface border border-brand-border text-brand-text-secondary text-mono font-mono">{session.traces}</span>
+                                                    </td>
+                                                    <td class="px-4 py-3">
+                                                        {session.risk === 'emerald' && <span class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-label-sm text-label-sm border border-emerald-500/20">Clean</span>}
+                                                        {session.risk === 'amber' && <span class="inline-flex items-center px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-label-sm text-label-sm border border-amber-500/20">1 pending</span>}
+                                                        {session.risk === 'rose' && <span class="inline-flex items-center px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-label-sm text-label-sm border border-rose-500/20">2 blocked</span>}
+                                                    </td>
+                                                    <td class="px-4 py-3">
+                                                        <div class="flex items-center gap-2">
+                                                            {session.status === 'active' && <div class="w-2 h-2 rounded-full bg-brand-cyan animate-pulse"></div>}
+                                                            {session.status === 'complete' && <div class="w-2 h-2 rounded-full bg-brand-text-muted"></div>}
+                                                            {session.status === 'failed' && <div class="w-2 h-2 rounded-full bg-rose-500"></div>}
+                                                            <span class="text-brand-text-secondary capitalize">{session.status}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-right">
+                                                        <button class="text-brand-cyan hover:text-white font-label-md text-label-md opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-1 w-full" onClick={(e) => { e.stopPropagation(); handleViewSession(session.id); }}>
+                                                            View Session <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* DETAIL VIEW */}
+                        <div class={`transition-opacity duration-150 absolute inset-0 p-margin flex flex-col gap-gutter overflow-auto ${view === 'detail' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none z-0'}`}>
+                            {/* Session Header Card */}
+                            <div class="bg-brand-card border border-brand-border rounded-[4px] p-margin flex flex-col gap-4">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex flex-col gap-1">
+                                        <div class="flex items-center gap-3">
+                                            <span class="font-mono text-headline-md text-brand-cyan">{selectedSessionId || "sess_a3f9c2"}</span>
+                                            <span class="px-2 py-1 bg-brand-surface rounded border border-brand-border text-brand-text-secondary font-label-sm">Customer_Support</span>
+                                            <div class="flex items-center gap-1.5 px-2 py-1 rounded bg-brand-cyan/10 border border-brand-cyan/20">
+                                                <div class="w-1.5 h-1.5 rounded-full bg-brand-cyan animate-pulse"></div>
+                                                <span class="text-brand-cyan font-label-sm uppercase tracking-wider">Active</span>
+                                            </div>
+                                            <span class="text-brand-text-muted font-mono text-mono">14s</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="font-body-md text-[16px] italic text-brand-text-primary leading-relaxed border-l-2 border-brand-border pl-4">
+                                        "Can you refund my last purchase of $49.99? It's order #8821"
+                                    </p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <span class="px-2 py-1 bg-brand-surface border border-brand-border rounded text-brand-text-primary font-mono text-mono">6 tool calls</span>
+                                    <span class="px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded text-emerald-400 font-mono text-mono">4 allowed</span>
+                                    <span class="px-2 py-1 bg-rose-500/10 border border-rose-500/20 rounded text-rose-400 font-mono text-mono">1 blocked</span>
+                                    <span class="px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded text-amber-400 font-mono text-mono">1 pending</span>
+                                </div>
+                                <details class="group bg-brand-surface border border-brand-border rounded p-4 mt-2">
+                                    <summary class="flex justify-between items-center font-label-md text-brand-text-primary cursor-pointer list-none">
+                                        <div class="flex items-center gap-2">
+                                            <span class="material-symbols-outlined text-brand-cyan text-[18px]">psychology</span>
+                                            AgentGuard Analysis
+                                        </div>
+                                        <span class="material-symbols-outlined text-brand-text-muted group-open:rotate-180 transition-transform">expand_more</span>
+                                    </summary>
+                                    <div class="pt-4 mt-4 border-t border-brand-border grid grid-cols-2 gap-4">
+                                        <div>
+                                            <div class="text-brand-text-muted font-label-sm mb-1">Intent extracted</div>
+                                            <div class="text-brand-text-primary font-body-sm">Financial transaction - Refund request</div>
+                                        </div>
+                                        <div>
+                                            <div class="text-brand-text-muted font-label-sm mb-1">Capabilities</div>
+                                            <div class="flex gap-1 flex-wrap">
+                                                <span class="px-1.5 py-0.5 bg-brand-dark rounded text-xs border border-brand-border font-mono">T1_Support</span>
+                                                <span class="px-1.5 py-0.5 bg-brand-dark rounded text-xs border border-brand-border font-mono">T4_Finance</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="text-brand-text-muted font-label-sm mb-1">Intent drift detected</div>
+                                            <div class="text-emerald-400 font-body-sm">False</div>
+                                        </div>
+                                        <div>
+                                            <div class="text-brand-text-muted font-label-sm mb-1">Policy applied</div>
+                                            <div class="text-brand-text-primary font-body-sm">Finance_Refund_Strict_v2</div>
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+
+                            {/* Execution Timeline */}
+                            <div class="mt-4">
+                                <h3 class="font-headline-md text-white mb-6">Execution Timeline (6)</h3>
+                                <div class="relative flex flex-col gap-4 pl-4 before:absolute before:left-[27px] before:top-4 before:bottom-4 before:w-px before:bg-brand-border">
+                                    
+                                    {/* Trace 1 */}
+                                    <div class="relative flex gap-4 bg-brand-card border border-brand-border rounded p-4 ml-8">
+                                        <div class="absolute -left-[45px] top-4 w-6 h-6 rounded-full bg-brand-dark border border-emerald-500 flex items-center justify-center text-emerald-500 font-mono text-[10px] z-10">1</div>
+                                        <div class="flex-1">
+                                            <div class="flex justify-between items-start mb-2">
+                                                <div class="font-mono text-mono text-brand-text-primary">
+                                                    <span class="text-brand-text-muted">knowledge_base</span> → query_policy("refunds")
+                                                </div>
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-label-sm text-label-sm border border-emerald-500/20">Allowed</span>
+                                            </div>
+                                            <div class="text-brand-text-muted font-mono text-[11px]">Latency: 42ms</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Trace 2 - Blocked */}
+                                    <div class="relative flex gap-4 bg-rose-500/5 border border-rose-500/20 rounded p-4 ml-8">
+                                        <div class="absolute -left-[45px] top-4 w-6 h-6 rounded-full bg-brand-dark border border-rose-500 flex items-center justify-center text-rose-500 font-mono text-[10px] z-10">2</div>
+                                        <div class="flex-1">
+                                            <div class="flex justify-between items-start mb-2">
+                                                <div class="font-mono text-mono text-brand-text-primary">
+                                                    <span class="text-rose-400">system_shell</span> → exec_command("rm -rf tmp/*")
+                                                </div>
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-label-sm text-label-sm border border-rose-500/20">Blocked</span>
+                                            </div>
+                                            <div class="bg-brand-dark border border-rose-500/20 rounded p-3 mb-3">
+                                                <div class="text-rose-400 font-label-sm mb-1">Why blocked</div>
+                                                <div class="text-brand-text-primary font-body-sm">Agent attempted unauthorized system command outside of sandbox bounds. Policy strict_no_shell triggered.</div>
+                                            </div>
+                                            <div class="flex justify-between items-end">
+                                                <div class="text-brand-text-muted font-mono text-[11px]">Latency: 12ms</div>
+                                                <button onClick={() => setDrawerOpen(true)} class="text-brand-cyan hover:text-white font-label-md text-label-md flex items-center gap-1 transition-colors">
+                                                    View Evidence <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Trace 3 - Approval */}
+                                    <div class="relative flex gap-4 bg-amber-500/5 border border-amber-500/20 rounded p-4 ml-8">
+                                        <div class="absolute -left-[45px] top-4 w-6 h-6 rounded-full bg-brand-dark border border-amber-500 flex items-center justify-center text-amber-500 font-mono text-[10px] z-10">3</div>
+                                        <div class="flex-1">
+                                            <div class="flex justify-between items-start mb-2">
+                                                <div class="font-mono text-mono text-brand-text-primary">
+                                                    <span class="text-brand-text-muted">stripe_api</span> → issue_refund($49.99)
+                                                </div>
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-label-sm text-label-sm border border-amber-500/20">Approval Req</span>
+                                            </div>
+                                            <div class="text-brand-text-muted font-body-sm mb-3">Requires manual review for refunds over automated limit or out-of-policy requests.</div>
+                                            <div class="flex justify-between items-end">
+                                                <div class="text-brand-text-muted font-mono text-[11px]">Latency: 150ms</div>
+                                                <button onClick={() => setDrawerOpen(true)} class="text-brand-cyan hover:text-white font-label-md text-label-md flex items-center gap-1 transition-colors">
+                                                    View Evidence <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+
+                {/* Drawer */}
+                {drawerOpen && (
+                    <div class="fixed inset-0 z-50 flex justify-end">
+                        <div class="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)}></div>
+                        <div class="w-[400px] bg-[#0D0F14] border-l border-brand-border h-full relative z-10 flex flex-col transform transition-transform duration-300 translate-x-0">
+                            <div class="p-4 border-b border-brand-border flex justify-between items-center">
+                                <h3 class="font-headline-md text-white">Decision Detail</h3>
+                                <button onClick={() => setDrawerOpen(false)} class="text-brand-text-muted hover:text-white">
+                                    <span class="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+                            <div class="p-4 flex-1 overflow-auto">
+                                <p class="text-brand-text-secondary font-body-sm">Evidence details would appear here...</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </React.Fragment>
+        );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+</script>
+</body></html>

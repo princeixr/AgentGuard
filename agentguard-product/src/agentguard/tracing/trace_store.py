@@ -18,6 +18,7 @@ from agentguard.tracing.schema_v1 import (
     TraceFeatureV1,
 )
 from agentguard.tracing.serializers import append_jsonl
+from agentguard.tracing.serializers import load_jsonl
 
 
 class TraceStore(BaseModel):
@@ -61,6 +62,30 @@ class TraceStore(BaseModel):
         path = self.root_dir / "v1" / namespace / "intent_contracts.jsonl"
         append_jsonl(path, contract)
         return path
+
+    def load_traces_v1(self, namespace: str = "default") -> list[AgentGuardTraceV1]:
+        path = self.root_dir / "v1" / namespace / "traces.jsonl"
+        return [
+            AgentGuardTraceV1.model_validate(record)
+            for record in load_jsonl(path)
+        ]
+
+    def load_live_events_v1(self, namespace: str = "default") -> list[LiveEventV1]:
+        path = self.root_dir / "v1" / namespace / "live_events.jsonl"
+        return [
+            LiveEventV1.model_validate(record)
+            for record in load_jsonl(path)
+        ]
+
+    def load_intent_contracts_v2(
+        self,
+        namespace: str = "default",
+    ) -> list[IntentContractV2]:
+        path = self.root_dir / "v1" / namespace / "intent_contracts.jsonl"
+        return [
+            IntentContractV2.model_validate(record)
+            for record in load_jsonl(path)
+        ]
 
     def append_label_v1(self, label: LabelRecordV1, namespace: str = "default") -> Path:
         path = self.root_dir / "v1" / namespace / "labels.jsonl"

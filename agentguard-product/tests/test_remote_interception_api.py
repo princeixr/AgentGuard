@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from agentguard.server.app import create_app
+from agentguard.tracing.serializers import load_jsonl
 
 
 def _registration():
@@ -109,3 +110,113 @@ def test_remote_interception_requires_approval_and_resolves(tmp_path, monkeypatc
         )
         assert resolved.status_code == 200
         assert resolved.json()["status"] == "approved"
+
+
+def test_remote_runtime_recovers_step_and_intent_state_after_restart(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("AGENTGUARD_AGENTTRUST_SHELL_ENABLED", "false")
+    monkeypatch.setenv("AGENTGUARD_INTENT_LLM_ENABLED", "false")
+    monkeypatch.setenv("AGENTGUARD_APPROVAL_ROOT", str(tmp_path / "approvals"))
+    trace_root = tmp_path / "traces"
+
+    turn = {
+        "schema_version": "agentguard.turn_start.v1",
+        "workspace_id": "wsp_test",
+        "agent_id": "agt_test",
+        "deployment_id": "dep_test",
+        "integration_id": "int_test",
+        "session_id": "chat_1:invocation_1",
+        "turn_id": "invocation_1",
+        "user_request": "List files in Downloads.",
+        "manifest_version": "test",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+    first_client = TestClient(
+        create_app(
+            data_root=tmp_path / "runtime-1",
+            agent_trace_root=trace_root,
+        )
+    )
+    assert first_client.post(
+        "/api/v1/agents/register",
+        json=_registration(),
+    ).status_code == 200
+    started = first_client.post("/api/v1/turns/start", json=turn)
+    intent_id = started.json()["intent_id"]
+    first = _proposal(
+        session_id=turn["session_id"],
+        turn_id=turn["turn_id"],
+        intent_id=intent_id,
+        call_id="call_1",
+        command="ls ~/Downloads",
+    )
+    evaluated = first_client.post("/api/v1/tool-proposals/evaluate", json=first)
+    assert evaluated.status_code == 200
+    first_client.post(
+        "/api/v1/tool-outcomes",
+        json=_outcome(evaluated.json()["decision_id"], "call_1"),
+    )
+
+    second_client = TestClient(
+        create_app(
+            data_root=tmp_path / "runtime-2",
+            agent_trace_root=trace_root,
+        )
+    )
+    assert second_client.post(
+        "/api/v1/agents/register",
+        json=_registration(),
+    ).status_code == 200
+    second = _proposal(
+        session_id=turn["session_id"],
+        turn_id=turn["turn_id"],
+        intent_id=intent_id,
+        call_id="call_2",
+        command="ls ~/Downloads/books",
+    )
+    evaluated = second_client.post("/api/v1/tool-proposals/evaluate", json=second)
+    assert evaluated.status_code == 200
+
+    traces = load_jsonl(trace_root / "v1" / "registered_agents" / "traces.jsonl")
+    assert [trace["step_index"] for trace in traces] == [1, 2]
+    assert traces[1]["previous_trace_id"] == traces[0]["trace_id"]
+    assert traces[1]["intent"]["raw_user_request"] == "List files in Downloads."
+    assert traces[1]["trajectory"]["prior_tool_count"] == 1
+
+
+def _proposal(
+    *,
+    session_id: str,
+    turn_id: str,
+    intent_id: str,
+    call_id: str,
+    command: str,
+):
+    return {
+        "schema_version": "agentguard.tool_proposal.v1",
+        "workspace_id": "wsp_test",
+        "agent_id": "agt_test",
+        "deployment_id": "dep_test",
+        "integration_id": "int_test",
+        "session_id": session_id,
+        "turn_id": turn_id,
+        "intent_id": intent_id,
+        "call_id": call_id,
+        "tool_name": "run_shell_command",
+        "arguments": {"command": command},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _outcome(decision_id: str, call_id: str):
+    return {
+        "schema_version": "agentguard.outcome_report.v1",
+        "decision_id": decision_id,
+        "call_id": call_id,
+        "status": "executed",
+        "output_summary": "ok",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }

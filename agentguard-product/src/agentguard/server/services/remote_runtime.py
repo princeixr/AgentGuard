@@ -23,11 +23,9 @@ from agentguard.server.models import (
     AgentRegistrationRequest,
     AgentRegistrationResponse,
     ApprovalListResponse,
-    ApprovalRecord,
     ApprovalRequest,
     EnforcementDecisionResponse,
     EventEnvelope,
-    GuardEvaluationView,
     OutcomeReportRequest,
     OutcomeReportResponse,
     PendingApproval,
@@ -79,6 +77,7 @@ class RemoteInterceptionService:
         self._prior_calls_by_session: dict[str, list[ExecutedToolCall]] = defaultdict(list)
         self._previous_trace_by_session: dict[str, str] = {}
         self._previous_output_by_session: dict[str, str] = {}
+        self._hydrate_runtime_state()
 
     def register(
         self,
@@ -295,6 +294,49 @@ class RemoteInterceptionService:
             latest[approval.approval_id] = approval
         return latest
 
+    def _hydrate_runtime_state(self) -> None:
+        for contract in self.trace_store.load_intent_contracts_v2(
+            namespace=self.namespace
+        ):
+            self._intent_by_id[contract.intent_id] = contract
+
+        output_by_trace: dict[str, tuple[str, str]] = {}
+        for event in self.trace_store.load_live_events_v1(namespace=self.namespace):
+            if event.trace_id is None or event.event_type not in {
+                "tool_executed",
+                "tool_blocked",
+                "tool_failed",
+            }:
+                continue
+            output_by_trace[event.trace_id] = (
+                str(event.payload.get("execution_status") or "blocked"),
+                str(event.payload.get("output_summary") or ""),
+            )
+
+        traces = sorted(
+            self.trace_store.load_traces_v1(namespace=self.namespace),
+            key=lambda trace: trace.timestamp,
+        )
+        for trace in traces:
+            self._previous_trace_by_session[trace.session_id] = trace.trace_id
+            status, output = output_by_trace.get(
+                trace.trace_id,
+                (trace.execution.status, trace.execution.output_summary or ""),
+            )
+            if output:
+                self._previous_output_by_session[trace.session_id] = output
+            self._prior_calls_by_session[trace.session_id].append(
+                ExecutedToolCall(
+                    call_id=trace.proposed_tool_call.call_id,
+                    session_id=trace.session_id,
+                    step_index=trace.step_index,
+                    tool_name=trace.proposed_tool_call.tool_name,
+                    arguments=trace.proposed_tool_call.arguments,
+                    output_summary=output,
+                    status=_executed_status(status),
+                )
+            )
+
     def _definition(self, agent_id: str):
         definition = self.registry.definition(agent_id)
         if definition is None:
@@ -318,7 +360,14 @@ class RemoteInterceptionService:
         metadata: ToolMetadata,
     ) -> AgentGuardTraceV1:
         turn = self._turn_request_by_id.get(request.turn_id)
-        user_request = turn.user_request if turn is not None else "User request unavailable."
+        intent_contract = self._intent_by_id.get(request.intent_id)
+        user_request = (
+            turn.user_request
+            if turn is not None
+            else intent_contract.raw_user_request
+            if intent_contract is not None
+            else "User request unavailable."
+        )
         return self._builder.build(
             TraceV1BuildInput(
                 session_id=request.session_id,
@@ -511,3 +560,13 @@ def _score_from_decision(
         cumulative_after=CumulativeScoresV1(cumulative_session_risk=risk),
         dominant_signals=[decision.decision],
     )
+
+
+def _executed_status(status: str) -> str:
+    if status == "executed":
+        return "executed"
+    if status == "failed":
+        return "failed"
+    if status in {"blocked", "blocked_by_guard"}:
+        return "blocked"
+    return "skipped"

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AgentGuard Admin - Policy Overview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed-dim": "#adc6ff",
+                        "primary-fixed": "#e5e2e1",
+                        "primary-container": "#1c1b1b",
+                        "surface-container": "#f1edec",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "background": "#fdf8f8",
+                        "on-tertiary-container": "#868382",
+                        "on-surface": "#1c1b1b",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed": "#001a42",
+                        "surface": "#fdf8f8",
+                        "surface-dim": "#ddd9d8",
+                        "surface-container-low": "#f7f3f2",
+                        "inverse-primary": "#c8c6c5",
+                        "on-primary": "#ffffff",
+                        "on-primary-container": "#858383",
+                        "tertiary-container": "#1c1b1a",
+                        "on-surface-variant": "#444748",
+                        "secondary": "#0058be",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed-dim": "#cac6c4",
+                        "surface-tint": "#5f5e5e",
+                        "surface-variant": "#e5e2e1",
+                        "surface-bright": "#fdf8f8",
+                        "primary": "#000000",
+                        "outline-variant": "#c4c7c7",
+                        "on-tertiary-fixed": "#1c1b1a",
+                        "on-background": "#1c1b1b",
+                        "on-tertiary-fixed-variant": "#484645",
+                        "on-primary-fixed": "#1c1b1b",
+                        "on-primary-fixed-variant": "#474746",
+                        "inverse-on-surface": "#f4f0ef",
+                        "error-container": "#ffdad6",
+                        "inverse-surface": "#313030",
+                        "tertiary": "#000000",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-container": "#2170e4",
+                        "surface-container-highest": "#e5e2e1",
+                        "on-secondary-fixed-variant": "#004395",
+                        "on-secondary-container": "#fefcff",
+                        "secondary-fixed": "#d8e2ff",
+                        "outline": "#747878",
+                        "surface-container-high": "#ebe7e6",
+                        "tertiary-fixed": "#e6e2df",
+                        "primary-fixed-dim": "#c8c6c5",
+                        "on-tertiary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "rail-width": "64px",
+                        "stack-compact": "8px",
+                        "gutter": "16px",
+                        "sidebar-width": "240px",
+                        "margin": "24px",
+                        "stack-dense": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Geist", "sans-serif"],
+                        "body-md": ["Geist", "sans-serif"],
+                        "headline-lg": ["Geist", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"],
+                        "label-sm": ["Geist", "sans-serif"],
+                        "body-sm": ["Geist", "sans-serif"],
+                        "label-md": ["Geist", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["18px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "mono": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "label-sm": ["11px", {"lineHeight": "14px", "fontWeight": "500"}],
+                        "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .font-jetbrains { font-family: 'JetBrains Mono', monospace; }
+        /* Custom toggle styles to match prompt requirements (cyan) despite strict theme restrictions, trying to blend */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #00e5ff; /* Cyan override for prompt specific request, though breaking theme slightly for prompt adherence */
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #00e5ff;
+        }
+        
+        /* Dark mode overrides for the split layout to ensure it looks good since theme provided seems mostly light */
+        .dark body {
+            background-color: #0f1115; /* Dark background */
+            color: #e5e5e5;
+        }
+        .dark .bg-surface-container { background-color: #1a1d24; }
+        .dark .border-outline-variant { border-color: #2a2f3a; }
+        .dark .text-on-surface { color: #e5e5e5; }
+        .dark .text-on-surface-variant { color: #a0a5b1; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md overflow-hidden selection:bg-secondary-fixed-dim">
+<!-- TopAppBar -->
+<nav class="docked full-width top border-b border-outline-variant flat no shadows flex justify-between items-center h-rail-width px-margin ml-sidebar-width bg-surface dark:bg-primary-container z-20 sticky top-0 md:ml-[240px]">
+<div class="flex items-center gap-gutter">
+<span class="font-headline-md text-headline-md text-primary dark:text-primary-fixed">AgentGuard</span>
+<span class="px-2 py-1 bg-surface-container-highest text-on-surface-variant font-label-sm text-label-sm rounded ml-4 border border-outline-variant hidden md:inline-block">Admin Workspace</span>
+</div>
+<div class="flex items-center gap-margin">
+<button class="hover:text-secondary transition-colors text-on-surface-variant relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-secondary rounded-full"></span>
+</button>
+<button class="hover:text-secondary transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest border border-outline-variant overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRTPWyRMlm9qCFwIOn8RddaEXEqE8ijUsLFGxwbLRtfxkr2AsiV64Wg4Jx7H27zhBwTxOiyc_EQiOBERox2sVUz7TyP7AJXAK5p5KzKalw3lgwWkLfXBcVpoxMWXnyCOzCRVAOj-_S0h8XWpOq9KmRU0KyuvjLWxxyO5Cz_6CkeKFXtPoRjNvpEvcQkkalWF1tYtRUAGd9atxCfsQcyvxNdOCRQ_HHFDkAmAnxftWi0fKP5iuFOfD5FfGsg3AATjBwyOWUbxl_1HQ"/>
+</div>
+</div>
+</nav>
+<!-- SideNavBar -->
+<aside class="fixed left-0 h-screen w-sidebar-width border-r border-outline-variant flat no shadows flex flex-col h-full py-margin px-gutter bg-primary dark:bg-primary z-30 hidden md:flex">
+<div class="flex items-center gap-3 mb-8 px-2">
+<div class="w-8 h-8 rounded bg-surface-container-highest flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-secondary dark:text-secondary-fixed-dim" style="font-variation-settings: 'FILL' 1;">security</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-on-primary">AgentGuard</h1>
+<p class="font-label-sm text-label-sm text-on-primary-container">AI Governance</p>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">security</span>
+<span class="font-body-md text-body-md">Live Interception</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">history_edu</span>
+<span class="font-body-md text-body-md">Trace Explorer</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-secondary font-bold border-r-2 border-secondary bg-surface-container-highest bg-opacity-10 opacity-80" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">admin_panel_settings</span>
+<span class="font-body-md text-body-md">Guard Admin</span>
+</a>
+</nav>
+<div class="mt-auto pt-4 border-t border-outline-variant px-2">
+<div class="flex items-center gap-2 text-on-primary-container font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">cloud_done</span>
+<span>System Operational</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex md:ml-[240px] h-[calc(100vh-64px)] overflow-hidden bg-[#0f1115]">
+<!-- Admin Vertical Tabs -->
+<div class="w-64 border-r border-[#2a2f3a] bg-[#15181e] flex flex-col overflow-y-auto hidden lg:flex">
+<div class="p-4 border-b border-[#2a2f3a]">
+<h2 class="font-label-md text-label-md text-[#a0a5b1] uppercase tracking-wider">Administration</h2>
+</div>
+<nav class="flex-1 py-2">
+<a class="flex items-center px-4 py-3 bg-[#1e232d] border-l-2 border-[#00e5ff] text-[#e5e5e5]" href="#">
+<span class="font-body-sm text-body-sm font-medium">Policy Overview</span>
+</a>
+<a class="flex items-center px-4 py-3 text-[#a0a5b1] hover:bg-[#1e232d] hover:text-[#e5e5e5] transition-colors border-l-2 border-transparent" href="#">
+<span class="font-body-sm text-body-sm">Tool Permissions</span>
+</a>
+<a class="flex items-center px-4 py-3 text-[#a0a5b1] hover:bg-[#1e232d] hover:text-[#e5e5e5] transition-colors border-l-2 border-transparent" href="#">
+<span class="font-body-sm text-body-sm">Approval Rules</span>
+</a>
+<a class="flex items-center px-4 py-3 text-[#a0a5b1] hover:bg-[#1e232d] hover:text-[#e5e5e5] transition-colors border-l-2 border-transparent" href="#">
+<span class="font-body-sm text-body-sm">Tier Configuration</span>
+</a>
+<a class="flex items-center px-4 py-3 text-[#a0a5b1] hover:bg-[#1e232d] hover:text-[#e5e5e5] transition-colors border-l-2 border-transparent" href="#">
+<span class="font-body-sm text-body-sm">Audit Log Settings</span>
+</a>
+</nav>
+</div>
+<!-- Policy Overview Canvas -->
+<div class="flex-1 flex flex-col overflow-y-auto relative">
+<!-- Header -->
+<header class="flex justify-between items-start p-8 border-b border-[#2a2f3a] bg-[#12141a]">
+<div>
+<div class="flex items-center gap-3 mb-2">
+<h1 class="font-headline-lg text-headline-lg text-[#e5e5e5]">demo-policy v2.1</h1>
+<span class="px-2 py-0.5 bg-[#00e5ff] bg-opacity-10 text-[#00e5ff] border border-[#00e5ff] border-opacity-30 rounded font-label-sm text-label-sm uppercase tracking-wider">Active</span>
+</div>
+<div class="flex items-center gap-4 text-[#a0a5b1] font-mono text-mono">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">commit</span>
+<span>a8f9b2c4e</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">update</span>
+<span>Last updated: 10 mins ago by Admin</span>
+</div>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 border border-[#2a2f3a] text-[#e5e5e5] bg-[#1a1d24] hover:bg-[#222730] transition-colors font-body-sm text-body-sm rounded shadow-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">history</span>
+                        Revert
+                    </button>
+<button class="px-4 py-2 bg-[#00e5ff] text-black hover:bg-[#33ebff] transition-colors font-label-md text-label-md rounded shadow-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">save</span>
+                        Save Changes
+                    </button>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="p-8 max-w-4xl space-y-6">
+<!-- Section 1: Platform Baseline -->
+<div class="border border-[#2a2f3a] rounded bg-[#15181e] overflow-hidden">
+<div class="px-6 py-4 border-b border-[#2a2f3a] bg-[#1a1d24] flex justify-between items-center cursor-pointer">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#a0a5b1]">policy</span>
+<h3 class="font-headline-md text-[16px] text-[#e5e5e5]">Platform Baseline</h3>
+</div>
+<div class="flex items-center gap-3">
+<span class="px-2 py-1 bg-[#2a2f3a] text-[#a0a5b1] font-label-sm text-label-sm rounded flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">lock</span> Locked
+                            </span>
+<span class="material-symbols-outlined text-[#a0a5b1] transition-transform rotate-180">expand_more</span>
+</div>
+</div>
+<div class="p-6 space-y-4 opacity-70 pointer-events-none">
+<div class="flex items-start gap-4 pb-4 border-b border-[#2a2f3a]">
+<div class="mt-1">
+<span class="material-symbols-outlined text-[#ba1a1a]">block</span>
+</div>
+<div>
+<h4 class="font-body-md text-body-md font-medium text-[#e5e5e5] mb-1">Default Deny High-Impact Actions</h4>
+<p class="font-body-sm text-body-sm text-[#a0a5b1]">System-level block on all financial, destructive, or bulk-email operations unless explicitly permitted by a higher-tier rule.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="mt-1">
+<span class="material-symbols-outlined text-[#ba1a1a]">do_not_disturb</span>
+</div>
+<div>
+<h4 class="font-body-md text-body-md font-medium text-[#e5e5e5] mb-1">Block Shell Pipes &amp; Redirection</h4>
+<p class="font-body-sm text-body-sm text-[#a0a5b1] font-jetbrains bg-[#1a1d24] p-1 rounded inline-block mt-1">| , &gt; , &gt;&gt; , &amp;</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Section 2: Workspace Policy -->
+<div class="border border-[#2a2f3a] rounded bg-[#15181e] overflow-hidden">
+<div class="px-6 py-4 border-b border-[#2a2f3a] bg-[#1a1d24] flex justify-between items-center cursor-pointer">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#e5e5e5]">domain</span>
+<h3 class="font-headline-md text-[16px] text-[#e5e5e5]">Workspace Policy</h3>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#a0a5b1] transition-transform rotate-180">expand_more</span>
+</div>
+</div>
+<div class="p-6 space-y-6">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div>
+<label class="block font-label-md text-label-md text-[#a0a5b1] mb-2 uppercase">Approved Domains</label>
+<textarea class="w-full bg-[#0f1115] border border-[#2a2f3a] rounded p-3 text-[#e5e5e5] font-mono text-mono focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] outline-none transition-all min-h-[80px] resize-none">*.internal.acme.com
+github.com/acme-corp/*
+api.stripe.com</textarea>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-[#a0a5b1] mb-2 uppercase">Global Payment Limit</label>
+<div class="relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#a0a5b1] font-mono">$</span>
+<input class="w-full bg-[#0f1115] border border-[#2a2f3a] rounded p-3 pl-8 text-[#e5e5e5] font-mono text-mono focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] outline-none transition-all" type="number" value="200"/>
+</div>
+<p class="mt-2 font-body-sm text-body-sm text-[#a0a5b1]">Maximum amount per transaction across all agents.</p>
+</div>
+</div>
+<div class="pt-4 border-t border-[#2a2f3a] flex items-center justify-between">
+<div>
+<h4 class="font-body-md text-body-md font-medium text-[#e5e5e5]">Require Approval for all <span class="font-mono text-[#00e5ff]">payment.execute</span></h4>
+<p class="font-body-sm text-body-sm text-[#a0a5b1]">Forces human-in-the-loop review for any payment execution, regardless of amount.</p>
+</div>
+<!-- Toggle -->
+<div class="relative inline-block w-12 h-6 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 checked:right-0 checked:border-[#00e5ff] border-[#2a2f3a] transition-all duration-300" id="toggle1" name="toggle" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-[#2a2f3a] cursor-pointer transition-colors duration-300" for="toggle1"></label>
+</div>
+</div>
+</div>
+</div>
+<!-- Section 3: Agent Policy -->
+<div class="border border-[#2a2f3a] rounded bg-[#15181e] overflow-hidden">
+<div class="px-6 py-4 border-b border-[#2a2f3a] bg-[#1a1d24] flex justify-between items-center cursor-pointer">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#e5e5e5]">smart_toy</span>
+<h3 class="font-headline-md text-[16px] text-[#e5e5e5]">Agent Policy: ADK Demo Agent</h3>
+</div>
+<div class="flex items-center gap-3">
+<span class="px-2 py-0.5 bg-[#1e232d] text-[#e5e5e5] font-mono text-[11px] rounded border border-[#2a2f3a]">agent_id: adk-77a9</span>
+<span class="material-symbols-outlined text-[#a0a5b1] transition-transform rotate-180">expand_more</span>
+</div>
+</div>
+<div class="p-0">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-[#1a1d24] border-b border-[#2a2f3a] font-label-md text-label-md text-[#a0a5b1] uppercase">
+<th class="py-3 px-6 font-medium">Integration / Tool</th>
+<th class="py-3 px-6 font-medium w-48">Permission State</th>
+<th class="py-3 px-6 font-medium w-24 text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm">
+<!-- Row 1 -->
+<tr class="border-b border-[#2a2f3a] hover:bg-[#1a1d24] transition-colors group">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#a0a5b1]">terminal</span>
+<div>
+<div class="text-[#e5e5e5] font-medium">Local Shell Access</div>
+<div class="text-[#a0a5b1] font-mono text-[11px]">system.shell.execute</div>
+</div>
+</div>
+</td>
+<td class="py-4 px-6">
+<select class="bg-[#0f1115] border border-[#2a2f3a] text-[#22c55e] text-sm rounded focus:ring-[#00e5ff] focus:border-[#00e5ff] block w-full p-2 appearance-none outline-none font-medium">
+<option selected="" value="allow">ALLOWED</option>
+<option value="deny">DENY</option>
+<option value="req_app">REQ APPROVAL</option>
+</select>
+</td>
+<td class="py-4 px-6 text-right">
+<button class="text-[#a0a5b1] hover:text-[#e5e5e5] opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="border-b border-[#2a2f3a] hover:bg-[#1a1d24] transition-colors group">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#a0a5b1]">mail</span>
+<div>
+<div class="text-[#e5e5e5] font-medium">Gmail API</div>
+<div class="text-[#a0a5b1] font-mono text-[11px]">google.workspace.gmail.*</div>
+</div>
+</div>
+</td>
+<td class="py-4 px-6">
+<select class="bg-[#0f1115] border border-[#2a2f3a] text-[#f59e0b] text-sm rounded focus:ring-[#00e5ff] focus:border-[#00e5ff] block w-full p-2 appearance-none outline-none font-medium">
+<option value="allow">ALLOWED</option>
+<option value="deny">DENY</option>
+<option selected="" value="req_app">REQ APPROVAL</option>
+</select>
+</td>
+<td class="py-4 px-6 text-right">
+<button class="text-[#a0a5b1] hover:text-[#e5e5e5] opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-[#1a1d24] transition-colors group">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#a0a5b1]">calendar_today</span>
+<div>
+<div class="text-[#e5e5e5] font-medium">Google Calendar</div>
+<div class="text-[#a0a5b1] font-mono text-[11px]">google.workspace.calendar.*</div>
+</div>
+</div>
+</td>
+<td class="py-4 px-6">
+<select class="bg-[#0f1115] border border-[#2a2f3a] text-[#22c55e] text-sm rounded focus:ring-[#00e5ff] focus:border-[#00e5ff] block w-full p-2 appearance-none outline-none font-medium">
+<option selected="" value="allow">ALLOWED</option>
+<option value="deny">DENY</option>
+<option value="req_app">REQ APPROVAL</option>
+</select>
+</td>
+<td class="py-4 px-6 text-right">
+<button class="text-[#a0a5b1] hover:text-[#e5e5e5] opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="p-4 border-t border-[#2a2f3a] bg-[#1a1d24] flex justify-center">
+<button class="text-[#00e5ff] hover:text-[#33ebff] font-label-md text-label-md flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-[16px]">add</span>
+                                Add Integration Override
+                            </button>
+</div>
+</div>
+</div>
+<!-- Spacer for scrolling -->
+<div class="h-12"></div>
+</div>
+</div>
+</main>
+</body></html>

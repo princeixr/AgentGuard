@@ -13,7 +13,7 @@ docker-logs:
 	docker compose logs -f
 
 adk-agent:
-	uv run --project google-adk-personal-agent adk web --port 8001 google-adk-personal-agent/src
+	uv run --project google-adk-personal-agent adk web --port 8001 google-adk-personal-agent/src/personal_agent
 	# http://127.0.0.1:8001/dev-ui/?app=personal_agent
 test: test-product test-dashboard
 
