@@ -12,6 +12,8 @@ from agentguard_sdk import (
     OutcomeReport,
     ToolProposal,
     TurnStart,
+    administrator_rejection_message,
+    agent_facing_enforcement_message,
 )
 
 from personal_agent.settings import settings
@@ -85,8 +87,8 @@ class AgentGuardAdkInterceptor:
             )
         )
         self._decision_by_call[call_id] = (decision.decision_id, started)
+        approval = None
         if decision.decision == "require_approval" and settings.enforce_approval:
-            approval = None
             if decision.approval_request_id:
                 try:
                     approval = self.client.wait_for_approval(
@@ -101,19 +103,28 @@ class AgentGuardAdkInterceptor:
 
         should_stop = decision.decision in {"block", "require_approval"}
         if should_stop:
+            rejected = approval is not None and approval.status == "rejected"
+            agent_message = (
+                administrator_rejection_message()
+                if rejected
+                else agent_facing_enforcement_message(
+                    decision.decision,
+                    decision.matched_rules,
+                )
+            )
             self.client.report_outcome(
                 OutcomeReport(
                     decision_id=decision.decision_id,
                     call_id=call_id,
                     status="blocked",
-                    output_summary=decision.explanation,
+                    output_summary=agent_message,
                 )
             )
             return {
                 "blocked_by_agentguard": True,
-                "approval_required": decision.decision == "require_approval",
-                "decision": decision.decision,
-                "explanation": decision.explanation,
+                "approval_required": decision.decision == "require_approval" and not rejected,
+                "decision": "block" if rejected else decision.decision,
+                "explanation": agent_message,
                 "trace_id": decision.trace_id,
             }
         return None

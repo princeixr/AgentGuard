@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 import { api } from "../../api/client";
 import type {
@@ -19,6 +20,8 @@ import type {
 import { useProductionAgent } from "../../api/useProductionAgent";
 import { EmptyState, ErrorState, LoadingState } from "../../components/States";
 import { StatusChip } from "../../components/StatusChip";
+
+const DETAIL_DISCLOSURE_GROUP = "live-interception-detail";
 
 export function LivePage() {
   const queryClient = useQueryClient();
@@ -154,13 +157,6 @@ export function LivePage() {
                 sourceStep={session.data.steps[0]}
                 userQuery={session.data.session.user_intent}
               />
-              <IntentContractContext
-                key={`contract-${session.data.session.session_id}`}
-                policy={policy.data}
-                sessionId={session.data.session.session_id}
-                sourceStep={session.data.steps[0]}
-                userQuery={session.data.session.user_intent}
-              />
             </>
           )}
 
@@ -234,13 +230,23 @@ export function LivePage() {
           </section>
 
           {selectedStep && (
-            <InterceptionDetail
-              approval={approvalByTrace.get(selectedStep.trace_id)}
-              evidenceLoading={selectedDetail.isLoading}
-              precedents={selectedDetail.data?.precedents ?? []}
-              step={selectedStep}
-              userIntent={session.data.session.user_intent}
-            />
+            <div className="live-detail-column">
+              <InterceptionDetail
+                approval={approvalByTrace.get(selectedStep.trace_id)}
+                evidenceLoading={selectedDetail.isLoading}
+                intentContractDisclosure={policy.data ? (
+                  <IntentContractContext
+                    key={`contract-${session.data.session.session_id}`}
+                    policy={policy.data}
+                    sessionId={session.data.session.session_id}
+                    sourceStep={session.data.steps[0]}
+                    userQuery={session.data.session.user_intent}
+                  />
+                ) : undefined}
+                precedents={selectedDetail.data?.precedents ?? []}
+                step={selectedStep}
+              />
+            </div>
           )}
         </section>
       ) : (
@@ -308,37 +314,42 @@ export const IntentContractContext = memo(function IntentContractContext({
   );
 
   return (
-    <section className="session-context intent-contract-context" aria-label="Intent Contract">
-      <article className="card intent-contract-card">
-        <div className="intent-contract-header">
-          <div>
-            <div className="eyebrow">Intent Contract</div>
-            <p>Effective capabilities and operations for this session.</p>
-          </div>
+    <details
+      aria-label="Intent Contract"
+      className="detail-disclosure intent-contract-card"
+      name={DETAIL_DISCLOSURE_GROUP}
+    >
+      <summary>
+        <span>
+          <span className="eyebrow">Intent Contract</span>
+          <small>Effective capabilities and operations for this session.</small>
+        </span>
+        <span className="intent-contract-summary-meta">
           <code>{snapshot.extractor}</code>
-        </div>
-        <div className="contract-columns">
-          <ContractColumn
-            emptyLabel="No explicit allowed capabilities"
-            items={snapshot.allowed}
-            label="Allowed"
-            tone="allowed"
-          />
-          <ContractColumn
-            emptyLabel="No approval-gated capabilities"
-            items={snapshot.requiresApproval}
-            label="Requires Approval"
-            tone="approval"
-          />
-          <ContractColumn
-            emptyLabel="No explicit forbidden capabilities"
-            items={snapshot.forbidden}
-            label="Forbidden"
-            tone="forbidden"
-          />
-        </div>
-      </article>
-    </section>
+          <ChevronDown size={16} />
+        </span>
+      </summary>
+      <div className="contract-rows">
+        <ContractColumn
+          emptyLabel="No explicit allowed capabilities"
+          items={snapshot.allowed}
+          label="Allowed"
+          tone="allowed"
+        />
+        <ContractColumn
+          emptyLabel="No approval-gated capabilities"
+          items={snapshot.requiresApproval}
+          label="Requires Approval"
+          tone="approval"
+        />
+        <ContractColumn
+          emptyLabel="No explicit forbidden capabilities"
+          items={snapshot.forbidden}
+          label="Forbidden"
+          tone="forbidden"
+        />
+      </div>
+    </details>
   );
 }, (previous, next) => previous.sessionId === next.sessionId);
 
@@ -432,32 +443,27 @@ function ApprovalBanner({
 export function InterceptionDetail({
   approval,
   evidenceLoading,
+  intentContractDisclosure,
   precedents,
   step,
-  userIntent,
 }: {
   approval?: PendingApproval;
   evidenceLoading: boolean;
+  intentContractDisclosure?: ReactNode;
   precedents: PrecedentSummary[];
   step: ReplayStep;
-  userIntent: string;
 }) {
   const evaluation = step.guard_evaluation;
   const verdict = displayVerdict(step, approval);
   const tone = decisionTone(step, approval);
-  const intentContract = asRecord(evaluation?.intent_contract);
   const authorization = asRecord(evaluation?.intent_authorization);
   const normalizedAction = asRecord(evaluation?.normalized_action);
   const attemptedTone = intentGapTone(authorization);
-  const requestedText =
-    stringValue(intentContract?.raw_user_request) ||
-    approval?.user_request ||
-    userIntent;
   const enforcedBy =
     stringValue(asRecord(evaluation?.combined_decision)?.enforced_by) ||
     evaluation?.enforced_by ||
     "firewall_v2";
-  const evaluator = `${evaluation?.firewall_version ?? "agentguard_firewall_v2"} · ${enforcedBy}`;
+  const evaluator = enforcedBy;
   const fallbackUsed = enforcedBy.includes("fallback");
   const tierTwo = evaluation?.tier_results.find(
     (tier) => stringValue(tier.tier) === "tier_2",
@@ -483,26 +489,9 @@ export function InterceptionDetail({
       </section>
 
       <section className="intent-action-section">
-        <div className="intent-action-card intent-requested">
-          <div className="intent-action-heading">
-            <span className="eyebrow">User requested</span>
-            <StatusChip
-              label={authorizationScopeLabel(authorization)}
-              value={stringValue(authorization?.recommendation) || "allow"}
-            />
-          </div>
-          <blockquote>“{requestedText || "User request unavailable."}”</blockquote>
-          <ScopeList contract={intentContract} />
-        </div>
         <div className={`intent-action-card intent-attempted intent-attempted-${attemptedTone}`}>
           <div className="intent-action-heading">
             <span className="eyebrow">Agent attempted</span>
-            {attemptedTone !== "allow" && (
-              <StatusChip
-                label={attemptedTone === "block" ? "scope violation" : "scope uncertain"}
-                value={attemptedTone}
-              />
-            )}
           </div>
           <div className="attempted-action">
             <code>{step.tool_name}</code>
@@ -526,7 +515,7 @@ export function InterceptionDetail({
         </p>
       </section>
 
-      <details className="detail-disclosure">
+      <details className="detail-disclosure" name={DETAIL_DISCLOSURE_GROUP}>
         <summary>
           <span>
             <span className="eyebrow">Evidence / precedent</span>
@@ -575,10 +564,7 @@ export function InterceptionDetail({
         label="Raw call payload"
         payload={step.arguments}
       />
-      <TechnicalDisclosure
-        label="Normalized action"
-        payload={evaluation?.normalized_action ?? {}}
-      />
+      {intentContractDisclosure}
     </aside>
   );
 }
@@ -591,7 +577,10 @@ function TechnicalDisclosure({
   payload: unknown;
 }) {
   return (
-    <details className="detail-disclosure technical-disclosure">
+    <details
+      className="detail-disclosure technical-disclosure"
+      name={DETAIL_DISCLOSURE_GROUP}
+    >
       <summary>
         <span className="eyebrow">{label}</span>
         <ChevronDown size={16} />
@@ -600,22 +589,6 @@ function TechnicalDisclosure({
         <pre className="json">{JSON.stringify(payload, null, 2)}</pre>
       </div>
     </details>
-  );
-}
-
-function ScopeList({ contract }: { contract: Record<string, unknown> | null }) {
-  const capabilities = stringArray(contract?.requested_capabilities);
-  const resources = stringArray(contract?.permitted_resources);
-  if (!capabilities.length && !resources.length) return null;
-  return (
-    <div className="scope-list">
-      {capabilities.map((capability) => (
-        <span className="tag" key={capability}>{capability}</span>
-      ))}
-      {resources.map((resource) => (
-        <span className="tag mono" key={resource}>{resource}</span>
-      ))}
-    </div>
   );
 }
 
@@ -663,13 +636,6 @@ function intentGapTone(authorization: Record<string, unknown> | null) {
   if (hasHardViolation || recommendation === "block") return "block";
   if (recommendation === "require_approval") return "approval";
   return "allow";
-}
-
-function authorizationScopeLabel(authorization: Record<string, unknown> | null) {
-  const recommendation = stringValue(authorization?.recommendation);
-  if (recommendation === "block") return "outside scope";
-  if (recommendation === "require_approval") return "scope uncertain";
-  return "within scope";
 }
 
 function actionSummary(

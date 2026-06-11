@@ -156,16 +156,21 @@ describe("InterceptionDetail", () => {
         evidenceLoading={false}
         precedents={[]}
         step={approvalStep}
-        userIntent="List files in Downloads."
       />,
     );
 
     expect(
       screen.getByRole("heading", { name: "require approval" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("User requested")).toBeInTheDocument();
+    expect(container.querySelector(".verdict-evaluator"))
+      .toHaveTextContent("combiner_low_confidence_fallback");
+    expect(screen.queryByText(/agentguard_firewall_v2/)).not.toBeInTheDocument();
+    expect(screen.queryByText("User requested")).not.toBeInTheDocument();
     expect(screen.getByText("Agent attempted")).toBeInTheDocument();
-    expect(screen.getByText("scope violation")).toBeInTheDocument();
+    expect(screen.queryByText("scope violation")).not.toBeInTheDocument();
+    expect(screen.queryByText("within scope")).not.toBeInTheDocument();
+    expect(container.querySelector(".intent-action-section"))
+      .toBeInTheDocument();
     expect(
       screen.getByText(/No explicit enforcing rule produced this verdict/),
     ).toBeInTheDocument();
@@ -174,9 +179,10 @@ describe("InterceptionDetail", () => {
     ).toBeInTheDocument();
 
     const disclosures = container.querySelectorAll("details");
-    expect(disclosures).toHaveLength(3);
+    expect(disclosures).toHaveLength(2);
     disclosures.forEach((disclosure) => {
       expect(disclosure).not.toHaveAttribute("open");
+      expect(disclosure).toHaveAttribute("name", "live-interception-detail");
     });
   });
 
@@ -187,7 +193,6 @@ describe("InterceptionDetail", () => {
         evidenceLoading={false}
         precedents={[]}
         step={approvalStep}
-        userIntent="List files in Downloads."
       />,
     );
 
@@ -226,6 +231,10 @@ describe("SessionContext", () => {
     expect(context.getByText("filesystem.write")).toBeInTheDocument();
     expect(context.getAllByText("filesystem.delete")).toHaveLength(1);
     expect(context.getByText("SCOPE_DEFINED")).toBeInTheDocument();
+    const contract = context.getByLabelText("Intent Contract");
+    expect(contract).not.toHaveAttribute("open");
+    expect(contract).toHaveAttribute("name", "live-interception-detail");
+    expect(contract?.querySelector(".contract-rows")).toBeInTheDocument();
 
     const changedStep = {
       ...approvalStep,
