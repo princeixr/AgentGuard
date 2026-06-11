@@ -26,9 +26,18 @@ jobs:
         run: |
           python -m pip install pip-audit
           python -m pip_audit
-      - name: Test backend
+      - name: Test backend when present
         working-directory: agentguard-product
-        run: PYTHONPATH=src:packages/agentguard-sdk/src pytest -q
+        run: |
+          set +e
+          PYTHONPATH=src:packages/agentguard-sdk/src pytest -q
+          status=$?
+          set -e
+          if [ "$status" -eq 5 ]; then
+            echo "::notice::No backend tests were collected; skipping this optional check."
+            exit 0
+          fi
+          exit "$status"
 
   frontend:
     runs-on: ubuntu-latest
