@@ -2,7 +2,11 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { AgentPolicy, ReplayStep } from "../../api/types";
-import { InterceptionDetail, SessionContext } from "./LivePage";
+import {
+  IntentContractContext,
+  InterceptionDetail,
+  SessionQueryContext,
+} from "./LivePage";
 
 const approvalStep: ReplayStep = {
   trace_id: "trace-1",
@@ -153,13 +157,22 @@ describe("InterceptionDetail", () => {
 describe("SessionContext", () => {
   it("stays frozen for one session and regenerates for a new session", () => {
     const { container, rerender } = render(
-      <SessionContext
-        key="session-1"
-        policy={policy}
-        sessionId="session-1"
-        sourceStep={approvalStep}
-        userQuery="List files in Downloads."
-      />,
+      <>
+        <SessionQueryContext
+          key="query-session-1"
+          policy={policy}
+          sessionId="session-1"
+          sourceStep={approvalStep}
+          userQuery="List files in Downloads."
+        />
+        <IntentContractContext
+          key="contract-session-1"
+          policy={policy}
+          sessionId="session-1"
+          sourceStep={approvalStep}
+          userQuery="List files in Downloads."
+        />
+      </>,
     );
     const context = within(container);
 
@@ -181,25 +194,43 @@ describe("SessionContext", () => {
       },
     };
     rerender(
-      <SessionContext
-        key="session-1"
-        policy={policy}
-        sessionId="session-1"
-        sourceStep={changedStep}
-        userQuery="Changed trace data"
-      />,
+      <>
+        <SessionQueryContext
+          key="query-session-1"
+          policy={policy}
+          sessionId="session-1"
+          sourceStep={changedStep}
+          userQuery="Changed trace data"
+        />
+        <IntentContractContext
+          key="contract-session-1"
+          policy={policy}
+          sessionId="session-1"
+          sourceStep={changedStep}
+          userQuery="Changed trace data"
+        />
+      </>,
     );
     expect(context.queryByText("Changed trace data", { exact: false }))
       .not.toBeInTheDocument();
 
     rerender(
-      <SessionContext
-        key="session-2"
-        policy={policy}
-        sessionId="session-2"
-        sourceStep={changedStep}
-        userQuery="Changed trace data"
-      />,
+      <>
+        <SessionQueryContext
+          key="query-session-2"
+          policy={policy}
+          sessionId="session-2"
+          sourceStep={changedStep}
+          userQuery="Changed trace data"
+        />
+        <IntentContractContext
+          key="contract-session-2"
+          policy={policy}
+          sessionId="session-2"
+          sourceStep={changedStep}
+          userQuery="Changed trace data"
+        />
+      </>,
     );
     expect(context.getByText("Changed trace data", { exact: false }))
       .toBeInTheDocument();

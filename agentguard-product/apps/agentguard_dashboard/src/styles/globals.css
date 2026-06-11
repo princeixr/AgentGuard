@@ -558,17 +558,34 @@ pre,
   50% { opacity: 0.35; }
 }
 
-.live-main-column {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 24px;
+.live-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(440px, 0.85fr);
+  grid-template-areas:
+    "query contract"
+    "feed verdict";
+  gap: 16px;
+  align-items: start;
 }
 
 .session-context {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 12px;
+}
+
+.session-query-context {
+  grid-area: query;
+  align-self: stretch;
+}
+
+.intent-contract-context {
+  grid-area: contract;
+}
+
+.session-query-context .session-query-card {
+  flex: 1;
 }
 
 .section-heading,
@@ -637,6 +654,7 @@ pre,
 
 .intent-contract-card {
   overflow: hidden;
+  max-height: 300px;
 }
 
 .intent-contract-header {
@@ -664,6 +682,11 @@ pre,
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   background: var(--border);
+}
+
+.intent-contract-card .contract-columns {
+  max-height: 228px;
+  overflow: auto;
 }
 
 .contract-column {
@@ -750,7 +773,9 @@ pre,
 }
 
 .live-feed-section {
+  grid-area: feed;
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 12px;
 }
@@ -993,6 +1018,7 @@ pre,
 }
 
 .detail-panel {
+  grid-area: verdict;
   position: sticky;
   top: 0;
   max-height: calc(100vh - 112px);
@@ -1456,8 +1482,17 @@ pre,
   }
 
   .stats-grid,
-  .detail-grid {
+  .detail-grid,
+  .live-workspace-grid {
     grid-template-columns: 1fr;
+  }
+
+  .live-workspace-grid {
+    grid-template-areas:
+      "query"
+      "contract"
+      "feed"
+      "verdict";
   }
 
   .detail-panel {

@@ -138,85 +138,92 @@ export function LivePage() {
       {session.isLoading ? (
         <div className="card"><LoadingState label="Loading live traces" /></div>
       ) : session.data?.steps.length ? (
-        <section className="detail-grid">
-          <div className="live-main-column">
-            {policy.data && (
-              <SessionContext
+        <section className="live-workspace-grid">
+          {policy.data && (
+            <>
+              <SessionQueryContext
                 key={session.data.session.session_id}
                 policy={policy.data}
                 sessionId={session.data.session.session_id}
                 sourceStep={session.data.steps[0]}
                 userQuery={session.data.session.user_intent}
               />
+              <IntentContractContext
+                key={`contract-${session.data.session.session_id}`}
+                policy={policy.data}
+                sessionId={session.data.session.session_id}
+                sourceStep={session.data.steps[0]}
+                userQuery={session.data.session.user_intent}
+              />
+            </>
+          )}
+
+          <section className="live-feed-section">
+            <div className="row-between live-feed-heading">
+              <h2>Live Trace Feed</h2>
+              <span className="mono">
+                {session.data.steps.length} recorded calls
+              </span>
+            </div>
+
+            {pending.length > 0 && (
+              <ApprovalBanner
+                approval={pending[0]}
+                pendingCount={pending.length}
+                onFocus={() => setSelectedTraceId(pending[0].trace_id)}
+              />
             )}
 
-            <section className="live-feed-section">
-              <div className="row-between live-feed-heading">
-                <h2>Live Trace Feed</h2>
-                <span className="mono">
-                  {session.data.steps.length} recorded calls
-                </span>
-              </div>
-
-              {pending.length > 0 && (
-                <ApprovalBanner
-                  approval={pending[0]}
-                  pendingCount={pending.length}
-                  onFocus={() => setSelectedTraceId(pending[0].trace_id)}
-                />
-              )}
-
-              <div className="feed timeline-feed">
-                {session.data.steps
-                  .slice()
-                  .reverse()
-                  .map((step, index) => (
-                    <div
+            <div className="feed timeline-feed">
+              {session.data.steps
+                .slice()
+                .reverse()
+                .map((step, index) => (
+                  <div
+                    className={[
+                      "timeline-entry",
+                      `timeline-entry-${decisionTone(step)}`,
+                      index === 0 ? "timeline-entry-newest" : "",
+                    ].filter(Boolean).join(" ")}
+                    key={step.trace_id}
+                  >
+                    <span className="timeline-dot" aria-hidden="true" />
+                    <button
+                      aria-pressed={selectedStep?.trace_id === step.trace_id}
                       className={[
-                        "timeline-entry",
-                        `timeline-entry-${decisionTone(step)}`,
-                        index === 0 ? "timeline-entry-newest" : "",
+                        "feed-row",
+                        `feed-row-${decisionTone(step)}`,
+                        pendingTraceIds.has(step.trace_id) ? "feed-row-paused" : "",
+                        selectedStep?.trace_id === step.trace_id ? "feed-row-selected" : "",
                       ].filter(Boolean).join(" ")}
-                      key={step.trace_id}
+                      onClick={() => setSelectedTraceId(step.trace_id)}
+                      type="button"
                     >
-                      <span className="timeline-dot" aria-hidden="true" />
-                      <button
-                        aria-pressed={selectedStep?.trace_id === step.trace_id}
-                        className={[
-                          "feed-row",
-                          `feed-row-${decisionTone(step)}`,
-                          pendingTraceIds.has(step.trace_id) ? "feed-row-paused" : "",
-                          selectedStep?.trace_id === step.trace_id ? "feed-row-selected" : "",
-                        ].filter(Boolean).join(" ")}
-                        onClick={() => setSelectedTraceId(step.trace_id)}
-                        type="button"
-                      >
-                        <div className="feed-tool">
-                          <code>{step.tool_name}</code>
-                          {pendingTraceIds.has(step.trace_id) && (
-                            <span className="feed-pause-label">
-                              <ShieldAlert size={11} />
-                              Execution paused here
-                            </span>
-                          )}
-                        </div>
-                        <span className="feed-argument">
-                          {step.argument_summary}
-                        </span>
-                        <span className="mono feed-evaluator">
-                          {step.guard_evaluation?.combined_decision?.enforced_by?.toString() ??
-                            step.guard_evaluation?.enforced_by ??
-                            "firewall_v2"}
-                        </span>
-                        <StatusChip
-                          value={step.guard_evaluation?.recommendation ?? step.decision}
-                        />
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            </section>
-          </div>
+                      <div className="feed-tool">
+                        <code>{step.tool_name}</code>
+                        {pendingTraceIds.has(step.trace_id) && (
+                          <span className="feed-pause-label">
+                            <ShieldAlert size={11} />
+                            Execution paused here
+                          </span>
+                        )}
+                      </div>
+                      <span className="feed-argument">
+                        {step.argument_summary}
+                      </span>
+                      <span className="mono feed-evaluator">
+                        {step.guard_evaluation?.combined_decision?.enforced_by?.toString() ??
+                          step.guard_evaluation?.enforced_by ??
+                          "firewall_v2"}
+                      </span>
+                      <StatusChip
+                        value={step.guard_evaluation?.recommendation ?? step.decision}
+                      />
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </section>
 
           {selectedStep && (
             <InterceptionDetail
@@ -247,7 +254,7 @@ interface SessionContextProps {
   userQuery: string;
 }
 
-export const SessionContext = memo(function SessionContext({
+export const SessionQueryContext = memo(function SessionQueryContext({
   policy,
   sourceStep,
   userQuery,
@@ -259,7 +266,7 @@ export const SessionContext = memo(function SessionContext({
   );
 
   return (
-    <section className="session-context" aria-label="Session Context">
+    <section className="session-context session-query-context" aria-label="Session Context">
       <div className="section-heading">
         <div>
           <div className="eyebrow">Session Context</div>
@@ -277,7 +284,23 @@ export const SessionContext = memo(function SessionContext({
         <div className="eyebrow">User Query</div>
         <blockquote>“{snapshot.userQuery}”</blockquote>
       </article>
+    </section>
+  );
+}, (previous, next) => previous.sessionId === next.sessionId);
 
+export const IntentContractContext = memo(function IntentContractContext({
+  policy,
+  sourceStep,
+  userQuery,
+}: SessionContextProps) {
+  const contract = asRecord(sourceStep.guard_evaluation?.intent_contract);
+  const snapshot = useMemo(
+    () => buildSessionContext(contract, policy, userQuery),
+    [],
+  );
+
+  return (
+    <section className="session-context intent-contract-context" aria-label="Intent Contract">
       <article className="card intent-contract-card">
         <div className="intent-contract-header">
           <div>
