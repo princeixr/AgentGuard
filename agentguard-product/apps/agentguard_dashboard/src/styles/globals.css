@@ -560,7 +560,7 @@ pre,
 
 .live-workspace-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(440px, 0.85fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.85fr);
   grid-template-areas:
     "query contract"
     "feed verdict";
@@ -934,7 +934,7 @@ pre,
 
 .feed-row {
   display: grid;
-  grid-template-columns: minmax(180px, 0.8fr) minmax(250px, 1.5fr) auto auto;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.5fr) auto auto;
   align-items: center;
   gap: 18px;
   border: 1px solid var(--border);
@@ -995,8 +995,12 @@ pre,
 }
 
 .feed-evaluator {
+  overflow: hidden;
+  min-width: 0;
   color: var(--text-muted);
   font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .feed-pause-label {
@@ -1461,6 +1465,41 @@ pre,
   font-size: 12px;
 }
 
+@media (max-width: 1280px) and (min-width: 901px) {
+  .live-workspace-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
+  }
+
+  .feed-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    gap: 5px 12px;
+  }
+
+  .feed-tool {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .feed-argument {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .feed-evaluator {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: end;
+  }
+
+  .feed-row > .status-chip {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-self: end;
+  }
+}
+
 @media (max-width: 900px) {
   :root {
     --sidebar-width: 72px;
@@ -1509,8 +1548,30 @@ pre,
   }
 
   .feed-row {
-    grid-template-columns: 1fr;
-    gap: 7px;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 5px 10px;
+  }
+
+  .feed-tool {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .feed-argument {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .feed-evaluator {
+    display: none;
+  }
+
+  .feed-row > .status-chip {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-self: end;
   }
 
   .contract-columns {
