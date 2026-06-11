@@ -111,6 +111,10 @@ def test_remote_interception_requires_approval_and_resolves(tmp_path, monkeypatc
         assert resolved.status_code == 200
         assert resolved.json()["status"] == "approved"
 
+        all_approvals = client.get("/api/v1/approvals?status=all")
+        assert all_approvals.status_code == 200
+        assert all_approvals.json()["items"][0]["status"] == "approved"
+
 
 def test_remote_runtime_recovers_step_and_intent_state_after_restart(
     tmp_path,

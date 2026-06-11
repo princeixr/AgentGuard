@@ -69,7 +69,7 @@ def list_approvals(
     status: str | None = Query(default="pending"),
     runtime: RemoteInterceptionService = Depends(get_remote_runtime),
 ) -> ApprovalListResponse:
-    return runtime.list_approvals(status=status)
+    return runtime.list_approvals(status=None if status == "all" else status)
 
 
 @router.get("/approvals/{approval_id}", response_model=PendingApproval)

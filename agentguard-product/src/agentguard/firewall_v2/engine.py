@@ -105,17 +105,20 @@ class AgentGuardFirewallV2:
             )
         )
         tier_results: list[TierResultV1] = [tier_1_result]
-        deterministic_block = tier_1_result.recommendation == "block"
+        deterministic_short_circuit = (
+            evaluation_plan.short_circuit_on_deterministic_decision
+            and tier_1_result.recommendation in {"require_approval", "block"}
+        )
         if (
             "tier_2" in evaluation_plan.required_tiers
-            and not deterministic_block
+            and not deterministic_short_circuit
         ):
             tier_results.append(
                 Tier2SemanticEvaluator().evaluate(trace, intent_contract)
             )
         if (
             "tier_3" in evaluation_plan.required_tiers
-            and not deterministic_block
+            and not deterministic_short_circuit
             and self.runtime_config.tier_3_enabled
         ):
             judge_input = build_judge_input(

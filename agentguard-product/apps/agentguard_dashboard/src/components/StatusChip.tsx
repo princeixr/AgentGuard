@@ -9,7 +9,9 @@ export function StatusChip({
 }) {
   const normalized = value.toLowerCase();
   const tone =
-    normalized === "allow" || normalized === "allowed" || normalized === "approved"
+    normalized === "approved"
+      ? "approved"
+      : normalized === "allow" || normalized === "allowed"
       ? "allow"
       : normalized === "block" ||
           normalized === "blocked" ||

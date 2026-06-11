@@ -113,7 +113,7 @@ export const api = {
         body: JSON.stringify({ action }),
       },
     ),
-  approvals: (status = "pending") =>
+  approvals: (status: PendingApproval["status"] | "all" = "pending") =>
     request<{ items: PendingApproval[] }>(
       `/api/v1/approvals?status=${encodeURIComponent(status)}`,
     ),

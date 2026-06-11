@@ -11,4 +11,12 @@ describe("StatusChip", () => {
       "status-approval",
     );
   });
+
+  it("renders approved as a distinct blue status", () => {
+    render(<StatusChip value="approved" />);
+    expect(screen.getByText("approved")).toHaveClass(
+      "status-chip",
+      "status-approved",
+    );
+  });
 });
