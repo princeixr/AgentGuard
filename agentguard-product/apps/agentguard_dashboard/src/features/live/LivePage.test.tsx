@@ -1,7 +1,11 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { AgentPolicy, ReplayStep } from "../../api/types";
+import type {
+  AgentPolicy,
+  PendingApproval,
+  ReplayStep,
+} from "../../api/types";
 import {
   IntentContractContext,
   InterceptionDetail,
@@ -122,6 +126,29 @@ const policy: AgentPolicy = {
   },
 };
 
+const approved: PendingApproval = {
+  approval_id: "approval-1",
+  decision_id: "decision-1",
+  trace_id: approvalStep.trace_id,
+  call_id: "call-1",
+  workspace_id: "workspace-1",
+  agent_id: "agent-1",
+  deployment_id: "deployment-1",
+  integration_id: "integration-1",
+  session_id: "session-1",
+  turn_id: "turn-1",
+  tool_name: approvalStep.tool_name,
+  arguments: approvalStep.arguments,
+  user_request: "List files in Downloads.",
+  explanation: "Approval is required.",
+  guard_evaluation: approvalStep.guard_evaluation,
+  status: "approved",
+  created_at: "2026-06-10T22:00:00Z",
+  resolved_at: "2026-06-10T22:00:05Z",
+  resolved_by: "operator",
+  note: null,
+};
+
 describe("InterceptionDetail", () => {
   it("presents the verdict and intent gap before collapsed technical payloads", () => {
     const { container } = render(
@@ -151,6 +178,23 @@ describe("InterceptionDetail", () => {
     disclosures.forEach((disclosure) => {
       expect(disclosure).not.toHaveAttribute("open");
     });
+  });
+
+  it("shows a resolved approval as an approved blue verdict", () => {
+    const { container } = render(
+      <InterceptionDetail
+        approval={approved}
+        evidenceLoading={false}
+        precedents={[]}
+        step={approvalStep}
+        userIntent="List files in Downloads."
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "approved" }),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".verdict-hero-approved")).toBeInTheDocument();
   });
 });
 

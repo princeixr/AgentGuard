@@ -38,8 +38,8 @@ export function LivePage() {
     refetchInterval: 3_000,
   });
   const approvals = useQuery({
-    queryKey: ["approvals", "pending"],
-    queryFn: () => api.approvals("pending"),
+    queryKey: ["approvals"],
+    queryFn: () => api.approvals("all"),
     refetchInterval: 2_000,
   });
   const policy = useQuery({
@@ -67,7 +67,12 @@ export function LivePage() {
     enabled: Boolean(agentId && sessionId),
     refetchInterval: 2_000,
   });
-  const pending = approvals.data?.items.filter((item) => item.agent_id === agentId) ?? [];
+  const agentApprovals =
+    approvals.data?.items.filter((item) => item.agent_id === agentId) ?? [];
+  const approvalByTrace = new Map(
+    agentApprovals.map((item) => [item.trace_id, item]),
+  );
+  const pending = agentApprovals.filter((item) => item.status === "pending");
   const pendingTraceIds = new Set(pending.map((item) => item.trace_id));
   const pendingStep = session.data?.steps
     .slice()
@@ -93,6 +98,7 @@ export function LivePage() {
       void queryClient.invalidateQueries({ queryKey: ["sessions", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["session", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["operations", agentId] });
+      void queryClient.invalidateQueries({ queryKey: ["approvals"] });
     };
     source.onopen = () => setConnected(true);
     source.onerror = () => setConnected(false);
@@ -178,56 +184,58 @@ export function LivePage() {
               {session.data.steps
                 .slice()
                 .reverse()
-                .map((step, index) => (
-                  <div
-                    className={[
-                      "timeline-entry",
-                      `timeline-entry-${decisionTone(step)}`,
-                      index === 0 ? "timeline-entry-newest" : "",
-                    ].filter(Boolean).join(" ")}
-                    key={step.trace_id}
-                  >
-                    <span className="timeline-dot" aria-hidden="true" />
-                    <button
-                      aria-pressed={selectedStep?.trace_id === step.trace_id}
+                .map((step, index) => {
+                  const approval = approvalByTrace.get(step.trace_id);
+                  const tone = decisionTone(step, approval);
+                  return (
+                    <div
                       className={[
-                        "feed-row",
-                        `feed-row-${decisionTone(step)}`,
-                        pendingTraceIds.has(step.trace_id) ? "feed-row-paused" : "",
-                        selectedStep?.trace_id === step.trace_id ? "feed-row-selected" : "",
+                        "timeline-entry",
+                        `timeline-entry-${tone}`,
+                        index === 0 ? "timeline-entry-newest" : "",
                       ].filter(Boolean).join(" ")}
-                      onClick={() => setSelectedTraceId(step.trace_id)}
-                      type="button"
+                      key={step.trace_id}
                     >
-                      <div className="feed-tool">
-                        <code>{step.tool_name}</code>
-                        {pendingTraceIds.has(step.trace_id) && (
-                          <span className="feed-pause-label">
-                            <ShieldAlert size={11} />
-                            Execution paused here
-                          </span>
-                        )}
-                      </div>
-                      <span className="feed-argument">
-                        {step.argument_summary}
-                      </span>
-                      <span className="mono feed-evaluator">
-                        {step.guard_evaluation?.combined_decision?.enforced_by?.toString() ??
-                          step.guard_evaluation?.enforced_by ??
-                          "firewall_v2"}
-                      </span>
-                      <StatusChip
-                        value={step.guard_evaluation?.recommendation ?? step.decision}
-                      />
-                    </button>
-                  </div>
-                ))}
+                      <span className="timeline-dot" aria-hidden="true" />
+                      <button
+                        aria-pressed={selectedStep?.trace_id === step.trace_id}
+                        className={[
+                          "feed-row",
+                          `feed-row-${tone}`,
+                          pendingTraceIds.has(step.trace_id) ? "feed-row-paused" : "",
+                          selectedStep?.trace_id === step.trace_id ? "feed-row-selected" : "",
+                        ].filter(Boolean).join(" ")}
+                        onClick={() => setSelectedTraceId(step.trace_id)}
+                        type="button"
+                      >
+                        <div className="feed-tool">
+                          <code>{step.tool_name}</code>
+                          {pendingTraceIds.has(step.trace_id) && (
+                            <span className="feed-pause-label">
+                              <ShieldAlert size={11} />
+                              Execution paused here
+                            </span>
+                          )}
+                        </div>
+                        <span className="feed-argument">
+                          {step.argument_summary}
+                        </span>
+                        <span className="mono feed-evaluator">
+                          {step.guard_evaluation?.combined_decision?.enforced_by?.toString() ??
+                            step.guard_evaluation?.enforced_by ??
+                            "firewall_v2"}
+                        </span>
+                        <StatusChip value={displayVerdict(step, approval)} />
+                      </button>
+                    </div>
+                  );
+                })}
             </div>
           </section>
 
           {selectedStep && (
             <InterceptionDetail
-              approval={pending.find((item) => item.trace_id === selectedStep.trace_id)}
+              approval={approvalByTrace.get(selectedStep.trace_id)}
               evidenceLoading={selectedDetail.isLoading}
               precedents={selectedDetail.data?.precedents ?? []}
               step={selectedStep}
@@ -435,8 +443,8 @@ export function InterceptionDetail({
   userIntent: string;
 }) {
   const evaluation = step.guard_evaluation;
-  const verdict = evaluation?.recommendation ?? step.decision;
-  const tone = decisionTone(step);
+  const verdict = displayVerdict(step, approval);
+  const tone = decisionTone(step, approval);
   const intentContract = asRecord(evaluation?.intent_contract);
   const authorization = asRecord(evaluation?.intent_authorization);
   const normalizedAction = asRecord(evaluation?.normalized_action);
@@ -630,9 +638,16 @@ function GapSignals({
   );
 }
 
-function decisionTone(step: ReplayStep) {
-  const decision = step.guard_evaluation?.recommendation ?? step.decision;
-  if (decision === "block") return "block";
+function displayVerdict(step: ReplayStep, approval?: PendingApproval) {
+  if (approval?.status === "approved") return "approved";
+  if (approval?.status === "rejected") return "rejected";
+  return step.guard_evaluation?.recommendation ?? step.decision;
+}
+
+function decisionTone(step: ReplayStep, approval?: PendingApproval) {
+  const decision = displayVerdict(step, approval);
+  if (decision === "approved") return "approved";
+  if (decision === "block" || decision === "rejected") return "block";
   if (decision === "require_approval" || decision === "review") return "approval";
   return "allow";
 }
