@@ -37,7 +37,7 @@ services:
     image: agentguard-api:prod
     restart: unless-stopped
     ports:
-      - "${AGENTGUARD_API_PORT:-8000}:8000"
+      - "${AGENTGUARD_API_PORT:-8001}:8000"
     environment:
       AGENTGUARD_ENV: production
       AGENTGUARD_API_KEY: ${AGENTGUARD_API_KEY:-}
@@ -77,7 +77,7 @@ services:
     image: agentguard-dashboard:prod
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "${AGENTGUARD_DASHBOARD_PORT:-3000}:80"
     depends_on:
       agentguard-api:
         condition: service_healthy
