@@ -9,6 +9,10 @@ from typing import Any
 from uuid import uuid4
 
 from agentguard_sdk.client import HttpAgentGuardClient
+from agentguard_sdk.messages import (
+    administrator_rejection_message,
+    agent_facing_enforcement_message,
+)
 from agentguard_sdk.models import (
     AgentRegistration,
     GuardCheck,
@@ -129,9 +133,27 @@ class AgentGuard:
                         "allowed": True,
                         "requires_approval": False,
                         "decision": "allow",
-                        "reason": "Approved by AgentGuard operator.",
+                        "reason": "Approved by your administrator.",
                     }
                 )
+            if approval.status == "rejected":
+                return result.model_copy(
+                    update={
+                        "allowed": False,
+                        "requires_approval": False,
+                        "decision": "block",
+                        "reason": administrator_rejection_message(),
+                    }
+                )
+        if result.decision in {"block", "require_approval"}:
+            return result.model_copy(
+                update={
+                    "reason": agent_facing_enforcement_message(
+                        result.decision,
+                        result.matched_rules,
+                    )
+                }
+            )
         return result
 
     def tool(
